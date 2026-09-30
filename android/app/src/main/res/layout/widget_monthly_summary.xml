@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:gravity="center"
+    android:background="@drawable/widget_bg"
+    android:padding="12dp">
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="本月支出"
+        android:textSize="11sp"
+        android:textColor="#8A918E" />
+
+    <TextView
+        android:id="@+id/widget_month_expense"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="¥0.00"
+        android:textSize="22sp"
+        android:textColor="#1C1F1E"
+        android:textStyle="bold"
+        android:layout_marginTop="4dp" />
+
+    <TextView
+        android:id="@+id/widget_entry_count"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="0 entries"
+        android:textSize="10sp"
+        android:textColor="#8A918E"
+        android:layout_marginTop="2dp" />
+
+    <ImageView
+        android:layout_width="24dp"
+        android:layout_height="24dp"
+        android:src="@android:drawable/ic_input_add"
+        android:contentDescription="记一笔"
+        android:layout_marginTop="8dp" />
+</LinearLayout>

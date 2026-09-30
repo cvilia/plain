@@ -1,0 +1,219 @@
+/// Recurring rule repository + batch undo. See PRD F6.1.
+library;
+
+import 'package:plain/core/money/money.dart';
+import 'package:plain/core/result/result.dart';
+import 'package:plain/core/time/clock.dart';
+import 'package:plain/data/db/database.dart';
+import 'package:plain/data/sync/change_log_writer.dart';
+import 'package:plain/domain/entities/enums.dart';
+import 'package:plain/domain/entities/recurring_rule.dart';
+import 'package:plain/domain/repositories/repositories.dart';
+
+class RecurringRepositoryImpl implements RecurringRepository {
+  RecurringRepositoryImpl({
+    required AppDatabase db, required ChangeLogWriter changeLogWriter,
+    required Clock clock,
+  })  : _db = db, _changeLog = changeLogWriter, _clock = clock;
+
+  final AppDatabase _db;
+  final ChangeLogWriter _changeLog;
+  final Clock _clock;
+
+  @override
+  Future<Result<List<RecurringRule>>> listByBook(String bookId) async {
+    final rows = _db.raw.select(
+      'SELECT * FROM recurring_rules WHERE book_id = ? AND deleted_at IS NULL ORDER BY next_run_at',
+      [bookId]);
+    return ok(rows.map(_fromRow).toList());
+  }
+
+  @override
+  Future<Result<List<RecurringRule>>> listDue({required DateTime now}) async {
+    final rows = _db.raw.select(
+      'SELECT * FROM recurring_rules WHERE is_enabled = 1 AND deleted_at IS NULL AND next_run_at <= ? ORDER BY next_run_at',
+      [now.millisecondsSinceEpoch]);
+    return ok(rows.map(_fromRow).toList());
+  }
+
+  @override
+  Future<Result<RecurringRule>> getById(String id) async {
+    final rows = _db.raw.select('SELECT * FROM recurring_rules WHERE id = ?', [id]);
+    if (rows.isEmpty) return err<RecurringRule>(const NotFoundFailure('recurring.not_found', 'nf'));
+    return ok(_fromRow(rows.first));
+  }
+
+  @override
+  Future<Result<RecurringRule>> create(RecurringRule rule) async {
+    try {
+      if (rule.frequency == RecurringFrequency.unknown) {
+        return err<RecurringRule>(const ValidationFailure('recurring.frequency_invalid', 'invalid'));
+      }
+      if (!rule.amount.withinProductLimit || rule.amount.isZero) {
+        return err<RecurringRule>(const ValidationFailure('recurring.amount_invalid', 'invalid'));
+      }
+      _db.transaction(() {
+        _insert(rule);
+        _changeLog.write(
+          entityType: EntityType.recurringRule, entityId: rule.id, op: ChangeOp.insert,
+          deviceId: rule.deviceId, baseRevision: 0,
+          before: const {}, after: _payload(rule),
+        );
+      });
+      return ok(rule);
+    } on Exception catch (e) {
+      return err(StorageFailure('db.insert_failed', e.toString(), isRetryable: true));
+    }
+  }
+
+  @override
+  Future<Result<RecurringRule>> update(RecurringRule rule) async {
+    try {
+      final old = _findById(rule.id);
+      if (old == null) return err<RecurringRule>(const NotFoundFailure('recurring.not_found', 'nf'));
+      _db.transaction(() {
+        _update(rule);
+        _changeLog.write(
+          entityType: EntityType.recurringRule, entityId: rule.id, op: ChangeOp.update,
+          deviceId: rule.deviceId, baseRevision: rule.baseRevision,
+          before: _payload(old), after: _payload(rule),
+        );
+      });
+      return ok(rule);
+    } on Exception catch (e) {
+      return err(StorageFailure('db.update_failed', e.toString(), isRetryable: true));
+    }
+  }
+
+  @override
+  Future<Result<void>> softDelete(String id) async {
+    try {
+      final old = _findById(id);
+      if (old == null) return err<void>(const NotFoundFailure('recurring.not_found', 'nf'));
+      final now = _clock.now();
+      final deleted = old.copyWith(
+        deletedAt: now, updatedAt: now,
+        isEnabled: false, revision: old.revision + 1, baseRevision: old.revision);
+      _db.transaction(() {
+        _update(deleted);
+        _changeLog.write(
+          entityType: EntityType.recurringRule, entityId: id, op: ChangeOp.delete,
+          deviceId: old.deviceId, baseRevision: old.revision,
+          before: _payload(old), after: const {},
+        );
+      });
+      return ok(null);
+    } on Exception catch (e) {
+      return err(StorageFailure('db.delete_failed', e.toString(), isRetryable: true));
+    }
+  }
+
+  @override
+  Future<Result<int>> undoBatch({required String batchId, required DateTime deletedAt}) async {
+    try {
+      var count = 0;
+      _db.transaction(() {
+        final rows = _db.raw.select(
+          'SELECT * FROM transactions WHERE batch_id = ? AND deleted_at IS NULL', [batchId]);
+        count = rows.length;
+        final nowMs = deletedAt.millisecondsSinceEpoch;
+        _db.raw.execute(
+          'UPDATE transactions SET deleted_at = ?, updated_at = ?, revision = revision + 1 '
+          'WHERE batch_id = ? AND deleted_at IS NULL',
+          [nowMs, nowMs, batchId]);
+        for (final row in rows) {
+          _changeLog.write(
+            entityType: EntityType.transaction, entityId: row['id']! as String, op: ChangeOp.delete,
+            deviceId: (row['device_id'] as String?) ?? '', baseRevision: (row['revision'] as int?) ?? 1,
+            before: Map<String, Object?>.from(row), after: const {}, changedAt: deletedAt,
+          );
+        }
+      });
+      return ok(count);
+    } on Exception catch (e) {
+      return err(StorageFailure('db.undo_failed', e.toString(), isRetryable: true));
+    }
+  }
+
+  RecurringRule? _findById(String id) {
+    final rows = _db.raw.select('SELECT * FROM recurring_rules WHERE id = ?', [id]);
+    return rows.isEmpty ? null : _fromRow(rows.first);
+  }
+
+  void _insert(RecurringRule r) {
+    _db.raw.execute(
+      'INSERT INTO recurring_rules (id,book_id,name,frequency,interval_n,anchor_day,weekday,skip_strategy,auto_confirm,'
+      'end_type,end_at,end_count,generated_count,next_run_at,entry_type,amount_cents,category_id,account_id,to_account_id,'
+      'note,last_batch_id,is_enabled,created_at,updated_at,deleted_at,revision,device_id,base_revision) '
+      'VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
+      _rowArgs(r));
+  }
+
+  void _update(RecurringRule r) {
+    _db.raw.execute(
+      'UPDATE recurring_rules SET name=?,frequency=?,interval_n=?,anchor_day=?,weekday=?,skip_strategy=?,auto_confirm=?,'
+      'end_type=?,end_at=?,end_count=?,generated_count=?,next_run_at=?,entry_type=?,amount_cents=?,category_id=?,account_id=?,'
+      'to_account_id=?,note=?,last_batch_id=?,is_enabled=?,updated_at=?,deleted_at=?,revision=?,base_revision=? WHERE id=?',
+      [r.name, r.frequency.wire, r.intervalN, r.anchorDay, r.weekday, r.skipStrategy.wire,
+        r.autoConfirm ? 1 : 0, r.endType.wire, r.endAt?.millisecondsSinceEpoch, r.endCount,
+        r.generatedCount, r.nextRunAt.millisecondsSinceEpoch, r.entryType.wire, r.amount.cents,
+        r.categoryId, r.accountId, r.toAccountId, r.note, r.lastBatchId, r.isEnabled ? 1 : 0,
+        r.updatedAt.millisecondsSinceEpoch, r.deletedAt?.millisecondsSinceEpoch,
+        r.revision, r.baseRevision, r.id]);
+  }
+
+  List<Object?> _rowArgs(RecurringRule r) => [
+    r.id, r.bookId, r.name, r.frequency.wire, r.intervalN, r.anchorDay, r.weekday,
+    r.skipStrategy.wire, r.autoConfirm ? 1 : 0, r.endType.wire,
+    r.endAt?.millisecondsSinceEpoch, r.endCount, r.generatedCount,
+    r.nextRunAt.millisecondsSinceEpoch, r.entryType.wire, r.amount.cents,
+    r.categoryId, r.accountId, r.toAccountId, r.note, r.lastBatchId,
+    r.isEnabled ? 1 : 0, r.createdAt.millisecondsSinceEpoch,
+    r.updatedAt.millisecondsSinceEpoch, r.deletedAt?.millisecondsSinceEpoch,
+    r.revision, r.deviceId, r.baseRevision,
+  ];
+
+  Map<String, Object?> _payload(RecurringRule r) => {
+    'id': r.id, 'book_id': r.bookId, 'name': r.name, 'frequency': r.frequency.wire,
+    'interval_n': r.intervalN, 'anchor_day': r.anchorDay, 'weekday': r.weekday,
+    'skip_strategy': r.skipStrategy.wire, 'auto_confirm': r.autoConfirm,
+    'end_type': r.endType.wire, 'end_at': r.endAt?.millisecondsSinceEpoch,
+    'end_count': r.endCount, 'generated_count': r.generatedCount,
+    'next_run_at': r.nextRunAt.millisecondsSinceEpoch, 'entry_type': r.entryType.wire,
+    'amount_cents': r.amount.cents, 'category_id': r.categoryId,
+    'account_id': r.accountId, 'to_account_id': r.toAccountId, 'note': r.note,
+    'last_batch_id': r.lastBatchId, 'is_enabled': r.isEnabled,
+    'created_at': r.createdAt.millisecondsSinceEpoch,
+    'updated_at': r.updatedAt.millisecondsSinceEpoch,
+    'deleted_at': r.deletedAt?.millisecondsSinceEpoch,
+    'revision': r.revision, 'device_id': r.deviceId, 'base_revision': r.baseRevision,
+  };
+
+  RecurringRule _fromRow(Map<String, Object?> row) => RecurringRule(
+    id: row['id']! as String, bookId: row['book_id']! as String,
+    name: row['name'] as String?,
+    frequency: RecurringFrequency.fromWire(row['frequency'] as String?),
+    intervalN: (row['interval_n'] as int?) ?? 1,
+    anchorDay: row['anchor_day'] as int?, weekday: row['weekday'] as int?,
+    skipStrategy: RecurringSkipStrategy.fromWire(row['skip_strategy'] as String?),
+    autoConfirm: ((row['auto_confirm'] as int?) ?? 1) == 1,
+    endType: RecurringEndType.fromWire(row['end_type'] as String?),
+    endAt: row['end_at'] == null ? null : DateTime.fromMillisecondsSinceEpoch(row['end_at']! as int, isUtc: true),
+    endCount: row['end_count'] as int?,
+    generatedCount: (row['generated_count'] as int?) ?? 0,
+    nextRunAt: DateTime.fromMillisecondsSinceEpoch(row['next_run_at']! as int, isUtc: true),
+    entryType: EntryType.fromWire(row['entry_type'] as String?),
+    amount: Money(row['amount_cents']! as int),
+    categoryId: row['category_id'] as String?,
+    accountId: row['account_id'] as String?,
+    toAccountId: row['to_account_id'] as String?,
+    note: row['note'] as String?,
+    lastBatchId: row['last_batch_id'] as String?,
+    isEnabled: ((row['is_enabled'] as int?) ?? 1) == 1,
+    createdAt: DateTime.fromMillisecondsSinceEpoch(row['created_at']! as int, isUtc: true),
+    updatedAt: DateTime.fromMillisecondsSinceEpoch(row['updated_at']! as int, isUtc: true),
+    deletedAt: row['deleted_at'] == null ? null : DateTime.fromMillisecondsSinceEpoch(row['deleted_at']! as int, isUtc: true),
+    revision: (row['revision'] as int?) ?? 1,
+    deviceId: row['device_id']! as String,
+    baseRevision: (row['base_revision'] as int?) ?? 0);
+}
