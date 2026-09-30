@@ -1,4 +1,4 @@
-/// Entry input page (SP-1-01). See PRD STORY-1.1.
+﻿/// Entry input page (SP-1-01). See PRD STORY-1.1.
 library;
 
 import 'package:flutter/material.dart';
@@ -7,6 +7,7 @@ import 'package:plain/app/bootstrap.dart';
 import 'package:plain/app/breakpoints.dart';
 import 'package:plain/app/theme/design_tokens.dart';
 import 'package:plain/core/constants/app_constants.dart';
+import 'package:plain/core/refresh/data_invalidation.dart';
 import 'package:plain/design_system/app_date_picker.dart';
 import 'package:plain/design_system/category_icons.dart';
 import 'package:plain/domain/entities/category.dart' as domain;
@@ -15,6 +16,7 @@ import 'package:plain/features/ledger/controllers/entry_input_controller.dart';
 import 'package:plain/features/ledger/presentation/category_picker_page.dart';
 
 final _categoriesProvider = FutureProvider<List<domain.Category>>((ref) async {
+  ref.watch(categoriesVersionProvider);
   final repo = ref.watch(categoryRepositoryProvider);
   final result = await repo.listVisible(kind: CategoryKind.expense);
   return result.successOrNull ?? const [];
@@ -62,7 +64,15 @@ class _EntryInputPageState extends ConsumerState<EntryInputPage> {
             TextButton(
               onPressed: () async {
                 final ok = await controller.saveExplicit();
-                if (ok && context.mounted) Navigator.pop(context);
+                if (!ok || !context.mounted) return;
+                final msg = controller.state.toastMessage;
+                if (msg != null) {
+                  ScaffoldMessenger.of(context)
+                    ..hideCurrentSnackBar()
+                    ..showSnackBar(SnackBar(content: Text(msg), duration: UiDurations.saveToast));
+                  controller.clearToast();
+                }
+                if (context.mounted) Navigator.pop(context);
               },
               child: const Text('保存'),
             ),
@@ -271,17 +281,17 @@ class _Keypad extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          _keyRow(['7', '8', '9', '\u00f7']),
-          _keyRow(['4', '5', '6', '\u00d7']),
-          _keyRow(['1', '2', '3', '-']),
-          _keyRow(['.', '0', '=', '+']),
-          _keyRow(['\u232b', 'C', 'OK']),
+          _keyRow(context, ['7', '8', '9', '\u00f7']),
+          _keyRow(context, ['4', '5', '6', '\u00d7']),
+          _keyRow(context, ['1', '2', '3', '-']),
+          _keyRow(context, ['.', '0', '=', '+']),
+          _keyRow(context, ['\u232b', 'C', 'OK']),
         ],
       ),
     );
   }
 
-  Widget _keyRow(List<String> labels) {
+  Widget _keyRow(BuildContext context, List<String> labels) {
     return SizedBox(
       height: 56,
       child: Row(children: [
@@ -289,7 +299,7 @@ class _Keypad extends StatelessWidget {
           Expanded(
             child: Padding(
               padding: const EdgeInsets.all(3),
-              child: _KeyButton(label: label, onTap: () => _onKey(label), isConfirm: label == 'OK', isEquals: label == '='),
+              child: _KeyButton(label: label, onTap: () => _onKey(context, label), isConfirm: label == 'OK', isEquals: label == '='),
             ),
           ),
         if (labels.length == 3) const Spacer(),
@@ -297,7 +307,7 @@ class _Keypad extends StatelessWidget {
     );
   }
 
-  void _onKey(String label) {
+  void _onKey(BuildContext context, String label) {
     switch (label) {
       case '\u232b':
         controller.onBackspace();
@@ -306,13 +316,26 @@ class _Keypad extends StatelessWidget {
       case '=':
         controller.onEquals();
       case 'OK':
-        controller.saveExplicit();
+        _saveAndToast(context);
       case '+' || '-' || '\u00d7' || '\u00f7':
         controller.onOperator(label);
       case '.':
         controller.onDot();
       default:
         controller.onDigit(label);
+    }
+  }
+
+  Future<void> _saveAndToast(BuildContext context) async {
+    final ok = await controller.saveExplicit();
+    if (!ok || !context.mounted) return;
+    final msg = controller.state.toastMessage;
+    if (msg != null) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..clearSnackBars()
+        ..showSnackBar(SnackBar(content: Text(msg), duration: UiDurations.saveToast));
+      controller.clearToast();
     }
   }
 }
@@ -407,17 +430,9 @@ class _CategoryGrid extends StatelessWidget {
           label: cat.name,
           selected: selected,
           color: BrandColors.primary,
-          onTap: () async {
-            final ok = await controller.submitOnCategoryTap(cat.id);
-            if (ok && context.mounted) {
-              final msg = state.toastMessage;
-              if (msg != null) {
-                ScaffoldMessenger.of(context)
-                  ..hideCurrentSnackBar()
-                  ..showSnackBar(SnackBar(content: Text(msg), duration: UiDurations.saveToast));
-                controller.clearToast();
-              }
-            }
+          onTap: () {
+            // Select only — save happens on OK / 保存 (explicit confirm).
+            controller.submitOnCategoryTap(cat.id);
           },
         );
       },
@@ -632,3 +647,4 @@ class _AttrChip extends StatelessWidget {
     return child;
   }
 }
+

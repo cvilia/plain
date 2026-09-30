@@ -7,6 +7,7 @@ import 'package:plain/app/bootstrap.dart';
 import 'package:plain/app/breakpoints.dart';
 import 'package:plain/app/theme/design_tokens.dart';
 import 'package:plain/core/format/amount_formatter.dart';
+import 'package:plain/core/refresh/data_invalidation.dart';
 import 'package:plain/domain/entities/enums.dart';
 import 'package:plain/domain/entities/recurring_rule.dart';
 import 'package:plain/domain/usecases/recurring_usecases.dart';
@@ -218,6 +219,7 @@ class _RecurringEditPageState extends ConsumerState<RecurringEditPage> {
       );
       return;
     }
+    ref.invalidateData.bumpRecurringMutated();
     Navigator.pop(context, true);
   }
 

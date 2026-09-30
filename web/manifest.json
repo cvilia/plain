@@ -1,11 +1,11 @@
 {
-    "name": "plain",
-    "short_name": "plain",
+    "name": "素记 Plain",
+    "short_name": "素记",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "记账应用",
+    "background_color": "#F7F5F0",
+    "theme_color": "#47B8A1",
+    "description": "本地优先的极简记账应用",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

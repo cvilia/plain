@@ -1,4 +1,4 @@
-/// Settings page. See PRD STORY-5.1, M9.
+﻿/// Settings page. See PRD STORY-5.1, M9.
 library;
 
 import 'package:flutter/material.dart';
@@ -31,6 +31,7 @@ class SettingsPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final hideAmounts = ref.watch(hideAmountsProvider);
     final appLockEnabled = ref.watch(appLockEnabledProvider);
+    watchBrandTheme(ref);
     final prefs = ref.watch(themePrefsProvider);
 
     return Scaffold(
@@ -231,3 +232,4 @@ class _SectionHeader extends StatelessWidget {
     );
   }
 }
+

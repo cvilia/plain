@@ -1,15 +1,17 @@
-﻿/// Full category picker page. See PRD STORY-1.1 (More grid).
+/// Full category picker page. See PRD STORY-1.1 (More grid).
 library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:plain/app/bootstrap.dart';
 import 'package:plain/app/theme/design_tokens.dart';
+import 'package:plain/core/refresh/data_invalidation.dart';
 import 'package:plain/design_system/category_icons.dart';
 import 'package:plain/domain/entities/category.dart' as domain;
 import 'package:plain/domain/entities/enums.dart';
 
 final _allCategoriesProvider = FutureProvider<List<domain.Category>>((ref) async {
+  ref.watch(categoriesVersionProvider);
   final repo = ref.watch(categoryRepositoryProvider);
   final result = await repo.listVisible();
   return result.successOrNull ?? const [];

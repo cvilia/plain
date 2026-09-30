@@ -7,11 +7,10 @@ import 'package:go_router/go_router.dart';
 import 'package:plain/app/bootstrap.dart';
 import 'package:plain/app/theme/design_tokens.dart';
 import 'package:plain/core/constants/app_constants.dart';
-import 'package:plain/data/data_freshness.dart';
+import 'package:plain/core/refresh/data_invalidation.dart';
 import 'package:plain/domain/entities/category.dart' as domain;
 import 'package:plain/domain/entities/enums.dart';
 import 'package:plain/domain/entities/ledger_entry.dart';
-import 'package:plain/features/ledger/controllers/flow_list_controller.dart';
 
 class EntryDetailPage extends ConsumerStatefulWidget {
   const EntryDetailPage({super.key, required this.entryId});
@@ -124,8 +123,7 @@ class _EntryDetailPageState extends ConsumerState<EntryDetailPage> {
               final deps = ref.read(appDependenciesProvider);
               final result = await deps.deleteEntry(widget.entryId);
               if (result.isSuccess && context.mounted) {
-                ref.read(dataFreshnessProvider.notifier).bump();
-                ref.read(flowListControllerProvider.notifier).refresh();
+                ref.invalidateData.bumpEntryMutated();
                 Navigator.pop(context);
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(content: const Text('已删除'), duration: UiDurations.undoWindow),

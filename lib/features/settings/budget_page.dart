@@ -1,4 +1,4 @@
-/// Budget settings page. See PRD F5.1/F5.2.
+﻿/// Budget settings page. See PRD F5.1/F5.2.
 library;
 
 import 'package:flutter/material.dart';
@@ -7,6 +7,7 @@ import 'package:plain/app/bootstrap.dart';
 import 'package:plain/app/breakpoints.dart';
 import 'package:plain/app/theme/design_tokens.dart';
 import 'package:plain/core/format/amount_formatter.dart';
+import 'package:plain/core/refresh/data_invalidation.dart';
 import 'package:plain/core/money/money.dart';
 import 'package:plain/domain/entities/budget.dart';
 import 'package:plain/domain/entities/category.dart';
@@ -116,6 +117,7 @@ class _BudgetPageState extends ConsumerState<BudgetPage> {
         revision: current.revision + 1, baseRevision: current.revision,
       ));
     }
+    ref.invalidateData.bumpBudgetMutated();
     await _load();
   }
 
@@ -131,6 +133,7 @@ class _BudgetPageState extends ConsumerState<BudgetPage> {
       categoryId: cat.id, amount: amount, createdAt: now, updatedAt: now,
       deviceId: deps.deviceId,
     ));
+    ref.invalidateData.bumpBudgetMutated();
     await _load();
   }
 
@@ -144,6 +147,7 @@ class _BudgetPageState extends ConsumerState<BudgetPage> {
       amount: amount, updatedAt: now,
       revision: b.revision + 1, baseRevision: b.revision,
     ));
+    ref.invalidateData.bumpBudgetMutated();
     await _load();
   }
 
@@ -162,6 +166,7 @@ class _BudgetPageState extends ConsumerState<BudgetPage> {
     if (okDel != true || !mounted) return;
     final deps = ref.read(appDependenciesProvider);
     await deps.budgetRepository.softDelete(budget.id);
+    ref.invalidateData.bumpBudgetMutated();
     await _load();
   }
 
@@ -328,3 +333,4 @@ class _BudgetBody extends StatelessWidget {
     );
   }
 }
+

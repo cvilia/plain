@@ -8,7 +8,7 @@ import 'package:plain/app/breakpoints.dart';
 import 'package:plain/app/theme/design_tokens.dart';
 import 'package:plain/core/constants/app_constants.dart';
 import 'package:plain/core/format/amount_formatter.dart';
-import 'package:plain/data/data_freshness.dart';
+import 'package:plain/core/refresh/data_invalidation.dart';
 import 'package:plain/design_system/category_icons.dart';
 import 'package:plain/domain/entities/category.dart' as domain;
 import 'package:plain/domain/entities/enums.dart';
@@ -50,7 +50,7 @@ class _TrashPageState extends ConsumerState<TrashPage> {
     final res = await deps.restoreEntry(entry.id);
     if (!mounted) return;
     if (res.isSuccess) {
-      ref.read(dataFreshnessProvider.notifier).bump();
+      ref.invalidateData.bumpEntryMutated();
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('已恢复')));
       await _load();
     } else {

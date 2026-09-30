@@ -5,8 +5,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:plain/app/bootstrap.dart';
 import 'package:plain/core/money/expression_evaluator.dart';
 import 'package:plain/core/money/money.dart';
+import 'package:plain/core/refresh/data_invalidation.dart';
 import 'package:plain/core/time/clock.dart';
-import 'package:plain/data/data_freshness.dart';
 import 'package:plain/data/platform/platform_bridge.dart';
 import 'package:plain/domain/entities/enums.dart';
 import 'package:plain/domain/entities/ledger_entry.dart';
@@ -260,14 +260,10 @@ class EntryInputController extends Notifier<EntryInputState> {
     );
   }
 
-  Future<bool> submitOnCategoryTap(String categoryId) async {
-    if (state.isEditing) {
-      state = state.copyWith(selectedCategoryId: categoryId);
-      return false;
-    }
+  /// Category tap only selects — save is an explicit OK action (PRD / UX fix).
+  void submitOnCategoryTap(String categoryId) {
     state = state.copyWith(selectedCategoryId: categoryId);
-    if (!state.hasAmount) return false;
-    return _save();
+    _saveDraft();
   }
 
   Future<bool> saveExplicit() => _save();
@@ -316,7 +312,7 @@ class EntryInputController extends Notifier<EntryInputState> {
         );
         draftStore.clear(); // Clear draft after successful save
         _updateWidgetSnapshot();
-        ref.read(dataFreshnessProvider.notifier).bump();
+        ref.invalidateData.bumpEntryMutated();
         return true;
       },
       failure: (f) {

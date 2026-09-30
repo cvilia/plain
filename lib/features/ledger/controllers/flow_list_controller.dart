@@ -3,8 +3,8 @@ library;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:plain/app/bootstrap.dart';
+import 'package:plain/core/refresh/data_invalidation.dart';
 import 'package:plain/core/time/clock.dart';
-import 'package:plain/data/data_freshness.dart';
 import 'package:plain/domain/entities/category.dart';
 import 'package:plain/domain/entities/enums.dart';
 import 'package:plain/domain/entities/ledger_entry.dart';
@@ -58,6 +58,13 @@ class FlowListState {
 class FlowListController extends Notifier<FlowListState> {
   @override
   FlowListState build() {
+    // Any entry mutation bumps ledgerVersion — list follows automatically.
+    // MUST defer: listen can fire while the widget tree is building (TickerMode
+    // / layout callbacks), and `state=` inside a build phase throws.
+    ref.listen(ledgerVersionProvider, (prev, next) {
+      if (prev == next || state.isLoading) return;
+      Future.microtask(refresh);
+    });
     // Auto-load on first access
     Future.microtask(loadInitial);
     return const FlowListState();
@@ -141,8 +148,7 @@ class FlowListController extends Notifier<FlowListState> {
 
     final result = await _repository.softDelete(id);
     if (result.isSuccess) {
-      ref.read(dataFreshnessProvider.notifier).bump();
-      await refresh();
+      ref.invalidateData.bumpEntryMutated();
       return true;
     }
     return false;
@@ -156,8 +162,7 @@ class FlowListController extends Notifier<FlowListState> {
 
     final result = await _repository.restore(entry.id);
     if (result.isSuccess) {
-      ref.read(dataFreshnessProvider.notifier).bump();
-      await refresh();
+      ref.invalidateData.bumpEntryMutated();
       return true;
     }
     return false;

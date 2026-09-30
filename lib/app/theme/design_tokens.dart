@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:plain/app/theme/theme_resolver.dart';
 import 'package:plain/app/theme/theme_registry.dart';
 import 'package:plain/app/theme/tokens.dart';
+import 'package:plain/core/refresh/data_invalidation.dart';
 
 /// Current theme tokens — updated on every theme/mode change.
 /// All [BrandColors] getters read from this, so existing UI follows the theme globally.
@@ -15,7 +16,9 @@ AppTokens? _activeTokens;
 /// Must be called before first frame and on every theme/mode change.
 void setActiveTheme(ThemeId id, Brightness brightness) {
   final (tokens, _) = themeDataFor(id, brightness);
-  _activeTokens = tokens;
+  if (!identical(_activeTokens, tokens)) {
+    _activeTokens = tokens;
+  }
 }
 
 AppTokens get _t {
@@ -25,6 +28,15 @@ AppTokens get _t {
     _activeTokens = tokens;
   }
   return _activeTokens!;
+}
+
+/// Call **once in `build()`** of any widget that reads [BrandColors].
+///
+/// [BrandColors] is a static facade over [_activeTokens]; it does not itself
+/// schedule rebuilds. Watching this (or [themePrefsProvider]) is what makes
+/// FAB / shell / tab pages repaint after a theme switch.
+void watchBrandTheme(WidgetRef ref) {
+  ref.watch(themeVersionProvider);
 }
 
 class BrandColors {
@@ -63,6 +75,17 @@ class BrandColors {
   static Color get darkSurfaceMuted => _t.surface2;
   static Color get darkBorder => _t.line;
   static Color get darkDivider => _t.lineSoft;
+
+  // Atmosphere (hero balance card / asset card)
+  static Color get heroStart => _t.heroGrad0;
+  static Color get heroEnd => _t.heroGrad1;
+  static Color get heroDarkStart => _t.heroDarkGrad0;
+  static Color get heroDarkEnd => _t.heroDarkGrad1;
+
+  // Charts
+  static Color get barFill => _t.barFill;
+  static Color get chartTrack => _t.chartTrack;
+  static Color get dash => _t.dash;
 }
 
 class Spacing {

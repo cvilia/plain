@@ -111,4 +111,70 @@ void main() {
       expect(lum(sheen) > lum(accent), true);
     });
   });
+
+  group('composite', () {
+    test('alpha=0 equals bg', () {
+      final fg = 0xFFFF0000;
+      final bg = 0xFF112233;
+      expect(composite(fg, 0.0, bg), bg);
+    });
+    test('alpha=1 equals fg', () {
+      final fg = 0xFFFF0000;
+      final bg = 0xFF112233;
+      expect(composite(fg, 1.0, bg), fg);
+    });
+    test('matches mix(bg, fg, alpha) bit-for-bit', () {
+      final fg = 0xFF47B8A1;
+      final bg = 0xFFFFFFFF;
+      for (final a in [0.0, 0.1, 0.16, 0.26, 0.5, 0.8, 1.0]) {
+        expect(composite(fg, a, bg), mix(bg, fg, a));
+      }
+    });
+  });
+
+  group('inkForLayers', () {
+    test('hits target on all three distinct bases', () {
+      final fg = 0xFF71AA46;
+      final bases = <int>[0xFFFFFFFF, 0xFFF5F8F5, 0xFFE9EFEA];
+      final result = inkForLayers(fg, bases, 4.5);
+      for (final bg in bases) {
+        expect(contrast(result, bg) >= 4.5, true,
+            reason: 'contrast on ${hexString(bg)} = '
+                '${contrast(result, bg).toStringAsFixed(2)}');
+      }
+    });
+
+    test('card + page-base combo (regression: 19 misses)', () {
+      // Light-mode trap: page bg darker than card → dark ink loses contrast.
+      final fg = 0xFF47B8A1; // qingci light primary
+      final surface = 0xFFFFFFFF;
+      final pageBg = 0xFFE9EFEA;
+      final softOnSurface = composite(fg, 0.16, surface);
+      final softOnBg = composite(fg, 0.16, pageBg);
+      final bases = <int>[softOnSurface, softOnBg, surface, pageBg];
+      final result = inkForLayers(fg, bases, 4.5);
+      for (final bg in bases) {
+        expect(contrast(result, bg) >= 4.5, true,
+            reason: 'miss on ${hexString(bg)} = '
+                '${contrast(result, bg).toStringAsFixed(2)}');
+      }
+    });
+
+    test('dark-mode high-alpha tint on bright base (regression)', () {
+      final fg = 0xFF9FD0C6; // qingci dark primary
+      final surface = 0xFF2B3733;
+      final softOnSurface = composite(fg, 0.26, surface);
+      final bases = <int>[softOnSurface, surface, 0xFF141A18];
+      final result = inkForLayers(fg, bases, 4.5);
+      for (final bg in bases) {
+        expect(contrast(result, bg) >= 4.5, true);
+      }
+    });
+
+    test('returns fg unchanged when already sufficient on every base', () {
+      final fg = 0xFF000000;
+      final bases = <int>[0xFFFFFFFF, 0xFFE9EFEA, 0xFFF5F8F5];
+      expect(inkForLayers(fg, bases, 4.5), fg);
+    });
+  });
 }

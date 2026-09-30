@@ -25,6 +25,7 @@ dependencies:
 
   flutter_secure_storage: ^9.2.4
   local_auth: ^2.3.0
+  shared_preferences: ^2.5.3
 
   fl_chart: ^0.70.2
 
@@ -40,3 +41,12 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+
+# sqlite3 hook downloads prebuilt libsqlite3 from GitHub releases.
+# Direct GitHub is often unreachable here — route through a mirror.
+# $RELEASE_TAG / $FILENAME are substituted by package:sqlite3.
+hooks:
+  user_defines:
+    sqlite3:
+      source: sqlite3
+      url_pattern: "https://ghfast.top/https://github.com/simolus3/sqlite3.dart/releases/download/$RELEASE_TAG/$FILENAME"

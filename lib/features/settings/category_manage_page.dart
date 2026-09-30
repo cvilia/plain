@@ -5,11 +5,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:plain/app/bootstrap.dart';
 import 'package:plain/app/theme/design_tokens.dart';
+import 'package:plain/core/refresh/data_invalidation.dart';
 import 'package:plain/design_system/category_icons.dart';
 import 'package:plain/domain/entities/category.dart' as domain;
 import 'package:plain/domain/entities/enums.dart';
 
 final _categoriesProvider = FutureProvider<List<domain.Category>>((ref) async {
+  ref.watch(categoriesVersionProvider);
   final repo = ref.watch(categoryRepositoryProvider);
   final result = await repo.listAll();
   return result.successOrNull ?? const [];
@@ -23,7 +25,7 @@ class CategoryManagePage extends ConsumerWidget {
     final categoriesAsync = ref.watch(_categoriesProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('分类管理')),
+      appBar: AppBar(title: const Text('分类绠＄悊')),
       body: categoriesAsync.when(
         data: (categories) {
           final expense = categories.where((c) => c.kind == CategoryKind.expense).toList();
@@ -71,7 +73,7 @@ class CategoryManagePage extends ConsumerWidget {
     final deps = ref.read(appDependenciesProvider);
     final updated = cat.copyWith(isHidden: !cat.isHidden, updatedAt: DateTime.now().toUtc());
     deps.categoryRepository.update(updated);
-    ref.invalidate(_categoriesProvider);
+    ref.invalidateData.bumpCategoriesMutated();
   }
 
   void _showRenameSheet(BuildContext context, WidgetRef ref, domain.Category cat) {
@@ -110,7 +112,7 @@ class CategoryManagePage extends ConsumerWidget {
                   baseRevision: cat.revision,
                 );
                 deps.categoryRepository.update(updated);
-                ref.invalidate(_categoriesProvider);
+                ref.invalidateData.bumpCategoriesMutated();
                 Navigator.pop(ctx);
               },
               child: const Text('保存'),
@@ -156,7 +158,7 @@ class CategoryManagePage extends ConsumerWidget {
               TextField(
                 controller: nameCtrl,
                 maxLength: 6,
-                decoration: const InputDecoration(labelText: '名称', hintText: '如：咖啡', border: OutlineInputBorder()),
+                decoration: const InputDecoration(labelText: '名称', hintText: '濡傦細鍜栧暋', border: OutlineInputBorder()),
               ),
               const SizedBox(height: Spacing.lg),
               FilledButton(
@@ -176,7 +178,7 @@ class CategoryManagePage extends ConsumerWidget {
                     updatedAt: now,
                     deviceId: deps.deviceId,
                   ));
-                  ref.invalidate(_categoriesProvider);
+                  ref.invalidateData.bumpCategoriesMutated();
                   Navigator.pop(ctx);
                 },
                 child: const Text('添加'),
@@ -239,7 +241,7 @@ class CategoryManagePage extends ConsumerWidget {
               final result = await deps.categoryRepository.merge(sourceId: source.id, targetId: target.id);
               result.when(
                 success: (count) {
-                  ref.invalidate(_categoriesProvider);
+                  ref.invalidateData.bumpCategoriesMutated();
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(content: Text('已合并 $count 笔账单')),
                   );
@@ -309,7 +311,7 @@ class _CategoryTile extends StatelessWidget {
           ),
         ),
         subtitle: category.isPreset
-            ? Text('预置', style: TextStyle(fontSize: 11, color: BrandColors.inkTertiary))
+            ? Text('棰勭疆', style: TextStyle(fontSize: 11, color: BrandColors.inkTertiary))
             : null,
         trailing: Row(
           mainAxisSize: MainAxisSize.min,
@@ -342,3 +344,4 @@ class _CategoryTile extends StatelessWidget {
     );
   }
 }
+

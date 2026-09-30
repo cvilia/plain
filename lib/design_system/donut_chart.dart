@@ -1,5 +1,5 @@
 /// Donut chart with drill-down. See PRD STORY-3.1 AC2.
-/// Click sector â†?expand to subcategories â†?click subcategory â†?filter list.
+/// Click sector -> expand to subcategories -> click subcategory -> filter list.
 library;
 
 import 'package:fl_chart/fl_chart.dart';

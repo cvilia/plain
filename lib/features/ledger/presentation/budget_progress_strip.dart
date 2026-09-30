@@ -7,12 +7,14 @@ import 'package:plain/app/bootstrap.dart';
 import 'package:plain/app/breakpoints.dart';
 import 'package:plain/app/theme/design_tokens.dart';
 import 'package:plain/core/format/amount_formatter.dart';
-import 'package:plain/data/data_freshness.dart';
+import 'package:plain/core/refresh/data_invalidation.dart';
 import 'package:plain/domain/entities/budget.dart';
 import 'package:plain/domain/entities/enums.dart';
 
 final budgetStatusProvider = FutureProvider.autoDispose<BudgetStatus?>((ref) async {
-  ref.watch(dataFreshnessProvider);
+  // Refetch when entries or budget rules change.
+  ref.watch(ledgerVersionProvider);
+  ref.watch(budgetVersionProvider);
   final deps = ref.watch(appDependenciesProvider);
   final res = await deps.resolveBudgetStatus.totalStatus(deps.bookId);
   return res.successOrNull;

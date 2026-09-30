@@ -22,36 +22,82 @@ AppTokens resolveTokens(ThemeSpec spec, Brightness brightness) {
   final tone = toneOf(spec.tone, isDark);
   final brand = isDark ? spec.dark : spec.light;
 
+  // Soft-layer alphas (global constants, §4.1).
+  final softA = isDark ? kSoftAlphaDark : kSoftAlphaLight;
+  final tintA = isDark ? kTintAlphaDark : kTintAlphaLight;
+  final aSoftA = isDark ? kASoftAlphaDark : kASoftAlphaLight;
+
+  int argb(int color, int shift) => (color >> shift) & 0xFF;
+  Color softOf(int base, double alpha) => Color.fromRGBO(
+      argb(base, 16), argb(base, 8), argb(base, 0), alpha);
+
   // ── Derived: on-primary / on-accent (§4.6 ②)
   final onPrimary = cm.pickOn(brand.p, tone.ink, 4.5);
   final onAccent = cm.pickOn(brand.a, tone.ink, 4.5);
 
-  // ── Derived: colored ink on tint backgrounds (§4.6 ①)
-  final primaryInk = cm.inkFor(brand.p, brand.pt, 4.5);
-  final accentInk = cm.inkFor(brand.a, brand.as_, 4.5);
+  // Composite soft/tint over every possible host base (rendered values).
+  final pSoftOver = <int>[
+    for (final host in [tone.surface, tone.surface2, tone.bg, tone.appBg])
+      cm.composite(brand.p, softA, host),
+  ];
+  final pTintOver = <int>[
+    for (final host in [tone.surface, tone.surface2, tone.bg, tone.appBg])
+      cm.composite(brand.p, tintA, host),
+  ];
+  final aSoftOver = <int>[
+    for (final host in [tone.surface, tone.surface2, tone.bg, tone.appBg])
+      cm.composite(brand.a, aSoftA, host),
+  ];
 
-  // ── Income ink (on incomeSoft)
+  // Colored small-text inks must clear 4.5:1 on every host, not just one.
+  final primaryInk = cm.inkForLayers(
+    brand.p,
+    <int>[...pSoftOver, ...pTintOver, tone.surface, tone.bg],
+    4.5,
+  );
+  final accentInk = cm.inkForLayers(
+    brand.a,
+    <int>[...aSoftOver, tone.surface, tone.bg],
+    4.5,
+  );
+
+  // ── Income ink (opaque soft layer + naked bases)
   final incomeBase = semColor('income', isDark);
   final incomeSoftInt = semColor('incomeSoft', isDark);
   final incomeSoft = Color(incomeSoftInt);
   final incomeLine = Color(semColor('incomeLine', isDark));
-  final incomeInk = cm.inkFor(incomeBase, incomeSoftInt, 4.5);
+  final incomeInk = cm.inkForLayers(
+    incomeBase,
+    <int>[incomeSoftInt, tone.surface, tone.bg, tone.appBg],
+    4.5,
+  );
 
-  // ── Status inks (on respective soft backgrounds)
+  // ── Status inks (opaque soft layers + naked bases)
   final okSoftBase = semColor('okSoft', isDark);
   final okBase = semColor('okBase', isDark);
-  final okInk = cm.inkFor(okBase, okSoftBase, 4.5);
+  final okInk = cm.inkForLayers(
+    okBase,
+    <int>[okSoftBase, tone.surface, tone.bg, tone.appBg],
+    4.5,
+  );
 
   final warnSoftBase = semColor('warnSoft', isDark);
   final warnInkBase = semColor('warnInk', isDark);
 
   final dnBgBase = semColor('dnBg', isDark);
   final dnBase = semColor('dnBase', isDark);
-  final dnInk = cm.inkFor(dnBase, dnBgBase, 4.5);
+  final dnInk = cm.inkForLayers(
+    dnBase,
+    <int>[dnBgBase, tone.surface, tone.bg, tone.appBg],
+    4.5,
+  );
 
   // ── Hero gradient endpoints (§4.6 ④) — always white text
   final hero0 = cm.heroSafe(brand.hero0);
   final hero1 = cm.heroSafe(brand.hero1);
+  // heroDark0/1 are design-locked for white text; heroSafe is the safety net.
+  final heroDark0 = cm.heroSafe(brand.heroDark0);
+  final heroDark1 = cm.heroSafe(brand.heroDark1);
 
   // ── Charts (§4.6 ⑤)
   final chartTrack = Color(cm.chartTrack(tone.surface2, brand.p, isDark));
@@ -73,9 +119,13 @@ AppTokens resolveTokens(ThemeSpec spec, Brightness brightness) {
     line: Color(tone.line), lineSoft: Color(tone.lineSoft),
 
     primary: Color(brand.p), primaryDeep: Color(brand.pd),
-    primarySoft: Color(brand.ps), primaryTint: Color(brand.pt),
+    // Soft layers stay translucent — Flutter composites them at paint time
+    // (B-scheme "airiness"): same token reads slightly different on each host.
+    primarySoft: softOf(brand.p, softA),
+    primaryTint: softOf(brand.p, tintA),
 
-    accent: Color(brand.a), accentDeep: Color(brand.ad), accentSoft: Color(brand.as_),
+    accent: Color(brand.a), accentDeep: Color(brand.ad),
+    accentSoft: softOf(brand.a, aSoftA),
     accentGrad: linearGradient(Color(sheen), Color(brand.a)),
 
     onPrimary: Color(onPrimary), onAccent: Color(onAccent),
@@ -89,7 +139,7 @@ AppTokens resolveTokens(ThemeSpec spec, Brightness brightness) {
     dnBg: Color(dnBgBase), dnInk: Color(dnInk),
 
     heroGrad0: Color(hero0), heroGrad1: Color(hero1),
-    heroDarkGrad0: Color(brand.heroDark0), heroDarkGrad1: Color(brand.heroDark1),
+    heroDarkGrad0: Color(heroDark0), heroDarkGrad1: Color(heroDark1),
     frame: Color(brand.frame),
 
     chartTrack: chartTrack, barFill: barFill, dash: dash,
@@ -102,7 +152,8 @@ AppTokens resolveTokens(ThemeSpec spec, Brightness brightness) {
       (brand.p >> 16) & 0xFF, (brand.p >> 8) & 0xFF, brand.p & 0xFF, shadowAlpha),
     shadowAccent: Color.fromRGBO(
       (brand.a >> 16) & 0xFF, (brand.a >> 8) & 0xFF, brand.a & 0xFF, shadowAlpha),
-    toastBg: Color(isDark ? 0xFFE4EBE6 : 0xFF2E3B36),
+    // Toast is a decorative layer: inverted ink, never a hard-coded hex.
+    toastBg: Color(tone.ink),
     shadow1: Color.fromRGBO(0, 0, 0, isDark ? 0.20 : 0.06),
     shadow2: Color.fromRGBO(0, 0, 0, isDark ? 0.28 : 0.10),
     shadow3: Color.fromRGBO(0, 0, 0, isDark ? 0.36 : 0.14),

@@ -6,9 +6,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:plain/app/bootstrap.dart';
 import 'package:plain/app/breakpoints.dart';
 import 'package:plain/app/theme/design_tokens.dart';
+import 'package:plain/core/refresh/data_invalidation.dart';
 import 'package:plain/domain/entities/enums.dart';
 
 final _accountsProvider = FutureProvider<List<_AccountWithBalance>>((ref) async {
+  // Refetch when accounts or ledger entries change (balances derive from both).
+  ref.watch(accountsVersionProvider);
+  ref.watch(ledgerVersionProvider);
   final deps = ref.watch(appDependenciesProvider);
   final db = deps.db;
   final rows = db.raw.select(
@@ -67,6 +71,7 @@ class AccountsPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    watchBrandTheme(ref);
     final accountsAsync = ref.watch(_accountsProvider);
 
     return Scaffold(
@@ -114,7 +119,7 @@ class AccountsPage extends ConsumerWidget {
                 const SizedBox(height: Spacing.lg),
                 ...accounts.map((a) => _AccountTile(
                       account: a,
-                      onRefresh: () => ref.invalidate(_accountsProvider),
+                      onRefresh: () => ref.invalidateData.bumpAccountsMutated(),
                       onReconcile: () => _showReconcileDialog(context, ref, a),
                     )),
               ],
@@ -139,7 +144,7 @@ class AccountsPage extends ConsumerWidget {
       context: context,
       isScrollControlled: true,
       builder: (ctx) => _AddAccountSheet(onSaved: () {
-        ref.invalidate(_accountsProvider);
+        ref.invalidateData.bumpAccountsMutated();
       }),
     );
   }
@@ -159,7 +164,7 @@ class AccountsPage extends ConsumerWidget {
             TextField(
               controller: ctrl,
               keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              decoration: const InputDecoration(labelText: '实际余额', border: OutlineInputBorder(), prefixText: '\u00a5'),
+              decoration: const InputDecoration(labelText: '瀹為檯浣欓', border: OutlineInputBorder(), prefixText: '\u00a5'),
             ),
           ],
         ),
@@ -200,7 +205,7 @@ class AccountsPage extends ConsumerWidget {
               }
 
               if (ctx.mounted) Navigator.pop(ctx);
-              ref.invalidate(_accountsProvider);
+              ref.invalidateData.bumpAccountsMutated();
             },
             child: const Text('对账'),
           ),
@@ -390,3 +395,5 @@ class _TypeOption extends StatelessWidget {
     );
   }
 }
+
+

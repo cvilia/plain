@@ -107,3 +107,40 @@ int barFill(int appBg, int primary, bool isDark) =>
 
 /// ⑦ dash: mix(line, muted, 0.42)
 int dashColor(int line, int muted) => mix(line, muted, 0.42);
+
+// ─── Layer compositing + multi-background ink (§4.1 / §4.6 ①′) ───────────────
+
+/// Composite [fg] at [alpha] over [bg], returning an opaque result.
+/// Linear interpolation in sRGB component space — bit-identical to browser
+/// and Flutter source-over compositing. Do NOT switch to linear-light mixing:
+/// the contrast gate must validate the color that actually renders.
+int composite(int fg, double alpha, int bg) => mix(bg, fg, alpha);
+
+/// ①′ inkForLayers: text color that hits [target] contrast against **every**
+/// background in [backgrounds].
+///
+/// Direction is decided by black/white endpoints (same rule as [inkFor]),
+/// never a mid-gray probe. Theme tint layers share a polarity, so pure black
+/// or pure white always resolves — the function must not report "not found".
+int inkForLayers(int fg, List<int> backgrounds, double target) {
+  if (backgrounds.isEmpty) return fg;
+  bool ok(int c) => backgrounds.every((bg) => contrast(c, bg) >= target);
+  if (ok(fg)) return fg;
+
+  // Hardest base for the original fg — used only to pick the push direction.
+  final hardest = backgrounds.reduce(
+      (a, b) => contrast(fg, a) < contrast(fg, b) ? a : b);
+  final toBlack = contrast(_black, hardest) > contrast(_white, hardest);
+  final primaryEnd = toBlack ? _black : _white;
+  final fallbackEnd = toBlack ? _white : _black;
+
+  for (final endpoint in [primaryEnd, fallbackEnd]) {
+    for (var t = 0.05; t <= 1.0; t += 0.05) {
+      final c = mix(fg, endpoint, t);
+      if (ok(c)) return c;
+    }
+    if (ok(endpoint)) return endpoint;
+  }
+  // Same-polarity layers: the preferred endpoint always clears 4.58:1.
+  return primaryEnd;
+}

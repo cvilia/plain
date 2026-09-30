@@ -6,7 +6,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:plain/app/bootstrap.dart';
 import 'package:plain/app/breakpoints.dart';
 import 'package:plain/app/theme/design_tokens.dart';
-import 'package:plain/data/data_freshness.dart';
+import 'package:plain/app/theme/theme_registry.dart';
+import 'package:plain/core/refresh/data_invalidation.dart';
 import 'package:plain/design_system/donut_chart.dart';
 
 class MonthlyReport {
@@ -17,6 +18,7 @@ class MonthlyReport {
     required this.incomeCents,
     required this.txCount,
     required this.categoryBreakdown,
+    this.dailyExpense = const {},
   });
 
   final int year;
@@ -25,6 +27,9 @@ class MonthlyReport {
   final int incomeCents;
   final int txCount;
   final List<CategorySlice> categoryBreakdown;
+
+  /// day-of-month (1–31) → expense cents. Used by 日支出走势.
+  final Map<int, int> dailyExpense;
 
   int get balanceCents => incomeCents - expenseCents;
 }
@@ -60,7 +65,7 @@ class SelectedMonthNotifier extends Notifier<DateTime> {
 final _selectedMonthProvider = NotifierProvider<SelectedMonthNotifier, DateTime>(SelectedMonthNotifier.new);
 
 final _reportProvider = FutureProvider<MonthlyReport>((ref) async {
-  ref.watch(dataFreshnessProvider);
+  ref.watch(ledgerVersionProvider);
   final month = ref.watch(_selectedMonthProvider);
   final deps = ref.watch(appDependenciesProvider);
   final db = deps.db;
@@ -84,10 +89,10 @@ final _reportProvider = FutureProvider<MonthlyReport>((ref) async {
   final catRows = db.raw.select('SELECT id, name FROM categories WHERE deleted_at IS NULL');
   final catMap = {for (final r in catRows) r['id']! as String: r['name']! as String};
 
-  final colors = [
+  // Category slices prefer the fixed CATCOL palette (INV-1).
+  final fallbackColors = [
     BrandColors.expense, BrandColors.primary, BrandColors.accent,
     BrandColors.transfer, BrandColors.income,
-    const Color(0xFF9B7BB8), const Color(0xFFD4A76A), const Color(0xFF6B9BD2),
   ];
 
   var colorIdx = 0;
@@ -101,12 +106,30 @@ final _reportProvider = FutureProvider<MonthlyReport>((ref) async {
 
     if (exp > 0) {
       final catId = row['category_id']! as String;
+      final catName = catMap[catId] ?? '其他';
       breakdown.add(CategorySlice(
-        name: catMap[catId] ?? '其他',
+        name: catName,
         expenseCents: exp,
-        color: colors[colorIdx % colors.length],
+        color: CATCOL[catName] != null
+            ? Color(CATCOL[catName]!)
+            : fallbackColors[colorIdx % fallbackColors.length],
       ));
       colorIdx++;
+    }
+  }
+
+  // Daily expense for 日支出走势
+  final dayRows = db.raw.select(
+    'SELECT day_key, SUM(expense_cents) AS exp FROM daily_stats '
+    'WHERE book_id = ? AND day_key >= ? AND day_key < ? GROUP BY day_key',
+    [deps.bookId, dayFrom, dayTo],
+  );
+  final dailyExpense = <int, int>{};
+  for (final row in dayRows) {
+    final key = row['day_key']! as String;
+    final day = int.tryParse(key.substring(key.length - 2)) ?? 0;
+    if (day > 0) {
+      dailyExpense[day] = (dailyExpense[day] ?? 0) + ((row['exp'] as int?) ?? 0);
     }
   }
 
@@ -117,11 +140,12 @@ final _reportProvider = FutureProvider<MonthlyReport>((ref) async {
     incomeCents: totalIncome,
     txCount: totalCount,
     categoryBreakdown: breakdown,
+    dailyExpense: dailyExpense,
   );
 });
 
 final _prevReportProvider = FutureProvider<MonthlyReport>((ref) async {
-  ref.watch(dataFreshnessProvider);
+  ref.watch(ledgerVersionProvider);
   final month = ref.watch(_selectedMonthProvider);
   final prevMonth = month.month == 1 ? DateTime(month.year - 1, 12) : DateTime(month.year, month.month - 1);
   final deps = ref.watch(appDependenciesProvider);
@@ -152,6 +176,7 @@ class ReportsPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    watchBrandTheme(ref);
     final selectedMonth = ref.watch(_selectedMonthProvider);
     final reportAsync = ref.watch(_reportProvider);
     final prevAsync = ref.watch(_prevReportProvider);
@@ -214,20 +239,12 @@ class _ReportContentState extends State<_ReportContent> {
         .map((s) => DonutSegment(name: s.name, value: s.expenseCents, color: s.color))
         .toList();
 
+    // 高保真 SP-3-01：支出分类 → 日支出走势 → 月对比
     return ListView(
       padding: const EdgeInsets.all(Spacing.lg),
       children: [
-        _SummaryCard(report: report),
-        const SizedBox(height: Spacing.lg),
-        widget.prevAsync.when(
-          data: (prev) => _ComparisonCard(current: report, previous: prev),
-          loading: () => const SizedBox.shrink(),
-          error: (e, _) => const SizedBox.shrink(),
-        ),
-        const SizedBox(height: Spacing.lg),
         if (segments.isNotEmpty) ...[
-          Text('分类支出占比', style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
-          const SizedBox(height: Spacing.md),
+          _sectionTitle(context, '支出分类'),
           Card(
             child: Padding(
               padding: const EdgeInsets.all(Spacing.lg),
@@ -244,7 +261,85 @@ class _ReportContentState extends State<_ReportContent> {
               ),
             ),
           ),
+          const SizedBox(height: Spacing.lg),
         ],
+        _sectionTitle(context, '日支出走势'),
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(Spacing.lg),
+            child: _DailyBars(dailyExpense: report.dailyExpense, month: report.month, year: report.year),
+          ),
+        ),
+        const SizedBox(height: Spacing.lg),
+        _sectionTitle(context, '月对比'),
+        widget.prevAsync.when(
+          data: (prev) => _ComparisonCard(current: report, previous: prev),
+          loading: () => const SizedBox.shrink(),
+          error: (e, _) => const SizedBox.shrink(),
+        ),
+      ],
+    );
+  }
+
+  Widget _sectionTitle(BuildContext context, String text) => Padding(
+        padding: const EdgeInsets.only(left: 2, bottom: Spacing.sm),
+        child: Text(text, style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
+      );
+}
+
+/// 日支出柱状图（高保真 .bars）
+class _DailyBars extends StatelessWidget {
+  const _DailyBars({required this.dailyExpense, required this.month, required this.year});
+  final Map<int, int> dailyExpense;
+  final int month;
+  final int year;
+
+  @override
+  Widget build(BuildContext context) {
+    final daysInMonth = DateTime(year, month + 1, 0).day;
+    final maxExp = dailyExpense.values.fold<int>(0, (m, v) => v > m ? v : m);
+    final now = DateTime.now();
+    final isCurrentMonth = now.year == year && now.month == month;
+    final today = now.day;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text('$month/1', style: TextStyle(fontSize: 10, color: BrandColors.inkTertiary)),
+            Text('$month/${daysInMonth ~/ 2}', style: TextStyle(fontSize: 10, color: BrandColors.inkTertiary)),
+            Text('$month/$daysInMonth', style: TextStyle(fontSize: 10, color: BrandColors.inkTertiary)),
+          ],
+        ),
+        const SizedBox(height: 8),
+        SizedBox(
+          height: 92,
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              for (var d = 1; d <= daysInMonth; d++)
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 1.5),
+                    child: Tooltip(
+                      message: '$month月$d日 ¥${((dailyExpense[d] ?? 0) / 100).toStringAsFixed(2)}',
+                      child: Container(
+                        height: ((dailyExpense[d] ?? 0) / (maxExp == 0 ? 1 : maxExp) * 92).clamp(3.0, 92.0),
+                        decoration: BoxDecoration(
+                          color: (isCurrentMonth && d == today)
+                              ? BrandColors.primary
+                              : BrandColors.barFill,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
       ],
     );
   }
@@ -352,3 +447,5 @@ class _ChangeItem extends StatelessWidget {
     );
   }
 }
+
+

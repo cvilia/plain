@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:plain/app/bootstrap.dart';
+import 'package:plain/app/first_launch.dart';
 import 'package:plain/app/l10n/app_strings.dart';
 import 'package:plain/app/router/app_router.dart';
 import 'package:plain/app/theme/design_tokens.dart';
@@ -17,9 +18,14 @@ import 'package:plain/core/id/uuid_v7.dart';
 import 'package:plain/data/db/database.dart';
 import 'package:plain/data/seed/preset_categories.dart';
 import 'package:plain/features/security/app_lock_screen.dart';
+import 'package:plain/features/settings/onboarding_page.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Theme prefs must be known before first frame (§5.2). Failure → defaults.
+  await preloadThemePrefs();
+  final onboardPending = await isOnboardingPending();
 
   AppDatabase? db;
   AppDependencies? deps;
@@ -48,19 +54,22 @@ Future<void> main() async {
   runApp(
     ProviderScope(
       overrides: [appDependenciesProvider.overrideWithValue(deps)],
-      child: const PlainApp(),
+      child: PlainApp(showOnboarding: onboardPending),
     ),
   );
 }
 
 class PlainApp extends ConsumerStatefulWidget {
-  const PlainApp({super.key});
+  const PlainApp({super.key, this.showOnboarding = false});
+  final bool showOnboarding;
+
   @override
   ConsumerState<PlainApp> createState() => _PlainAppState();
 }
 
 class _PlainAppState extends ConsumerState<PlainApp> with WidgetsBindingObserver {
   late final _router = buildRouter();
+  late bool _onboarding = widget.showOnboarding;
 
   @override
   void initState() {
@@ -105,6 +114,23 @@ class _PlainAppState extends ConsumerState<PlainApp> with WidgetsBindingObserver
 
     final (_, lightTheme) = themeDataFor(prefs.themeId, Brightness.light);
     final (_, darkTheme) = themeDataFor(prefs.themeId, Brightness.dark);
+
+    // First launch: full-screen onboarding (SP-0-01), no shell chrome.
+    if (_onboarding) {
+      return MaterialApp(
+        title: 'SuJi',
+        debugShowCheckedModeBanner: false,
+        theme: lightTheme,
+        darkTheme: darkTheme,
+        themeMode: prefs.themeMode,
+        home: OnboardingPage(
+          onDone: () async {
+            await markOnboardingDone();
+            if (mounted) setState(() => _onboarding = false);
+          },
+        ),
+      );
+    }
 
     return MaterialApp.router(
       title: 'SuJi',

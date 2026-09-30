@@ -4,7 +4,7 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:plain/app/theme/color_math.dart';
+import 'package:plain/app/theme/design_tokens.dart';
 import 'package:plain/app/theme/theme_prefs.dart';
 import 'package:plain/app/theme/theme_registry.dart';
 
@@ -21,7 +21,7 @@ class ThemePage extends ConsumerWidget {
         padding: const EdgeInsets.all(16),
         children: [
           // ── Appearance 3-state ──
-          const Text('外观', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.grey)),
+          Text('外观', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: BrandColors.inkTertiary)),
           const SizedBox(height: 8),
           SegmentedButton<ThemeMode>(
             style: SegmentedButton.styleFrom(textStyle: const TextStyle(fontSize: 13)),
@@ -38,7 +38,7 @@ class ThemePage extends ConsumerWidget {
           const SizedBox(height: 24),
 
           // ── Theme grid ──
-          const Text('主题', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.grey)),
+          Text('主题', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: BrandColors.inkTertiary)),
           const SizedBox(height: 8),
           ...ThemeId.values.map((id) => _ThemeCard(
             spec: themeSpecOf(id),
@@ -74,7 +74,7 @@ class _ThemeCard extends StatelessWidget {
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
         side: BorderSide(
-          color: selected ? Color(brand.p) : Colors.grey.shade300,
+          color: selected ? Color(brand.pd) : BrandColors.divider,
           width: selected ? 2 : 1,
         ),
       ),
@@ -106,15 +106,15 @@ class _ThemeCard extends StatelessWidget {
                   children: [
                     Text(spec.name, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
                     const SizedBox(height: 2),
-                    Text(spec.tag, style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+                    Text(spec.tag, style: TextStyle(fontSize: 12, color: BrandColors.inkTertiary)),
                   ],
                 ),
               ),
-              // Checkmark
+              // Checkmark — use deep primary so light themes stay visible on card
               if (selected)
-                Icon(Icons.check_circle, color: Color(brand.p), size: 22)
+                Icon(Icons.check_circle, color: Color(brand.pd), size: 22)
               else
-                Icon(Icons.circle_outlined, color: Colors.grey.shade400, size: 22),
+                Icon(Icons.circle_outlined, color: BrandColors.inkTertiary, size: 22),
             ],
           ),
         ),
@@ -135,7 +135,7 @@ class _Dot extends StatelessWidget {
       decoration: BoxDecoration(
         color: color,
         shape: BoxShape.circle,
-        border: Border.all(color: Colors.grey.shade300, width: 1),
+        border: Border.all(color: BrandColors.divider, width: 1),
       ),
     );
   }

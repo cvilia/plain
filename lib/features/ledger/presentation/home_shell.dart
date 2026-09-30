@@ -2,16 +2,19 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:plain/app/breakpoints.dart';
 import 'package:plain/app/theme/design_tokens.dart';
 
-class HomeShell extends StatelessWidget {
+class HomeShell extends ConsumerWidget {
   const HomeShell({super.key, required this.navigationShell});
   final StatefulNavigationShell navigationShell;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    // Shell stays mounted across theme switches — must follow BrandColors.
+    watchBrandTheme(ref);
     return LayoutBuilder(
       builder: (context, constraints) {
         final sizeClass = Breakpoints.sizeClassFromConstraints(constraints);
