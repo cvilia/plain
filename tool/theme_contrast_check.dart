@@ -134,10 +134,10 @@ void main() {
     }
   }
 
-  // ── INV-1: CATCOL invariant across themes (spot-check)
-  final catColors = CATCOL.values.toSet();
+  // ── INV-1: categoryColorMap invariant across themes (spot-check)
+  final catColors = categoryColorMap.values.toSet();
   if (catColors.length != 12) {
-    stderr.writeln('INV-1 violated: CATCOL must have exactly 12 unique colors, got ${catColors.length}');
+    stderr.writeln('INV-1 violated: categoryColorMap must have exactly 12 unique colors, got ${catColors.length}');
     exit(1);
   }
 

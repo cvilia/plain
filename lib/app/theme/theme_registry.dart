@@ -1,5 +1,5 @@
 /// Theme registry: compile-time color constants for 10 themes × 2 brightness.
-/// Values are authoritative from 需求变更.md §4.3–4.5 — do not modify without re-running contrast gate.
+/// Values are authoritative from 04-技术架构设计.md §16.1 — do not modify without re-running contrast gate.
 library;
 
 /// Theme identifiers. [id] is the frozen persistence key (pinyin, never
@@ -151,7 +151,7 @@ TonePalette toneOf(ToneId tone, bool isDark) =>
     (isDark ? _toneDark : _toneLight)[tone]!;
 
 // ─── Brand layer: 10 themes × 2 brightness ───────────────────────────────────
-// Values copied field-for-field from 需求变更.md §4.4. No rounding, no tweaks.
+// Values copied field-for-field from 04-技术架构设计.md §16.1. No rounding, no tweaks.
 
 const Map<ThemeId, ThemeSpec> _specs = {
   ThemeId.qingci: ThemeSpec(
@@ -291,20 +291,27 @@ ThemeSpec themeSpecOf(ThemeId id) => _specs[id] ?? _specs[ThemeId.qingci]!;
 // ─── Fixed palettes (cross-theme invariant, INV-1) ───────────────────────────
 
 /// Category colors — 12 items, identical across all themes.
-const Map<String, int> CATCOL = {
-  '餐饮': 0xFFE69A6D,
-  '购物': 0xFFDC8EA6,
-  '日用': 0xFF9B8FD4,
-  '交通': 0xFF75B2C8,
-  '蔬果': 0xFF97BC81,
-  '娱乐': 0xFFBFA8E9,
-  '居住': 0xFFC58B72,
-  '医疗': 0xFFD97C7C,
-  '学习': 0xFF7FA8DC,
-  '人情': 0xFFC977A8,
-  '其他': 0xFFA3ABA4,
-  '通讯': 0xFF6FAFA3,
+/// Fixed 12-color palette for expense category slices (INV-1).
+///
+/// Keyed by the stable category `iconRef` (not the display name) so user
+/// renames do not break chart colors. See 14-代码优化建议.md P0-9.
+const Map<String, int> categoryColorMap = {
+  'food': 0xFFE69A6D,
+  'shopping': 0xFFDC8EA6,
+  'daily': 0xFF9B8FD4,
+  'transport': 0xFF75B2C8,
+  'fruit': 0xFF97BC81,
+  'entertainment': 0xFFBFA8E9,
+  'housing': 0xFFC58B72,
+  'medical': 0xFFD97C7C,
+  'study': 0xFF7FA8DC,
+  'social': 0xFFC977A8,
+  'other': 0xFFA3ABA4,
+  'telecom': 0xFF6FAFA3,
 };
+
+/// Resolve a slice color from a category's iconRef; falls back to null.
+int? categoryColorFor(String iconRef) => categoryColorMap[iconRef];
 
 /// Income / expense semantic colors (fixed, not theme-derived).
 const Map<String, int> _semLight = {

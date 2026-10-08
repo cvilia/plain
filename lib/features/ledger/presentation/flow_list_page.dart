@@ -2,14 +2,18 @@
 /// Visual source of truth: 09-高保真UI.html SP-0-02.
 library;
 
+import 'package:plain/app/theme/app_colors.dart';
+import 'package:plain/core/time/date_format.dart';
+import 'package:plain/design_system/category_avatar.dart';
+import 'package:plain/design_system/app_empty_state.dart';
 import 'package:flutter/material.dart';
+import 'package:plain/design_system/app_toast.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:plain/app/breakpoints.dart';
 import 'package:plain/app/theme/design_tokens.dart';
 import 'package:plain/app/theme/tokens.dart';
-import 'package:plain/core/constants/app_constants.dart';
-import 'package:plain/design_system/category_icons.dart';
+import 'package:plain/core/format/amount_formatter.dart';
 import 'package:plain/domain/entities/category.dart' as domain;
 import 'package:plain/domain/entities/enums.dart';
 import 'package:plain/domain/entities/ledger_entry.dart';
@@ -20,7 +24,6 @@ class FlowListPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    watchBrandTheme(ref);
     final state = ref.watch(flowListControllerProvider);
     final controller = ref.read(flowListControllerProvider.notifier);
 
@@ -44,19 +47,11 @@ class _EmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.receipt_long_outlined, size: 80, color: BrandColors.inkTertiary),
-          const SizedBox(height: Spacing.lg),
-          Text('还没有记录', style: Theme.of(context).textTheme.titleMedium?.copyWith(color: BrandColors.inkSecondary)),
-          const SizedBox(height: Spacing.sm),
-          Text('点击下方按钮记一笔', style: Theme.of(context).textTheme.bodySmall?.copyWith(color: BrandColors.inkTertiary)),
-          const SizedBox(height: Spacing.xl),
-          FilledButton.icon(onPressed: onEntryTap, icon: const Icon(Icons.add), label: const Text('记一笔')),
-        ],
-      ),
+    return AppEmptyState(
+      icon: Icons.receipt_long_outlined,
+      title: '还没有记录',
+      subtitle: '点击下方按钮记一笔',
+      action: FilledButton.icon(onPressed: onEntryTap, icon: const Icon(Icons.add), label: const Text('记一笔')),
     );
   }
 }
@@ -88,12 +83,13 @@ class _FlowList extends StatelessWidget {
 }
 
 /// 结余卡：hero 渐变 + 漂浮光斑（高保真记忆点）。
-class _BalanceCard extends StatelessWidget {
+class _BalanceCard extends ConsumerWidget {
   const _BalanceCard({required this.state});
   final FlowListState state;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final hideAmounts = ref.watch(hideAmountsProvider);
     var income = 0;
     var expense = 0;
     for (final g in state.groups) {
@@ -113,7 +109,7 @@ class _BalanceCard extends StatelessWidget {
             Positioned.fill(
               child: DecoratedBox(
                 decoration: BoxDecoration(
-                  gradient: heroGradient(BrandColors.heroStart, BrandColors.heroEnd),
+                  gradient: heroGradient(context.colors.heroStart, context.colors.heroEnd),
                 ),
               ),
             ),
@@ -136,7 +132,7 @@ class _BalanceCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    '${balance >= 0 ? '+' : ''}${(balance / 100).toStringAsFixed(2)}',
+                    '${balance >= 0 ? '+' : ''}${formatAmount(balance, hide: hideAmounts)}',
                     style: const TextStyle(
                       fontSize: 30,
                       fontWeight: FontWeight.w600,
@@ -148,9 +144,9 @@ class _BalanceCard extends StatelessWidget {
                   const SizedBox(height: 14),
                   Row(
                     children: [
-                      _BalanceStat(label: '收入', value: '+${(income / 100).toStringAsFixed(2)}', color: const Color(0xFFFFDCC6)),
+                      _BalanceStat(label: '收入', value: '+${formatAmount(income, hide: hideAmounts)}', color: const Color(0xFFFFDCC6)),
                       const SizedBox(width: Spacing.xl),
-                      _BalanceStat(label: '支出', value: '-${(expense / 100).toStringAsFixed(2)}', color: const Color(0xFFDFF2EC)),
+                      _BalanceStat(label: '支出', value: '-${formatAmount(expense, hide: hideAmounts)}', color: const Color(0xFFDFF2EC)),
                     ],
                   ),
                   const SizedBox(height: 10),
@@ -205,25 +201,26 @@ class _BalanceStat extends StatelessWidget {
   }
 }
 
-class _DayGroupWidget extends StatelessWidget {
+class _DayGroupWidget extends ConsumerWidget {
   const _DayGroupWidget({required this.group, required this.controller, required this.categoryMap});
   final DayGroup group;
   final FlowListController controller;
   final Map<String, domain.Category> categoryMap;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final hideAmounts = ref.watch(hideAmountsProvider);
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Padding(
         padding: const EdgeInsets.fromLTRB(Spacing.lg, Spacing.lg, Spacing.lg, Spacing.sm),
         child: Row(children: [
-          Text(_dayLabel(group.dayKey), style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600, color: BrandColors.ink)),
+          Text(_dayLabel(group.dayKey), style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600, color: context.colors.ink)),
           const Spacer(),
           if (group.dayExpense > 0)
-            Text('-${(group.dayExpense / 100).toStringAsFixed(2)}', style: TextStyle(fontSize: 12, color: BrandColors.expense)),
+            Text('-${formatAmount(group.dayExpense, hide: hideAmounts)}', style: TextStyle(fontSize: 12, color: context.colors.expense)),
           if (group.dayIncome > 0) ...[
             const SizedBox(width: Spacing.sm),
-            Text('+${(group.dayIncome / 100).toStringAsFixed(2)}', style: TextStyle(fontSize: 12, color: BrandColors.income)),
+            Text('+${formatAmount(group.dayIncome, hide: hideAmounts)}', style: TextStyle(fontSize: 12, color: context.colors.income)),
           ],
         ]),
       ),
@@ -231,33 +228,20 @@ class _DayGroupWidget extends StatelessWidget {
     ]);
   }
 
-  String _dayLabel(String dayKey) {
-    final now = DateTime.now();
-    final today = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
-    final y = now.subtract(const Duration(days: 1));
-    final yest = '${y.year}-${y.month.toString().padLeft(2, '0')}-${y.day.toString().padLeft(2, '0')}';
-    if (dayKey == today) return '今天';
-    if (dayKey == yest) return '昨天';
-    final parts = dayKey.split('-');
-    if (parts.length != 3) return dayKey;
-    final wd = const ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
-    final dt = DateTime.tryParse(dayKey);
-    final weekday = dt == null ? '' : ' ${wd[dt.weekday % 7]}';
-    return '${int.parse(parts[1])}月${int.parse(parts[2])}日$weekday';
-  }
+  String _dayLabel(String dayKey) => dayLabel(dayKey);
 }
 
-class _EntryTile extends StatefulWidget {
+class _EntryTile extends ConsumerStatefulWidget {
   const _EntryTile({required this.entry, required this.category, required this.controller});
   final LedgerEntry entry;
   final domain.Category? category;
   final FlowListController controller;
 
   @override
-  State<_EntryTile> createState() => _EntryTileState();
+  ConsumerState<_EntryTile> createState() => _EntryTileState();
 }
 
-class _EntryTileState extends State<_EntryTile> {
+class _EntryTileState extends ConsumerState<_EntryTile> {
   bool _dismissing = false;
 
   @override
@@ -267,9 +251,9 @@ class _EntryTileState extends State<_EntryTile> {
     final controller = widget.controller;
     final isExpense = entry.type == EntryType.expense;
     final isIncome = entry.type == EntryType.income;
-    final amountColor = isExpense ? BrandColors.expense : isIncome ? BrandColors.income : BrandColors.transfer;
+    final amountColor = isExpense ? context.colors.expense : isIncome ? context.colors.income : context.colors.transfer;
     final prefix = isExpense ? '-' : isIncome ? '+' : '';
-    final amountText = '$prefix${(entry.amount.cents / 100).toStringAsFixed(2)}';
+    final amountText = '$prefix${formatAmount(entry.amount.cents, hide: ref.watch(hideAmountsProvider))}';
 
     return Dismissible(
       key: Key(entry.id),
@@ -277,8 +261,8 @@ class _EntryTileState extends State<_EntryTile> {
       background: Container(
         alignment: Alignment.centerRight,
         padding: const EdgeInsets.only(right: Spacing.lg),
-        color: BrandColors.expense.withValues(alpha: 0.15),
-        child: Icon(Icons.delete_outline, color: BrandColors.expense),
+        color: context.colors.expense.withValues(alpha: 0.15),
+        child: Icon(Icons.delete_outline, color: context.colors.expense),
       ),
       confirmDismiss: (direction) async {
         // Prevent multiple calls during dismiss animation
@@ -286,37 +270,27 @@ class _EntryTileState extends State<_EntryTile> {
         _dismissing = true;
 
         final ok = await controller.deleteEntry(entry.id);
-        if (ok && mounted) {
-          // Clear old snackbars first, then show new one
-          ScaffoldMessenger.of(context)
-            ..hideCurrentSnackBar()
-            ..clearSnackBars()
-            ..showSnackBar(SnackBar(
-              content: const Text('已删除'),
-              duration: UiDurations.undoWindow,
-              action: SnackBarAction(
-                label: '撤销',
-                onPressed: () async {
-                  await controller.undoDelete();
-                },
-              ),
-            ));
-        }
+        if (!ok) return ok;
+        // Guard State.context across the async gap before using it.
+        if (!context.mounted) return ok;
+        showAppToastWithAction(
+          context,
+          '已删除',
+          actionLabel: '撤销',
+          onAction: () => controller.undoDelete(),
+          bottom: 120,
+        );
         return ok;
       },
       child: ListTile(
         contentPadding: const EdgeInsets.symmetric(horizontal: Spacing.lg, vertical: Spacing.xs),
-        leading: CircleAvatar(
-          radius: 20,
-          backgroundColor: amountColor.withValues(alpha: 0.1),
-          child: Icon(iconForCategory(category?.iconRef ?? 'other'), size: 20, color: amountColor),
-        ),
+        leading: CategoryAvatar(iconRef: category?.iconRef ?? 'other', color: amountColor),
         title: Text(category?.name ?? '未分类', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500)),
         subtitle: Text(
           _subtitleOf(entry),
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: TextStyle(fontSize: 12, color: BrandColors.inkTertiary),
+          style: TextStyle(fontSize: 12, color: context.colors.inkTertiary),
         ),
         trailing: Text(amountText, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: amountColor)),
         onTap: () => context.push('/entry/${entry.id}'),

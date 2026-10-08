@@ -1,6 +1,7 @@
 /// Compact total-budget progress strip for the home flow list. See PRD F5.1.
 library;
 
+import 'package:plain/app/theme/app_colors.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:plain/app/bootstrap.dart';
@@ -28,15 +29,15 @@ class BudgetProgressStrip extends ConsumerWidget {
     final async = ref.watch(budgetStatusProvider);
     return async.when(
       loading: () => const SizedBox.shrink(),
-      error: (_, __) => const SizedBox.shrink(),
+      error: (_, _) => const SizedBox.shrink(),
       data: (status) {
         if (status == null) return const SizedBox.shrink();
         final hide = ref.watch(hideAmountsProvider);
         final ratio = status.ratio.clamp(0.0, 1.0);
         final color = switch (status.level) {
-          BudgetLevel.over => BrandColors.expense,
-          BudgetLevel.warn => BrandColors.accent,
-          BudgetLevel.ok => BrandColors.primary,
+          BudgetLevel.over => context.colors.expense,
+          BudgetLevel.warn => context.colors.accent,
+          BudgetLevel.ok => context.colors.primary,
         };
         return Padding(
           padding: const EdgeInsets.fromLTRB(Spacing.lg, Spacing.sm, Spacing.lg, 0),
@@ -50,7 +51,7 @@ class BudgetProgressStrip extends ConsumerWidget {
                     maxLines: 1, overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       fontSize: AdaptiveFontSizes.caption,
-                      color: BrandColors.inkSecondary,
+                      color: context.colors.inkSecondary,
                     ),
                   ),
                 ),
@@ -69,7 +70,7 @@ class BudgetProgressStrip extends ConsumerWidget {
                 child: LinearProgressIndicator(
                   value: ratio,
                   minHeight: 6,
-                  backgroundColor: BrandColors.surfaceMuted,
+                  backgroundColor: context.colors.surfaceMuted,
                   valueColor: AlwaysStoppedAnimation(color),
                 ),
               ),

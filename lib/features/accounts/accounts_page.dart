@@ -1,53 +1,33 @@
 /// Account management page (SP-2-01). See PRD STORY-2.1.
 library;
 
+import 'package:plain/app/theme/app_colors.dart';
+import 'package:plain/design_system/category_avatar.dart';
+import 'package:plain/design_system/app_empty_state.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:plain/app/bootstrap.dart';
 import 'package:plain/app/breakpoints.dart';
 import 'package:plain/app/theme/design_tokens.dart';
+import 'package:plain/core/format/amount_formatter.dart';
+import 'package:plain/core/money/money.dart';
 import 'package:plain/core/refresh/data_invalidation.dart';
+import 'package:plain/domain/entities/category.dart';
 import 'package:plain/domain/entities/enums.dart';
+import 'package:plain/domain/repositories/repositories.dart';
+import 'package:plain/domain/usecases/entry_usecases.dart';
 
 final _accountsProvider = FutureProvider<List<_AccountWithBalance>>((ref) async {
   // Refetch when accounts or ledger entries change (balances derive from both).
   ref.watch(accountsVersionProvider);
   ref.watch(ledgerVersionProvider);
   final deps = ref.watch(appDependenciesProvider);
-  final db = deps.db;
-  final rows = db.raw.select(
-    'SELECT * FROM accounts WHERE deleted_at IS NULL ORDER BY sort_order ASC',
-  );
-  final result = <_AccountWithBalance>[];
-  for (final row in rows) {
-    final id = row['id']! as String;
-    final opening = (row['opening_balance_cents'] as int?) ?? 0;
-
-    final expRow = db.raw.select(
-      'SELECT COALESCE(SUM(amount_cents), 0) AS s FROM transactions '
-      'WHERE account_id = ? AND type = ? AND deleted_at IS NULL',
-      [id, 'expense'],
-    );
-    final incRow = db.raw.select(
-      'SELECT COALESCE(SUM(amount_cents), 0) AS s FROM transactions '
-      'WHERE account_id = ? AND type = ? AND deleted_at IS NULL',
-      [id, 'income'],
-    );
-    final exp = expRow.first['s']! as int;
-    final inc = incRow.first['s']! as int;
-
-    result.add(_AccountWithBalance(
-      id: id,
-      name: row['name']! as String,
-      type: AccountType.fromWire(row['type'] as String?),
-      openingBalance: opening,
-      balance: opening - exp + inc,
-      isHidden: (row['is_hidden'] as int?) == 1,
-    ));
-  }
-  return result;
+  final res = await deps.accountRepository.listWithBalances();
+  final list = res.successOrNull ?? const <AccountWithBalance>[];
+  return list.map(_AccountWithBalance.from).toList();
 });
 
+/// Flat view-model the list UI already expects.
 class _AccountWithBalance {
   const _AccountWithBalance({
     required this.id,
@@ -57,13 +37,21 @@ class _AccountWithBalance {
     required this.balance,
     required this.isHidden,
   });
-
   final String id;
   final String name;
   final AccountType type;
   final int openingBalance;
   final int balance;
   final bool isHidden;
+
+  factory _AccountWithBalance.from(AccountWithBalance src) => _AccountWithBalance(
+        id: src.account.id,
+        name: src.account.name,
+        type: src.account.type,
+        openingBalance: src.account.openingBalance,
+        balance: src.balanceCents,
+        isHidden: src.account.isHidden,
+      );
 }
 
 class AccountsPage extends ConsumerWidget {
@@ -71,7 +59,6 @@ class AccountsPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    watchBrandTheme(ref);
     final accountsAsync = ref.watch(_accountsProvider);
 
     return Scaffold(
@@ -79,18 +66,11 @@ class AccountsPage extends ConsumerWidget {
       body: accountsAsync.when(
         data: (accounts) {
           if (accounts.isEmpty) {
-            return ContentWidthConstraint(
-              child: Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.account_balance_wallet_outlined, size: 80, color: BrandColors.inkTertiary),
-                    const SizedBox(height: Spacing.lg),
-                    Text('还没有账户', style: Theme.of(context).textTheme.titleMedium?.copyWith(color: BrandColors.inkSecondary)),
-                    const SizedBox(height: Spacing.sm),
-                    Text('添加现金或银行卡', style: Theme.of(context).textTheme.bodySmall?.copyWith(color: BrandColors.inkTertiary)),
-                  ],
-                ),
+            return const ContentWidthConstraint(
+              child: AppEmptyState(
+                icon: Icons.account_balance_wallet_outlined,
+                title: '还没有账户',
+                subtitle: '添加现金或银行卡',
               ),
             );
           }
@@ -106,11 +86,11 @@ class AccountsPage extends ConsumerWidget {
                     padding: const EdgeInsets.all(Spacing.xl),
                     child: Column(
                       children: [
-                        Text('净资产', style: Theme.of(context).textTheme.bodySmall?.copyWith(color: BrandColors.inkSecondary)),
+                        Text('净资产', style: Theme.of(context).textTheme.bodySmall?.copyWith(color: context.colors.inkSecondary)),
                         const SizedBox(height: Spacing.sm),
                         Text(
-                          '\u00a5${(netAssets / 100).toStringAsFixed(2)}',
-                          style: TextStyle(fontSize: 32, fontWeight: FontWeight.w600, color: BrandColors.ink),
+                          formatAmountYuan(netAssets, hide: ref.watch(hideAmountsProvider)),
+                          style: TextStyle(fontSize: 32, fontWeight: FontWeight.w600, color: context.colors.ink),
                         ),
                       ],
                     ),
@@ -132,8 +112,8 @@ class AccountsPage extends ConsumerWidget {
       floatingActionButton: FloatingActionButton(
         heroTag: 'fab_accounts_add',
         onPressed: () => _showAddSheet(context, ref),
-        backgroundColor: BrandColors.primary,
-        foregroundColor: BrandColors.onPrimary,
+        backgroundColor: context.colors.primary,
+        foregroundColor: context.colors.onPrimary,
         child: const Icon(Icons.add),
       ),
     );
@@ -150,7 +130,7 @@ class AccountsPage extends ConsumerWidget {
   }
 
   void _showReconcileDialog(BuildContext context, WidgetRef ref, _AccountWithBalance account) {
-    final ctrl = TextEditingController(text: (account.balance / 100).toStringAsFixed(2));
+    final ctrl = TextEditingController(text: formatAmount(account.balance));
     showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -159,12 +139,12 @@ class AccountsPage extends ConsumerWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('当前余额: ${(account.balance / 100).toStringAsFixed(2)}'),
+            Text('当前余额: ${formatAmountYuan(account.balance, hide: ref.watch(hideAmountsProvider))}'),
             const SizedBox(height: Spacing.md),
             TextField(
               controller: ctrl,
               keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              decoration: const InputDecoration(labelText: '瀹為檯浣欓', border: OutlineInputBorder(), prefixText: '\u00a5'),
+              decoration: const InputDecoration(labelText: '实际余额', border: OutlineInputBorder(), prefixText: '\u00a5'),
             ),
           ],
         ),
@@ -174,38 +154,34 @@ class AccountsPage extends ConsumerWidget {
             onPressed: () async {
               final text = ctrl.text.trim();
               if (text.isEmpty) return;
-              final parts = text.split('.');
-              final yuan = int.tryParse(parts[0]) ?? 0;
-              var cent = 0;
-              if (parts.length > 1) {
-                final centStr = parts[1].padRight(2, '0').substring(0, 2);
-                cent = int.tryParse(centStr) ?? 0;
+              final int actualCents;
+              try {
+                actualCents = Money.parseYuan(text).cents;
+              } on FormatException {
+                return;
               }
-              final actualCents = yuan * 100 + cent;
               final diff = actualCents - account.balance;
 
               if (diff != 0) {
+                // Route through CreateEntryUseCase so change_log / daily_stats /
+                // UUID / revision are all written (raw INSERT used to skip them).
                 final deps = ref.read(appDependenciesProvider);
-                final db = deps.db;
-                final now = DateTime.now().toUtc().millisecondsSinceEpoch;
                 final isExpense = diff < 0;
-                final adjId = 'recon_$now';
-                final catRows = db.raw.select(
-                  "SELECT id FROM categories WHERE name = 'Other' AND deleted_at IS NULL LIMIT 1",
-                );
-                final catId = catRows.isEmpty ? null : catRows.first['id']! as String;
-
-                db.raw.execute(
-                  'INSERT INTO transactions '
-                  '(id,book_id,type,amount_cents,currency,category_id,account_id,'
-                  'occurred_at,note,source,created_at,updated_at,revision,device_id,base_revision) '
-                  'VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
-                  [adjId, deps.bookId, isExpense ? 'expense' : 'income', diff.abs(), 'CNY', catId, account.id, now, '对账调整', 'reconcile', now, now, 1, deps.deviceId, 0],
-                );
+                await deps.createEntry(CreateEntryInput(
+                  amountExpression: formatAmount(diff.abs()),
+                  type: isExpense ? EntryType.expense : EntryType.income,
+                  categoryId: isExpense ? 'preset_other' : 'preset_income_other',
+                  accountId: account.id,
+                  note: '对账调整',
+                  source: EntrySource.reconcile,
+                  bookId: deps.bookId,
+                  deviceId: deps.deviceId,
+                ));
               }
 
               if (ctx.mounted) Navigator.pop(ctx);
               ref.invalidateData.bumpAccountsMutated();
+              ref.invalidateData.bumpEntryMutated();
             },
             child: const Text('对账'),
           ),
@@ -215,26 +191,25 @@ class AccountsPage extends ConsumerWidget {
   }
 }
 
-class _AccountTile extends StatelessWidget {
+class _AccountTile extends ConsumerWidget {
   const _AccountTile({required this.account, required this.onRefresh, required this.onReconcile});
   final _AccountWithBalance account;
   final VoidCallback onRefresh;
   final VoidCallback onReconcile;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final isCash = account.type == AccountType.cash;
     return Card(
       margin: const EdgeInsets.only(bottom: Spacing.sm),
       child: ListTile(
         contentPadding: const EdgeInsets.symmetric(horizontal: Spacing.lg, vertical: Spacing.sm),
-        leading: CircleAvatar(
-          radius: 20,
-          backgroundColor: BrandColors.primary.withValues(alpha: 0.1),
-          child: Icon(isCash ? Icons.payments_outlined : Icons.credit_card_outlined, size: 20, color: BrandColors.primary),
+        leading: CategoryAvatar(
+          iconRef: isCash ? 'payments' : 'card',
+          color: context.colors.primary,
         ),
         title: Text(account.name, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500)),
-        subtitle: Text(isCash ? '现金' : '储蓄卡', style: TextStyle(fontSize: 12, color: BrandColors.inkTertiary)),
+        subtitle: Text(isCash ? '现金' : '储蓄卡', style: TextStyle(fontSize: 12, color: context.colors.inkTertiary)),
         trailing: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -242,9 +217,9 @@ class _AccountTile extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                Text('\u00a5${(account.balance / 100).toStringAsFixed(2)}', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: BrandColors.ink)),
+                Text(formatAmountYuan(account.balance, hide: ref.watch(hideAmountsProvider)), style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: context.colors.ink)),
                 if (account.openingBalance != 0)
-                  Text('期初: ${(account.openingBalance / 100).toStringAsFixed(2)}', style: TextStyle(fontSize: 11, color: BrandColors.inkTertiary)),
+                  Text('期初: ${formatAmount(account.openingBalance)}', style: TextStyle(fontSize: 11, color: context.colors.inkTertiary)),
               ],
             ),
             PopupMenuButton<String>(
@@ -325,28 +300,33 @@ class _AddAccountSheetState extends ConsumerState<_AddAccountSheet> {
     if (name.isEmpty) return;
     setState(() => _saving = true);
 
-    var openingCents = 0;
     final openingText = _openingCtrl.text.trim();
+    var openingCents = 0;
     if (openingText.isNotEmpty) {
-      final parts = openingText.split('.');
-      final yuan = int.tryParse(parts[0]) ?? 0;
-      var cent = 0;
-      if (parts.length > 1) {
-        final centStr = parts[1].padRight(2, '0').substring(0, 2);
-        cent = int.tryParse(centStr) ?? 0;
+      try {
+        openingCents = Money.parseYuan(openingText).cents;
+      } on FormatException {
+        openingCents = 0;
       }
-      openingCents = yuan * 100 + cent;
     }
 
-    final db = ref.read(appDependenciesProvider).db;
-    final deviceId = ref.read(appDependenciesProvider).deviceId;
-    final now = DateTime.now().toUtc().millisecondsSinceEpoch;
-    final id = 'acct_${DateTime.now().millisecondsSinceEpoch}';
-
-    db.raw.execute(
-      'INSERT INTO accounts (id,name,type,currency,opening_balance_cents,note,sort_order,is_hidden,created_at,updated_at,revision,device_id,base_revision) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)',
-      [id, name, _type.wire, 'CNY', openingCents, _noteCtrl.text.trim().isEmpty ? null : _noteCtrl.text.trim(), 0, 0, now, now, 1, deviceId, 0],
-    );
+    final deps = ref.read(appDependenciesProvider);
+    final now = deps.clock.now();
+    await deps.accountRepository.create(Account(
+      id: deps.idGen.generate(),
+      name: name,
+      type: _type,
+      currency: 'CNY',
+      openingBalance: openingCents,
+      note: _noteCtrl.text.trim().isEmpty ? null : _noteCtrl.text.trim(),
+      sortOrder: 0,
+      isHidden: false,
+      createdAt: now,
+      updatedAt: now,
+      revision: 1,
+      deviceId: deps.deviceId,
+      baseRevision: 0,
+    ));
 
     if (mounted) {
       widget.onSaved();
@@ -374,20 +354,20 @@ class _TypeOption extends StatelessWidget {
         width: 80,
         padding: const EdgeInsets.symmetric(vertical: Spacing.md),
         decoration: BoxDecoration(
-          color: !enabled ? BrandColors.surfaceMuted.withValues(alpha: 0.5) : selected ? BrandColors.primary.withValues(alpha: 0.1) : BrandColors.surfaceMuted,
+          color: !enabled ? context.colors.surfaceMuted.withValues(alpha: 0.5) : selected ? context.colors.primary.withValues(alpha: 0.1) : context.colors.surfaceMuted,
           borderRadius: BorderRadius.circular(Radii.md),
-          border: Border.all(color: !enabled ? BrandColors.border.withValues(alpha: 0.5) : selected ? BrandColors.primary : BrandColors.border),
+          border: Border.all(color: !enabled ? context.colors.border.withValues(alpha: 0.5) : selected ? context.colors.primary : context.colors.border),
         ),
         child: Column(children: [
-          Icon(icon, size: 28, color: !enabled ? BrandColors.inkTertiary.withValues(alpha: 0.4) : selected ? BrandColors.primary : BrandColors.inkSecondary),
+          Icon(icon, size: 28, color: !enabled ? context.colors.inkTertiary.withValues(alpha: 0.4) : selected ? context.colors.primary : context.colors.inkSecondary),
           const SizedBox(height: Spacing.xs),
-          Text(label, style: TextStyle(fontSize: 13, fontWeight: selected ? FontWeight.w600 : FontWeight.w400, color: !enabled ? BrandColors.inkTertiary.withValues(alpha: 0.4) : selected ? BrandColors.primary : BrandColors.inkSecondary)),
+          Text(label, style: TextStyle(fontSize: 13, fontWeight: selected ? FontWeight.w600 : FontWeight.w400, color: !enabled ? context.colors.inkTertiary.withValues(alpha: 0.4) : selected ? context.colors.primary : context.colors.inkSecondary)),
           if (badge != null) ...[
             const SizedBox(height: 2),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-              decoration: BoxDecoration(color: BrandColors.accent.withValues(alpha: 0.3), borderRadius: BorderRadius.circular(Radii.sm)),
-              child: Text(badge!, style: TextStyle(fontSize: 9, color: BrandColors.inkSecondary)),
+              decoration: BoxDecoration(color: context.colors.accent.withValues(alpha: 0.3), borderRadius: BorderRadius.circular(Radii.sm)),
+              child: Text(badge!, style: TextStyle(fontSize: 9, color: context.colors.inkSecondary)),
             ),
           ],
         ]),

@@ -13,6 +13,7 @@ import 'package:plain/domain/entities/ledger_entry.dart';
 import 'package:plain/domain/services/category_suggester.dart';
 import 'package:plain/domain/usecases/entry_usecases.dart';
 import 'package:plain/features/ledger/controllers/draft_store.dart';
+import 'package:plain/features/ledger/controllers/recent_categories.dart';
 
 class EntryInputState {
   const EntryInputState({
@@ -193,6 +194,10 @@ class EntryInputController extends Notifier<EntryInputState> {
   /// Select category without saving (for picker page).
   void selectCategory(String categoryId) {
     state = state.copyWith(selectedCategoryId: categoryId);
+    // Pin to recent list immediately so the grid shows it first after 返回.
+    if (categoryId.isNotEmpty) {
+      ref.read(recentCategoriesProvider.notifier).use(state.type.wire, categoryId);
+    }
     _saveDraft();
   }
 
@@ -263,8 +268,13 @@ class EntryInputController extends Notifier<EntryInputState> {
   /// Category tap only selects — save is an explicit OK action (PRD / UX fix).
   void submitOnCategoryTap(String categoryId) {
     state = state.copyWith(selectedCategoryId: categoryId);
+    if (categoryId.isNotEmpty) {
+      ref.read(recentCategoriesProvider.notifier).use(state.type.wire, categoryId);
+    }
     _saveDraft();
   }
+
+  String? get currentToast => state.toastMessage;
 
   Future<bool> saveExplicit() => _save();
 
@@ -299,9 +309,10 @@ class EntryInputController extends Notifier<EntryInputState> {
 
     return result.when(
       success: (entry) {
+        final amt = entry.amount.toYuanString();
         final toast = eval.wasIncomplete
-            ? 'Saved ${entry.amount.toYuanString()} (prefix)'
-            : 'Saved \u00a5${entry.amount.toYuanString()}';
+            ? '已记 ¥$amt（前缀）'
+            : '已记 ¥$amt';
         state = state.copyWith(
           amountExpression: '',
           displayAmount: '',
@@ -313,6 +324,9 @@ class EntryInputController extends Notifier<EntryInputState> {
         draftStore.clear(); // Clear draft after successful save
         _updateWidgetSnapshot();
         ref.invalidateData.bumpEntryMutated();
+        ref.read(recentCategoriesProvider.notifier).use(
+          state.type.wire, state.selectedCategoryId ?? '',
+        );
         return true;
       },
       failure: (f) {
@@ -394,9 +408,6 @@ class EntryInputController extends Notifier<EntryInputState> {
     if (lastNum.contains('.') && !_isOperatorPending(expr)) display = lastNum;
     state = state.copyWith(displayAmount: display, wasIncompleteExpression: result.wasIncomplete);
   }
-
-  /// No-op placeholder (kept for API compatibility).
-  void _noop() {}
 
   bool _isOperatorPending(String expr) {
     if (expr.isEmpty) return false;

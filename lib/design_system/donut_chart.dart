@@ -2,6 +2,7 @@
 /// Click sector -> expand to subcategories -> click subcategory -> filter list.
 library;
 
+import 'package:plain/app/theme/app_colors.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:plain/app/theme/design_tokens.dart';
@@ -47,7 +48,7 @@ class DonutChart extends StatefulWidget {
 }
 
 class _DonutChartState extends State<DonutChart> {
-  int _touchedIndex = -1;
+  final int _touchedIndex = -1;
 
   @override
   Widget build(BuildContext context) {
@@ -121,7 +122,7 @@ class _DonutChartState extends State<DonutChart> {
                 const SizedBox(width: 4),
                 Text(
                   '${s.name} ${pct.toStringAsFixed(1)}%',
-                  style: TextStyle(fontSize: 11, color: BrandColors.inkSecondary),
+                  style: TextStyle(fontSize: 11, color: context.colors.inkSecondary),
                 ),
               ],
             );
@@ -152,7 +153,7 @@ class _DonutChartState extends State<DonutChart> {
             ? Container(
                 padding: const EdgeInsets.all(4),
                 decoration: BoxDecoration(
-                  color: BrandColors.ink,
+                  color: context.colors.ink,
                   borderRadius: BorderRadius.circular(4),
                 ),
                 child: Text(

@@ -1,5 +1,5 @@
 /// Pure-Dart color math for theme derivation. No Flutter dependency (CI-friendly).
-/// Implements WCAG 2.1 contrast + derivation rules from 需求变更.md §4.6.
+/// Implements WCAG 2.1 contrast + derivation rules from 04-技术架构设计.md §16.1.
 library;
 
 import 'dart:math' as math;

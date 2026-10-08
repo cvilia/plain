@@ -14,19 +14,21 @@ class HideAmountsNotifier extends Notifier<bool> {
 
 final hideAmountsProvider = NotifierProvider<HideAmountsNotifier, bool>(HideAmountsNotifier.new);
 
-/// Format an amount, respecting hide mode.
-/// Returns '****' when hidden, otherwise formatted string.
+/// Format an amount in yuan, respecting hide mode.
+///
+/// Integer arithmetic only (int64 cents → yuan string); never uses double.
+/// Returns '****' when hidden, otherwise formatted string like `-12.50`.
 String formatAmount(int cents, {bool hide = false}) {
   if (hide) return '****';
-  final sign = cents < 0 ? '-' : '';
+  final neg = cents < 0;
   final abs = cents.abs();
-  return '$sign${(abs / 100).toStringAsFixed(2)}';
+  final s = '${abs ~/ 100}.${(abs % 100).toString().padLeft(2, '0')}';
+  return neg ? '-$s' : s;
 }
 
 /// Format amount with currency symbol.
 String formatAmountYuan(int cents, {bool hide = false}) {
-  if (hide) return '\u00a5****';
+  if (hide) return '¥****';
   final sign = cents < 0 ? '-' : '';
-  final abs = cents.abs();
-  return '$sign\u00a5${(abs / 100).toStringAsFixed(2)}';
+  return '$sign¥${formatAmount(cents)}';
 }

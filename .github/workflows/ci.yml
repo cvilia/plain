@@ -1,0 +1,32 @@
+# CI: analyze + tests + theme contrast gate.
+# Fail-fast on any regression — see 14-代码优化建议.md 批 2.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Pub get
+        run: flutter pub get
+
+      - name: Analyze (flutter_lints full set)
+        run: dart analyze
+
+      - name: Tests
+        run: flutter test
+
+      - name: Theme contrast gate
+        run: dart run tool/theme_contrast_check.dart

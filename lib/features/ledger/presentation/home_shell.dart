@@ -1,6 +1,7 @@
 /// Home shell: bottom nav / NavigationRail. See 04-9, 06-E3.
 library;
 
+import 'package:plain/app/theme/app_colors.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -13,8 +14,7 @@ class HomeShell extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // Shell stays mounted across theme switches — must follow BrandColors.
-    watchBrandTheme(ref);
+    // Shell stays mounted across theme switches — must follow context.colors.
     return LayoutBuilder(
       builder: (context, constraints) {
         final sizeClass = Breakpoints.sizeClassFromConstraints(constraints);
@@ -85,8 +85,8 @@ class _EntryFab extends StatelessWidget {
     return FloatingActionButton(
       heroTag: heroTag,
       onPressed: onPressed,
-      backgroundColor: BrandColors.primary,
-      foregroundColor: BrandColors.onPrimary,
+      backgroundColor: context.colors.primary,
+      foregroundColor: context.colors.onPrimary,
       elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(Radii.lg)),
       child: const Icon(Icons.add),

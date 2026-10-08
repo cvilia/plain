@@ -1,4 +1,5 @@
 /// Color math unit tests. Verify WCAG functions + derivation rules.
+library;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:plain/app/theme/color_math.dart';
 

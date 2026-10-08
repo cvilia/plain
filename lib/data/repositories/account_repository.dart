@@ -4,6 +4,8 @@ library;
 import 'package:plain/core/result/result.dart';
 import 'package:plain/core/time/clock.dart';
 import 'package:plain/data/db/database.dart';
+import 'package:plain/data/db/row_x.dart';
+import 'package:plain/data/db/run_write.dart';
 import 'package:plain/data/sync/change_log_writer.dart';
 import 'package:plain/domain/entities/category.dart';
 import 'package:plain/domain/entities/enums.dart';
@@ -35,6 +37,52 @@ class AccountRepositoryImpl implements AccountRepository {
   }
 
   @override
+  Future<Result<List<AccountWithBalance>>> listWithBalances() async {
+    try {
+      final rows = _db.raw.select(
+        'SELECT * FROM accounts WHERE deleted_at IS NULL ORDER BY sort_order ASC',
+      );
+      // One grouped query instead of 2N+1.
+      final sums = _db.raw.select(
+        'SELECT account_id, to_account_id, type, SUM(amount_cents) AS s '
+        'FROM transactions WHERE deleted_at IS NULL '
+        'GROUP BY account_id, to_account_id, type',
+      );
+      final expenseBy = <String, int>{};
+      final incomeBy = <String, int>{};
+      final transferOutBy = <String, int>{};
+      final transferInBy = <String, int>{};
+      for (final r in sums) {
+        final acc = r['account_id'] as String?;
+        final to = r['to_account_id'] as String?;
+        final type = r['type']! as String;
+        final s = (r['s'] as int?) ?? 0;
+        if (type == EntryType.expense.wire && acc != null) {
+          expenseBy[acc] = (expenseBy[acc] ?? 0) + s;
+        } else if (type == EntryType.income.wire && acc != null) {
+          incomeBy[acc] = (incomeBy[acc] ?? 0) + s;
+        } else if (type == EntryType.transfer.wire) {
+          if (acc != null) transferOutBy[acc] = (transferOutBy[acc] ?? 0) + s;
+          if (to != null) transferInBy[to] = (transferInBy[to] ?? 0) + s;
+        }
+      }
+      final out = <AccountWithBalance>[];
+      for (final row in rows) {
+        final a = _fromRow(row);
+        final bal = a.openingBalance -
+            (expenseBy[a.id] ?? 0) +
+            (incomeBy[a.id] ?? 0) -
+            (transferOutBy[a.id] ?? 0) +
+            (transferInBy[a.id] ?? 0);
+        out.add(AccountWithBalance(account: a, balanceCents: bal));
+      }
+      return ok(out);
+    } on Exception catch (e) {
+      return err(StorageFailure('db.query_failed', e.toString(), isRetryable: true));
+    }
+  }
+
+  @override
   Future<Result<Account>> getById(String id) async {
     final rows = _db.raw.select(
       'SELECT * FROM accounts WHERE id = ? AND deleted_at IS NULL',
@@ -48,8 +96,11 @@ class AccountRepositoryImpl implements AccountRepository {
 
   @override
   Future<Result<Account>> create(Account account) async {
-    try {
-      _db.transaction(() {
+    return runWrite(
+      _db,
+      failCode: 'db.insert_failed',
+      result: account,
+      body: () {
         _insert(account);
         _changeLog.write(
           entityType: EntityType.account,
@@ -60,17 +111,21 @@ class AccountRepositoryImpl implements AccountRepository {
           before: const {},
           after: _payload(account),
         );
-      });
-      return ok(account);
-    } on Exception catch (e) {
-      return err(StorageFailure('db.insert_failed', e.toString(), isRetryable: true));
-    }
+      },
+    );
   }
 
   @override
   Future<Result<Account>> update(Account account) async {
-    try {
-      _db.transaction(() {
+    final existing = await getById(account.id);
+    final f = existing.failureOrNull;
+    if (f != null) return err<Account>(f);
+    final old = existing.successOrNull!;
+    return runWrite(
+      _db,
+      failCode: 'db.update_failed',
+      result: account,
+      body: () {
         _update(account);
         _changeLog.write(
           entityType: EntityType.account,
@@ -78,46 +133,46 @@ class AccountRepositoryImpl implements AccountRepository {
           op: ChangeOp.update,
           deviceId: account.deviceId,
           baseRevision: account.baseRevision,
-          before: const {},
+          before: _payload(old),
           after: _payload(account),
         );
-      });
-      return ok(account);
-    } on Exception catch (e) {
-      return err(StorageFailure('db.update_failed', e.toString(), isRetryable: true));
-    }
+      },
+    );
   }
 
   @override
   Future<Result<void>> softDelete(String id) async {
-    try {
-      // Check for transaction references (PRD STORY-2.1 AC2)
-      final refCount = _db.raw.select(
-        'SELECT COUNT(*) AS c FROM transactions '
-        'WHERE (account_id = ? OR to_account_id = ?) AND deleted_at IS NULL',
-        [id, id],
-      );
-      if ((refCount.first['c'] as int) > 0) {
-        return err<void>(const ConflictFailure(
-          'account.has_transactions',
-          'Account has transactions. Migrate or hide instead.',
-        ));
-      }
+    // Check for transaction references (PRD STORY-2.1 AC2)
+    final refCount = _db.raw.select(
+      'SELECT COUNT(*) AS c FROM transactions '
+      'WHERE (account_id = ? OR to_account_id = ?) AND deleted_at IS NULL',
+      [id, id],
+    );
+    if ((refCount.first['c'] as int) > 0) {
+      return err<void>(const ConflictFailure(
+        'account.has_transactions',
+        'Account has transactions. Migrate or hide instead.',
+      ));
+    }
 
-      final existing = await getById(id);
-      final f = existing.failureOrNull;
-      if (f != null) return err<void>(f);
+    final existing = await getById(id);
+    final f = existing.failureOrNull;
+    if (f != null) return err<void>(f);
 
-      final acct = existing.successOrNull!;
-      final now = _clock.now();
-      final deleted = acct.copyWith(
-        deletedAt: now,
-        updatedAt: now,
-        revision: acct.revision + 1,
-        baseRevision: acct.revision,
-      );
+    final acct = existing.successOrNull!;
+    final now = _clock.now();
+    final deleted = acct.copyWith(
+      deletedAt: now,
+      updatedAt: now,
+      revision: acct.revision + 1,
+      baseRevision: acct.revision,
+    );
 
-      _db.transaction(() {
+    return runWrite<void>(
+      _db,
+      failCode: 'db.delete_failed',
+      result: null,
+      body: () {
         _update(deleted);
         _changeLog.write(
           entityType: EntityType.account,
@@ -128,11 +183,8 @@ class AccountRepositoryImpl implements AccountRepository {
           before: _payload(acct),
           after: const {},
         );
-      });
-      return ok(null);
-    } on Exception catch (e) {
-      return err(StorageFailure('db.delete_failed', e.toString(), isRetryable: true));
-    }
+      },
+    );
   }
 
   @override
@@ -177,9 +229,11 @@ class AccountRepositoryImpl implements AccountRepository {
         [accountId, EntryType.transfer.wire],
       );
 
-      final balance = opening - totalExpense + totalIncome
-          - (transferOut.first['s']! as int)
-          + (transferIn.first['s']! as int);
+      final balance = opening -
+          totalExpense +
+          totalIncome -
+          (transferOut.first['s']! as int) +
+          (transferIn.first['s']! as int);
 
       return ok(AccountBalance(
         accountId: accountId,
@@ -210,49 +264,76 @@ class AccountRepositoryImpl implements AccountRepository {
 
       if (diff == 0) return ok(null);
 
-      // Create adjustment entry (PRD STORY-2.1 AC3)
+      // Create adjustment entry (PRD STORY-2.1 AC3).
+      // Prefer CreateEntryUseCase at call sites — this is a lower-level fallback
+      // and must keep change_log + daily_stats + unique id intact.
       final now = _clock.now();
       final isExpense = diff < 0;
       final adjType = isExpense ? EntryType.expense : EntryType.income;
       final adjAmount = diff.abs();
-      final adjId = 'reconcile_${now.millisecondsSinceEpoch}';
+      // Time-ordered unique id (millis + sub-ms avoids same-ms collisions).
+      final adjId = 'recon_${now.millisecondsSinceEpoch}'
+          '_${now.microsecondsSinceEpoch % 1000000}';
 
-      _db.transaction(() {
-        _db.raw.execute(
-          'INSERT INTO transactions '
-          '(id,book_id,type,amount_cents,currency,category_id,account_id,'
-          'occurred_at,note,source,created_at,updated_at,revision,device_id,base_revision) '
-          'VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
-          [
-            adjId,
-            bookId,
-            adjType.wire,
-            adjAmount,
-            'CNY',
-            otherCategoryId,
-            accountId,
-            now.millisecondsSinceEpoch,
-            'Reconcile adjustment',
-            EntrySource.reconcile.wire,
-            now.millisecondsSinceEpoch,
-            now.millisecondsSinceEpoch,
-            1,
-            deviceId,
-            0,
-          ],
-        );
-        _changeLog.write(
-          entityType: EntityType.transaction,
-          entityId: adjId,
-          op: ChangeOp.insert,
-          deviceId: deviceId,
-          baseRevision: 0,
-          before: const {},
-          after: {'id': adjId, 'amount_cents': adjAmount, 'source': 'reconcile'},
-        );
-      });
-
-      return ok(null);
+      return runWrite(
+        _db,
+        failCode: 'db.reconcile_failed',
+        result: null,
+        body: () {
+          _db.raw.execute(
+            'INSERT INTO transactions '
+            '(id,book_id,type,amount_cents,currency,category_id,account_id,'
+            'occurred_at,note,source,created_at,updated_at,revision,device_id,base_revision) '
+            'VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
+            [
+              adjId,
+              bookId,
+              adjType.wire,
+              adjAmount,
+              'CNY',
+              otherCategoryId,
+              accountId,
+              now.millisecondsSinceEpoch,
+              '对账调整',
+              EntrySource.reconcile.wire,
+              now.millisecondsSinceEpoch,
+              now.millisecondsSinceEpoch,
+              1,
+              deviceId,
+              0,
+            ],
+          );
+          // Keep daily_stats in sync (used by reports / budget strip).
+          final dayKey = _clock.localDayKey(now);
+          final exp = isExpense ? adjAmount : 0;
+          final inc = isExpense ? 0 : adjAmount;
+          _db.raw.execute(
+            'INSERT INTO daily_stats (book_id,day_key,category_id,account_id,'
+            'expense_cents,income_cents,tx_count,updated_at) VALUES (?,?,?,?,?,?,?,?) '
+            'ON CONFLICT(book_id,day_key,category_id,account_id) DO UPDATE SET '
+            'expense_cents=expense_cents+?,income_cents=income_cents+?,'
+            'tx_count=tx_count+?,updated_at=?',
+            [
+              bookId, dayKey, otherCategoryId, accountId, exp, inc, 1,
+              now.millisecondsSinceEpoch,
+              exp, inc, 1, now.millisecondsSinceEpoch,
+            ],
+          );
+          _changeLog.write(
+            entityType: EntityType.transaction,
+            entityId: adjId,
+            op: ChangeOp.insert,
+            deviceId: deviceId,
+            baseRevision: 0,
+            before: const {},
+            after: {
+              'id': adjId, 'book_id': bookId, 'type': adjType.wire,
+              'amount_cents': adjAmount, 'category_id': otherCategoryId,
+              'account_id': accountId, 'source': 'reconcile',
+            },
+          );
+        },
+      );
     } on Exception catch (e) {
       return err(StorageFailure('db.reconcile_failed', e.toString(), isRetryable: true));
     }
@@ -275,10 +356,11 @@ class AccountRepositoryImpl implements AccountRepository {
 
   void _update(Account a) {
     _db.raw.execute(
-      'UPDATE accounts SET name=?,opening_balance_cents=?,note=?,sort_order=?,'
-      'is_hidden=?,updated_at=?,deleted_at=?,revision=?,base_revision=? WHERE id=?',
+      'UPDATE accounts SET name=?,type=?,currency=?,opening_balance_cents=?,'
+      'note=?,sort_order=?,is_hidden=?,updated_at=?,deleted_at=?,revision=?,'
+      'base_revision=? WHERE id=?',
       [
-        a.name, a.openingBalance, a.note, a.sortOrder,
+        a.name, a.type.wire, a.currency, a.openingBalance, a.note, a.sortOrder,
         a.isHidden ? 1 : 0,
         a.updatedAt.millisecondsSinceEpoch,
         a.deletedAt?.millisecondsSinceEpoch,
@@ -295,15 +377,13 @@ class AccountRepositoryImpl implements AccountRepository {
         openingBalance: (row['opening_balance_cents'] as int?) ?? 0,
         note: row['note'] as String?,
         sortOrder: row['sort_order']! as int,
-        isHidden: (row['is_hidden'] as int?) == 1,
-        createdAt: DateTime.fromMillisecondsSinceEpoch(row['created_at']! as int, isUtc: true),
-        updatedAt: DateTime.fromMillisecondsSinceEpoch(row['updated_at']! as int, isUtc: true),
-        deletedAt: row['deleted_at'] == null
-            ? null
-            : DateTime.fromMillisecondsSinceEpoch(row['deleted_at']! as int, isUtc: true),
-        revision: (row['revision'] as int?) ?? 1,
+        isHidden: row.boolOr('is_hidden'),
+        createdAt: row.dateTime('created_at'),
+        updatedAt: row.dateTime('updated_at'),
+        deletedAt: row.nullableDateTime('deleted_at'),
+        revision: row.intOr('revision', 1),
         deviceId: row['device_id']! as String,
-        baseRevision: (row['base_revision'] as int?) ?? 0,
+        baseRevision: row.intOr('base_revision', 0),
       );
 
   Map<String, Object?> _payload(Account a) => {

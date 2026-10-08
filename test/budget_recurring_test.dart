@@ -1,4 +1,5 @@
 /// Budget status and recurring engine tests (in-memory DB).
+library;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:plain/core/id/uuid_v7.dart';
 import 'package:plain/core/money/money.dart';
@@ -79,7 +80,7 @@ void main() {
       final useCase = ResolveBudgetStatusUseCase(repository: budgetRepo, clock: clock);
       final statusRes = await useCase.totalStatus('book-1');
       expect(statusRes.isSuccess, true);
-      final status = statusRes.successOrNull!;
+      final status = statusRes.successOrNull;
       expect(status, isNotNull);
       expect(status!.spentCents, 10000);
       expect(status.limitCents, 100000);
@@ -97,7 +98,7 @@ void main() {
       ));
       final useCase = ResolveBudgetStatusUseCase(repository: budgetRepo, clock: clock);
       var status = (await useCase.totalStatus('book-1')).successOrNull!;
-      expect(status!.level, BudgetLevel.warn);
+      expect(status.level, BudgetLevel.warn);
 
       await createEntry(CreateEntryInput(
         amountExpression: '30', type: EntryType.expense,
@@ -105,7 +106,7 @@ void main() {
         occurredAt: DateTime.utc(2026, 9, 11),
       ));
       status = (await useCase.totalStatus('book-1')).successOrNull!;
-      expect(status!.level, BudgetLevel.over);
+      expect(status.level, BudgetLevel.over);
       expect(status.isOver, true);
     });
 
@@ -114,7 +115,7 @@ void main() {
       await budgetRepo.create(makeTotal(cents: 100000));
       final useCase = ResolveBudgetStatusUseCase(repository: budgetRepo, clock: clock);
       final status = (await useCase.totalStatus('book-1')).successOrNull!;
-      expect(status!.daysLeft, 2);
+      expect(status.daysLeft, 2);
       expect(status.dailyAvailableCents, 50000);
     });
 

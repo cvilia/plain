@@ -1,5 +1,8 @@
 /// Localization delegates and strings. See 06-C1, 04-9.
-/// Supports zh-CN and en-US. All UI strings go through here.
+///
+/// V1.0 ships zh-CN only — `supportedLocales` is deliberately a single
+/// locale so the app never shows a half-translated UI. The `isZh ? :`
+/// branches remain for a future en-US pass (14-代码优化建议.md P1-5).
 library;
 
 import 'package:flutter/foundation.dart';
@@ -12,14 +15,13 @@ class AppStrings {
   final Locale locale;
 
   static AppStrings of(BuildContext context) {
-    return Localizations.of<AppStrings>(context, AppStrings) ?? AppStrings(const Locale('en'));
+    return Localizations.of<AppStrings>(context, AppStrings) ?? AppStrings(const Locale('zh', 'CN'));
   }
 
   static const LocalizationsDelegate<AppStrings> delegate = _AppStringsDelegate();
 
   static const List<Locale> supportedLocales = [
     Locale('zh', 'CN'),
-    Locale('en', 'US'),
   ];
 
   bool get isZh => locale.languageCode == 'zh';
@@ -99,6 +101,9 @@ class AppStrings {
   String get categories => isZh ? '分类管理' : 'Categories';
   String get addCategory => isZh ? '添加分类' : 'Add Category';
   String get renameCategory => isZh ? '重命名分类' : 'Rename Category';
+  String get editCategoryInfo => isZh ? '编辑分类信息' : 'Edit Category';
+  String get categoryNote => isZh ? '备注' : 'Note';
+  String get categoryNoteHint => isZh ? '界定分类边界，最多 30 字' : 'Boundary hint, max 30 chars';
   String get hide => isZh ? '隐藏' : 'Hide';
   String get show => isZh ? '显示' : 'Show';
   String get preset => isZh ? '预置' : 'Preset';

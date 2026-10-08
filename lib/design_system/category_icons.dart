@@ -20,6 +20,9 @@ IconData iconForCategory(String ref) {
     'salary' => Icons.payments_outlined,
     'bonus' => Icons.star_outline,
     'income' => Icons.trending_up_outlined,
+    // Account-type refs used by CategoryAvatar on the assets page.
+    'payments' || 'cash' => Icons.payments_outlined,
+    'card' || 'bank' => Icons.credit_card_outlined,
     'other' => Icons.category_outlined,
     _ => Icons.category_outlined,
   };

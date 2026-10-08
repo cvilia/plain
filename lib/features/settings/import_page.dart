@@ -1,14 +1,16 @@
 ﻿/// CSV import wizard: paste → map columns → preview → import. PRD F7.5.
 library;
 
+import 'package:plain/app/theme/app_colors.dart';
 import 'package:flutter/material.dart';
+import 'package:plain/design_system/app_toast.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:plain/app/bootstrap.dart';
 import 'package:plain/app/breakpoints.dart';
 import 'package:plain/app/theme/design_tokens.dart';
+import 'package:plain/core/format/amount_formatter.dart';
 import 'package:plain/domain/entities/enums.dart';
 import 'package:plain/domain/services/csv_importer.dart';
-import 'package:plain/domain/usecases/import_usecase.dart';
 
 class ImportPage extends ConsumerStatefulWidget {
   const ImportPage({super.key});
@@ -38,9 +40,7 @@ class _ImportPageState extends ConsumerState<ImportPage> {
     if (text.trim().isEmpty) return;
     final rows = parseCsv(text);
     if (rows.length < 2) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('CSV 内容不足，至少需要表头和一行数据')),
-      );
+      showAppToast(context, 'CSV 内容不足，至少需要表头和一行数据');
       return;
     }
     setState(() {
@@ -105,9 +105,7 @@ class _ImportPageState extends ConsumerState<ImportPage> {
       _step = 3;
     });
     if (result.isFailure && _report == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('导入失败: ${result.failureOrNull?.message ?? ''}')),
-      );
+      showAppToast(context, '导入失败: ${result.failureOrNull?.message ?? ''}');
     }
   }
 
@@ -144,7 +142,7 @@ class _ImportPageState extends ConsumerState<ImportPage> {
             const SizedBox(height: Spacing.sm),
             Text(
               '从竞品 App 导出 CSV 后，将内容粘贴到下方。支持钱迹、随手记、挖财等主流格式。',
-              style: TextStyle(fontSize: 13, color: BrandColors.inkSecondary),
+              style: TextStyle(fontSize: 13, color: context.colors.inkSecondary),
             ),
             const SizedBox(height: Spacing.lg),
             TextField(
@@ -154,7 +152,7 @@ class _ImportPageState extends ConsumerState<ImportPage> {
                 hintText: '日期,金额,分类,备注\n2024-01-15,25.00,餐饮,午餐\n...',
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(Radii.md)),
                 filled: true,
-                fillColor: BrandColors.surfaceMuted,
+                fillColor: context.colors.surfaceMuted,
               ),
             ),
             const SizedBox(height: Spacing.lg),
@@ -182,7 +180,7 @@ class _ImportPageState extends ConsumerState<ImportPage> {
             Text('映射列', style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
             const SizedBox(height: Spacing.sm),
             Text('共 ${_rows.length - 1} 行数据，请指定各列含义',
-                style: TextStyle(fontSize: 13, color: BrandColors.inkSecondary)),
+                style: TextStyle(fontSize: 13, color: context.colors.inkSecondary)),
             const SizedBox(height: Spacing.lg),
             _buildColDropdown('日期列 *', _mapping.dateCol, headers, (v) {
               if (v == null) return;
@@ -271,23 +269,23 @@ class _ImportPageState extends ConsumerState<ImportPage> {
             Text('预览', style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
             const SizedBox(height: Spacing.sm),
             Text('可导入 ${deduped.unique.length} 条，跳过 ${_previewErrors.length} 条异常',
-                style: TextStyle(fontSize: 13, color: BrandColors.inkSecondary)),
+                style: TextStyle(fontSize: 13, color: context.colors.inkSecondary)),
             const SizedBox(height: Spacing.md),
             if (_previewErrors.isNotEmpty) ...[
               Container(
                 padding: const EdgeInsets.all(Spacing.md),
                 decoration: BoxDecoration(
-                  color: BrandColors.expense.withValues(alpha: 0.08),
+                  color: context.colors.expense.withValues(alpha: 0.08),
                   borderRadius: BorderRadius.circular(Radii.sm),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('异常行', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: BrandColors.expense)),
+                    Text('异常行', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: context.colors.expense)),
                     const SizedBox(height: Spacing.xs),
-                    ..._previewErrors.take(5).map((e) => Text(e, style: TextStyle(fontSize: 11, color: BrandColors.expense))),
+                    ..._previewErrors.take(5).map((e) => Text(e, style: TextStyle(fontSize: 11, color: context.colors.expense))),
                     if (_previewErrors.length > 5)
-                      Text('... 共 ${_previewErrors.length} 条', style: TextStyle(fontSize: 11, color: BrandColors.expense)),
+                      Text('... 共 ${_previewErrors.length} 条', style: TextStyle(fontSize: 11, color: context.colors.expense)),
                   ],
                 ),
               ),
@@ -299,7 +297,7 @@ class _ImportPageState extends ConsumerState<ImportPage> {
                 Expanded(
                   flex: 2,
                   child: Text('${e.occurredAt.year}-${e.occurredAt.month.toString().padLeft(2, '0')}-${e.occurredAt.day.toString().padLeft(2, '0')}',
-                      style: TextStyle(fontSize: 12, color: BrandColors.inkSecondary)),
+                      style: TextStyle(fontSize: 12, color: context.colors.inkSecondary)),
                 ),
                 Expanded(
                   flex: 2,
@@ -307,13 +305,13 @@ class _ImportPageState extends ConsumerState<ImportPage> {
                 ),
                 Expanded(
                   flex: 3,
-                  child: Text(e.note ?? '', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, color: BrandColors.inkTertiary)),
+                  child: Text(e.note ?? '', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, color: context.colors.inkTertiary)),
                 ),
                 Text(
-                  '${e.type == EntryType.expense ? '-' : '+'}${(e.amountCents / 100).toStringAsFixed(2)}',
+                  '${e.type == EntryType.expense ? '-' : '+'}${formatAmount(e.amountCents)}',
                   style: TextStyle(
                     fontSize: 13, fontWeight: FontWeight.w600,
-                    color: e.type == EntryType.expense ? BrandColors.expense : BrandColors.income,
+                    color: e.type == EntryType.expense ? context.colors.expense : context.colors.income,
                   ),
                 ),
               ]),
@@ -321,7 +319,7 @@ class _ImportPageState extends ConsumerState<ImportPage> {
             if (deduped.unique.length > 10)
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: Spacing.sm),
-                child: Text('... 共 ${deduped.unique.length} 条', style: TextStyle(fontSize: 12, color: BrandColors.inkTertiary)),
+                child: Text('... 共 ${deduped.unique.length} 条', style: TextStyle(fontSize: 12, color: context.colors.inkTertiary)),
               ),
             const SizedBox(height: Spacing.lg),
             Row(children: [
@@ -358,13 +356,13 @@ class _ImportPageState extends ConsumerState<ImportPage> {
             Text('导入完成', style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
             const SizedBox(height: Spacing.lg),
             if (r != null) ...[
-              _ResultRow('成功导入', '${r.successCount} 条', BrandColors.income),
-              _ResultRow('去重跳过', '${r.dedupedCount} 条', BrandColors.inkSecondary),
-              _ResultRow('失败/异常', '${r.failedCount} 条', BrandColors.expense),
+              _ResultRow('成功导入', '${r.successCount} 条', context.colors.income),
+              _ResultRow('去重跳过', '${r.dedupedCount} 条', context.colors.inkSecondary),
+              _ResultRow('失败/异常', '${r.failedCount} 条', context.colors.expense),
               if (r.errors.isNotEmpty) ...[
                 const SizedBox(height: Spacing.md),
-                Text('异常详情', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: BrandColors.expense)),
-                ...r.errors.take(5).map((e) => Text(e, style: TextStyle(fontSize: 11, color: BrandColors.expense))),
+                Text('异常详情', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: context.colors.expense)),
+                ...r.errors.take(5).map((e) => Text(e, style: TextStyle(fontSize: 11, color: context.colors.expense))),
               ],
             ],
             const SizedBox(height: Spacing.xl),
@@ -392,19 +390,19 @@ class _StepIndicator extends StatelessWidget {
     return Row(
       children: [
         for (var i = 0; i < labels.length; i++) ...[
-          if (i > 0) Expanded(child: Container(height: 1, color: i <= current ? BrandColors.primary : BrandColors.border)),
+          if (i > 0) Expanded(child: Container(height: 1, color: i <= current ? context.colors.primary : context.colors.border)),
           Container(
             width: 28, height: 28,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: i <= current ? BrandColors.primary : BrandColors.surfaceMuted,
+              color: i <= current ? context.colors.primary : context.colors.surfaceMuted,
             ),
             child: Center(
               child: i < current
-                  ? Icon(Icons.check, size: 16, color: BrandColors.onPrimary)
+                  ? Icon(Icons.check, size: 16, color: context.colors.onPrimary)
                   : Text('${i + 1}', style: TextStyle(
                       fontSize: 12, fontWeight: FontWeight.w600,
-                      color: i <= current ? BrandColors.onPrimary : BrandColors.inkTertiary,
+                      color: i <= current ? context.colors.onPrimary : context.colors.inkTertiary,
                     )),
             ),
           ),
@@ -427,7 +425,7 @@ class _ResultRow extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: TextStyle(fontSize: 14, color: BrandColors.inkSecondary)),
+          Text(label, style: TextStyle(fontSize: 14, color: context.colors.inkSecondary)),
           Text(value, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: color)),
         ],
       ),

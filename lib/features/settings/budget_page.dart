@@ -1,6 +1,8 @@
-﻿/// Budget settings page. See PRD F5.1/F5.2.
+/// Budget settings page. See PRD F5.1/F5.2.
 library;
 
+import 'package:plain/app/theme/app_colors.dart';
+import 'package:plain/design_system/confirm_dialog.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:plain/app/bootstrap.dart';
@@ -9,9 +11,40 @@ import 'package:plain/app/theme/design_tokens.dart';
 import 'package:plain/core/format/amount_formatter.dart';
 import 'package:plain/core/refresh/data_invalidation.dart';
 import 'package:plain/core/money/money.dart';
+import 'package:plain/design_system/category_icons.dart';
 import 'package:plain/domain/entities/budget.dart';
 import 'package:plain/domain/entities/category.dart';
 import 'package:plain/domain/entities/enums.dart';
+
+
+class _BudgetData {
+  const _BudgetData({
+    required this.totalStatus,
+    required this.categoryStatuses,
+    required this.expenseCategories,
+  });
+  final BudgetStatus? totalStatus;
+  final List<BudgetStatus> categoryStatuses;
+  final List<Category> expenseCategories;
+}
+
+/// Read model for the budget page. Watches budget + categories + ledger
+/// versions so local writes refetch automatically (AGENTS.md 写→bump / 读→watch).
+final _budgetDataProvider = FutureProvider<_BudgetData>((ref) async {
+  ref.watch(budgetVersionProvider);
+  ref.watch(categoriesVersionProvider);
+  ref.watch(ledgerVersionProvider);
+  final deps = ref.watch(appDependenciesProvider);
+  final total = await deps.resolveBudgetStatus.totalStatus(deps.bookId);
+  final all = await deps.resolveBudgetStatus.allStatuses(deps.bookId);
+  final cats = await deps.categoryRepository.listVisible(kind: CategoryKind.expense);
+  final list = all.successOrNull ?? const <BudgetStatus>[];
+  return _BudgetData(
+    totalStatus: total.successOrNull,
+    categoryStatuses: list.where((s) => !s.budget.isTotal).toList(),
+    expenseCategories: cats.successOrNull ?? const [],
+  );
+});
 
 class BudgetPage extends ConsumerStatefulWidget {
   const BudgetPage({super.key});
@@ -21,45 +54,25 @@ class BudgetPage extends ConsumerStatefulWidget {
 }
 
 class _BudgetPageState extends ConsumerState<BudgetPage> {
-  BudgetStatus? _totalStatus;
-  List<BudgetStatus> _categoryStatuses = const [];
-  List<Category> _expenseCategories = const [];
-  bool _loading = true;
-
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _load());
-  }
-
-  Future<void> _load() async {
-    final deps = ref.read(appDependenciesProvider);
-    final total = await deps.resolveBudgetStatus.totalStatus(deps.bookId);
-    final all = await deps.resolveBudgetStatus.allStatuses(deps.bookId);
-    final cats = await deps.categoryRepository.listVisible(kind: CategoryKind.expense);
-    if (!mounted) return;
-    setState(() {
-      _totalStatus = total.successOrNull;
-      final list = all.successOrNull ?? const <BudgetStatus>[];
-      _categoryStatuses = list.where((s) => !s.budget.isTotal).toList();
-      _expenseCategories = cats.successOrNull ?? const [];
-      _loading = false;
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
     final hide = ref.watch(hideAmountsProvider);
+    final async = ref.watch(_budgetDataProvider);
     return Scaffold(
       appBar: AppBar(title: const Text('预算')),
       body: ContentWidthConstraint(
-        child: _loading
-            ? const Center(child: CircularProgressIndicator())
-            : ListView(
+        child: async.when(
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (e, _) => Center(child: Text('加载失败: $e')),
+          data: (data) {
+            final totalStatus = data.totalStatus;
+            final categoryStatuses = data.categoryStatuses;
+            final expenseCategories = data.expenseCategories;
+            return ListView(
                 padding: const EdgeInsets.only(bottom: 100),
                 children: [
                   const SizedBox(height: Spacing.md),
-                  _TotalBudgetCard(status: _totalStatus, hide: hide, onEdit: _editTotal),
+                  _TotalBudgetCard(status: totalStatus, hide: hide, onEdit: _editTotal),
                   const SizedBox(height: Spacing.lg),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: Spacing.lg),
@@ -68,7 +81,7 @@ class _BudgetPageState extends ConsumerState<BudgetPage> {
                         Text('分类预算', style: TextStyle(
                           fontSize: AdaptiveFontSizes.title,
                           fontWeight: FontWeight.w600,
-                          color: BrandColors.ink,
+                          color: context.colors.ink,
                         )),
                         const Spacer(),
                         TextButton.icon(
@@ -79,30 +92,32 @@ class _BudgetPageState extends ConsumerState<BudgetPage> {
                       ],
                     ),
                   ),
-                  if (_categoryStatuses.isEmpty)
+                  if (categoryStatuses.isEmpty)
                     Padding(
                       padding: const EdgeInsets.all(Spacing.xl),
                       child: Text(
                         '还没有分类预算。给常超支的分类设个上限吧。',
                         textAlign: TextAlign.center,
-                        style: TextStyle(color: BrandColors.inkTertiary, fontSize: AdaptiveFontSizes.body),
+                        style: TextStyle(color: context.colors.inkTertiary, fontSize: AdaptiveFontSizes.body),
                       ),
                     )
                   else
-                    ..._categoryStatuses.map((s) => _CategoryBudgetTile(
-                      status: s, hide: hide,
+                    ...categoryStatuses.map((s) => _CategoryBudgetTile(
+                      status: s, hide: hide, categories: expenseCategories,
                       onEdit: () => _editCategory(s),
                       onDelete: () => _deleteBudget(s.budget),
                     )),
                 ],
-              ),
+            );
+          },
+        ),
       ),
     );
   }
 
   Future<void> _editTotal() async {
     final deps = ref.read(appDependenciesProvider);
-    final current = _totalStatus?.budget;
+    final current = ref.read(_budgetDataProvider).value?.totalStatus?.budget;
     final amount = await _askAmount(context, initial: current?.amount);
     if (amount == null || !mounted) return;
     final now = deps.clock.now();
@@ -118,7 +133,6 @@ class _BudgetPageState extends ConsumerState<BudgetPage> {
       ));
     }
     ref.invalidateData.bumpBudgetMutated();
-    await _load();
   }
 
   Future<void> _addCategoryBudget() async {
@@ -134,7 +148,6 @@ class _BudgetPageState extends ConsumerState<BudgetPage> {
       deviceId: deps.deviceId,
     ));
     ref.invalidateData.bumpBudgetMutated();
-    await _load();
   }
 
   Future<void> _editCategory(BudgetStatus status) async {
@@ -148,39 +161,29 @@ class _BudgetPageState extends ConsumerState<BudgetPage> {
       revision: b.revision + 1, baseRevision: b.revision,
     ));
     ref.invalidateData.bumpBudgetMutated();
-    await _load();
   }
 
   Future<void> _deleteBudget(Budget budget) async {
-    final okDel = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('删除预算'),
-        content: const Text('删除后不可恢复，确定删除这笔预算？'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('取消')),
-          TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('删除')),
-        ],
-      ),
+    final okDel = await showConfirmDialog(
+      context,
+      title: '删除预算',
+      message: '删除后不可恢复，确定删除这笔预算？',
+      confirmLabel: '删除',
+      destructive: true,
     );
     if (okDel != true || !mounted) return;
     final deps = ref.read(appDependenciesProvider);
     await deps.budgetRepository.softDelete(budget.id);
     ref.invalidateData.bumpBudgetMutated();
-    await _load();
   }
 
   Future<Category?> _pickCategory() async {
-    return showDialog<Category>(
+    return showModalBottomSheet<Category>(
       context: context,
-      builder: (ctx) => SimpleDialog(
-        title: const Text('选择分类'),
-        children: _expenseCategories
-            .map((c) => SimpleDialogOption(
-                  onPressed: () => Navigator.pop(ctx, c),
-                  child: Text(c.name),
-                ))
-            .toList(),
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => _CategoryPickerSheet(
+        categories: (ref.read(_budgetDataProvider).value?.expenseCategories ?? const []).leaves,
       ),
     );
   }
@@ -223,7 +226,6 @@ class _TotalBudgetCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: Spacing.lg),
       child: Padding(
@@ -238,7 +240,7 @@ class _TotalBudgetCard extends StatelessWidget {
               TextButton(onPressed: onEdit, child: Text(status == null ? '设置' : '修改')),
             ]),
             if (status == null)
-              Text('未设置月度总预算', style: TextStyle(color: BrandColors.inkTertiary))
+              Text('未设置月度总预算', style: TextStyle(color: context.colors.inkTertiary))
             else
               _BudgetBody(status: status!, hide: hide),
           ],
@@ -251,12 +253,25 @@ class _TotalBudgetCard extends StatelessWidget {
 class _CategoryBudgetTile extends StatelessWidget {
   const _CategoryBudgetTile({
     required this.status, required this.hide,
+    required this.categories,
     required this.onEdit, required this.onDelete,
   });
   final BudgetStatus status;
   final bool hide;
+  final List<Category> categories;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
+
+  /// Display name only — never raw categoryId (e.g. preset_food).
+  String get _title {
+    final id = status.budget.categoryId;
+    if (id == null) return '分类';
+    for (final c in categories) {
+      if (c.id == id) return c.name;
+    }
+    // Never surface internal ids like preset_food.
+    return '分类';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -269,7 +284,7 @@ class _CategoryBudgetTile extends StatelessWidget {
           children: [
             Row(children: [
               Expanded(child: Text(
-                status.budget.categoryId ?? '分类',
+                _title,
                 maxLines: 1, overflow: TextOverflow.ellipsis,
                 style: const TextStyle(fontWeight: FontWeight.w600),
               )),
@@ -294,9 +309,9 @@ class _BudgetBody extends StatelessWidget {
     final s = status;
     final ratio = s.ratio.clamp(0.0, 1.0);
     final color = switch (s.level) {
-      BudgetLevel.over => BrandColors.expense,
-      BudgetLevel.warn => BrandColors.accent,
-      BudgetLevel.ok => BrandColors.primary,
+      BudgetLevel.over => context.colors.expense,
+      BudgetLevel.warn => context.colors.accent,
+      BudgetLevel.ok => context.colors.primary,
     };
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -307,7 +322,7 @@ class _BudgetBody extends StatelessWidget {
           child: LinearProgressIndicator(
             value: ratio,
             minHeight: 8,
-            backgroundColor: BrandColors.surfaceMuted,
+            backgroundColor: context.colors.surfaceMuted,
             valueColor: AlwaysStoppedAnimation(color),
           ),
         ),
@@ -315,7 +330,7 @@ class _BudgetBody extends StatelessWidget {
         Row(children: [
           Expanded(child: Text(
             '已用 ${formatAmountYuan(s.spentCents, hide: hide)} / ${formatAmountYuan(s.limitCents, hide: hide)}',
-            style: TextStyle(fontSize: AdaptiveFontSizes.caption, color: BrandColors.inkSecondary),
+            style: TextStyle(fontSize: AdaptiveFontSizes.caption, color: context.colors.inkSecondary),
             maxLines: 1, overflow: TextOverflow.ellipsis,
           )),
           Text(
@@ -326,7 +341,7 @@ class _BudgetBody extends StatelessWidget {
         const SizedBox(height: Spacing.xs),
         Text(
           '剩 ${s.daysLeft} 天 · 日均可用 ${formatAmountYuan(s.dailyAvailableCents, hide: hide)}',
-          style: TextStyle(fontSize: AdaptiveFontSizes.caption, color: BrandColors.inkTertiary),
+          style: TextStyle(fontSize: AdaptiveFontSizes.caption, color: context.colors.inkTertiary),
           maxLines: 1, overflow: TextOverflow.ellipsis,
         ),
       ],
@@ -334,3 +349,79 @@ class _BudgetBody extends StatelessWidget {
   }
 }
 
+
+/// Bottom-sheet category picker (budget page).
+class _CategoryPickerSheet extends StatelessWidget {
+  const _CategoryPickerSheet({required this.categories});
+  final List<Category> categories;
+
+  @override
+  Widget build(BuildContext context) {
+    final maxH = MediaQuery.sizeOf(context).height * 0.55;
+    return Material(
+      color: Colors.transparent,
+      child: Container(
+        constraints: BoxConstraints(maxHeight: maxH),
+        decoration: BoxDecoration(
+          color: context.colors.surfaceCard,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+          boxShadow: [
+            BoxShadow(color: Colors.black.withValues(alpha: 0.12), blurRadius: 24, offset: const Offset(0, -4)),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 12),
+            Container(
+              width: 32,
+              height: 4,
+              decoration: BoxDecoration(
+                color: context.colors.border,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text('选择分类', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: context.colors.ink)),
+            const SizedBox(height: 8),
+            Flexible(
+              child: ListView.separated(
+                shrinkWrap: true,
+                padding: const EdgeInsets.fromLTRB(Spacing.xl, 4, Spacing.xl, Spacing.xl),
+                itemCount: categories.length,
+                separatorBuilder: (_, _) => Divider(height: 1, indent: 52, color: context.colors.divider),
+                itemBuilder: (ctx, i) {
+                  final c = categories[i];
+                  return InkWell(
+                    borderRadius: BorderRadius.circular(12),
+                    onTap: () => Navigator.pop(ctx, c),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 12),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 36,
+                            height: 36,
+                            decoration: BoxDecoration(
+                              color: context.colors.primaryLight.withValues(alpha: 0.16),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Icon(iconForCategory(c.iconRef), size: 18, color: context.colors.primary),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(c.name, style: TextStyle(fontSize: 15, color: context.colors.ink)),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}

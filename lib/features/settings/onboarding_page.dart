@@ -1,6 +1,7 @@
 /// Onboarding (first launch). Matches 09-高保真UI.html SP-0-01.
 library;
 
+import 'package:plain/app/theme/app_colors.dart';
 import 'package:flutter/material.dart';
 import 'package:plain/app/theme/design_tokens.dart';
 
@@ -41,7 +42,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: BrandColors.surfaceCard,
+      backgroundColor: context.colors.surfaceCard,
       body: SafeArea(
         child: Column(
           children: [
@@ -89,7 +90,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
                   width: on ? 22 : 8,
                   height: 8,
                   decoration: BoxDecoration(
-                    color: on ? BrandColors.primary : BrandColors.border,
+                    color: on ? context.colors.primary : context.colors.border,
                     borderRadius: BorderRadius.circular(4),
                   ),
                 );
@@ -131,7 +132,7 @@ class _ObStep extends StatelessWidget {
             width: 88,
             height: 88,
             decoration: BoxDecoration(
-              color: BrandColors.primaryLight,
+              color: context.colors.primaryLight,
               borderRadius: BorderRadius.circular(24),
             ),
             alignment: Alignment.center,
@@ -140,7 +141,7 @@ class _ObStep extends StatelessWidget {
               style: TextStyle(
                 fontSize: logo.length == 1 ? 36 : 28,
                 fontWeight: FontWeight.w700,
-                color: BrandColors.primaryDark,
+                color: context.colors.primaryDark,
               ),
             ),
           ),
@@ -148,14 +149,14 @@ class _ObStep extends StatelessWidget {
           Text(
             title,
             textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 24, fontWeight: FontWeight.w700, color: BrandColors.ink),
+            style: TextStyle(fontSize: 24, fontWeight: FontWeight.w700, color: context.colors.ink),
           ),
           const SizedBox(height: Spacing.md),
           if (subtitle != null)
             Text(
               subtitle!,
               textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 14, color: BrandColors.inkSecondary, height: 1.7),
+              style: TextStyle(fontSize: 14, color: context.colors.inkSecondary, height: 1.7),
             ),
           if (promises != null) ...[
             const SizedBox(height: Spacing.lg),
@@ -168,15 +169,15 @@ class _ObStep extends StatelessWidget {
                       decoration: BoxDecoration(
                         border: i == promises!.length - 1
                             ? null
-                            : Border(bottom: BorderSide(color: BrandColors.divider)),
+                            : Border(bottom: BorderSide(color: context.colors.divider)),
                       ),
                       padding: const EdgeInsets.symmetric(horizontal: Spacing.lg, vertical: 14),
                       child: Row(
                         children: [
-                          Icon(Icons.check_circle_outline, size: 18, color: BrandColors.primary),
+                          Icon(Icons.check_circle_outline, size: 18, color: context.colors.primary),
                           const SizedBox(width: 12),
                           Expanded(
-                            child: Text(promises![i], style: TextStyle(fontSize: 13, color: BrandColors.ink)),
+                            child: Text(promises![i], style: TextStyle(fontSize: 13, color: context.colors.ink)),
                           ),
                         ],
                       ),

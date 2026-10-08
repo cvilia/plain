@@ -1,12 +1,14 @@
 ﻿/// Settings page. See PRD STORY-5.1, M9.
 library;
 
+import 'package:plain/app/theme/app_colors.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:plain/app/breakpoints.dart';
 import 'package:plain/app/theme/design_tokens.dart';
 import 'package:plain/app/theme/theme_prefs.dart';
 import 'package:plain/core/format/amount_formatter.dart';
+import 'package:plain/features/security/app_lock_prefs.dart';
 import 'package:plain/features/security/app_lock_screen.dart';
 import 'package:plain/features/settings/backup_page.dart';
 import 'package:plain/features/settings/budget_page.dart';
@@ -31,7 +33,6 @@ class SettingsPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final hideAmounts = ref.watch(hideAmountsProvider);
     final appLockEnabled = ref.watch(appLockEnabledProvider);
-    watchBrandTheme(ref);
     final prefs = ref.watch(themePrefsProvider);
 
     return Scaffold(
@@ -119,9 +120,19 @@ class SettingsPage extends ConsumerWidget {
                 title: const Text('应用锁'),
                 subtitle: const Text('需要生物识别或 PIN 码'),
                 value: appLockEnabled,
-                onChanged: (v) {
-                  ref.read(appLockEnabledProvider.notifier).toggle(v);
-                  ref.read(appLockControllerProvider.notifier).lock();
+                onChanged: (v) async {
+                  if (v) {
+                    // Must set PIN first — never lock without credentials.
+                    final ok = await showAppLockSetupDialog(context);
+                    if (!ok || !context.mounted) return;
+                    ref.read(appLockEnabledProvider.notifier).set(true);
+                    ref.read(appLockControllerProvider.notifier).lock();
+                  } else {
+                    await AppLockPrefs.disable();
+                    if (!context.mounted) return;
+                    ref.read(appLockEnabledProvider.notifier).set(false);
+                    ref.read(appLockControllerProvider.notifier).unlock();
+                  }
                 },
               ),
             ),
@@ -176,7 +187,7 @@ class SettingsPage extends ConsumerWidget {
                 ListTile(
                   leading: Icon(Icons.info_outline),
                   title: Text('版本'),
-                  trailing: Text('1.0.0', style: TextStyle(color: BrandColors.inkTertiary)),
+                  trailing: Text('1.0.0', style: TextStyle(color: context.colors.inkTertiary)),
                 ),
                 const Divider(height: 1),
                 ListTile(
@@ -202,15 +213,15 @@ class SettingsPage extends ConsumerWidget {
                   width: 64,
                   height: 64,
                   decoration: BoxDecoration(
-                    color: BrandColors.primary.withValues(alpha: 0.1),
+                    color: context.colors.primary.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(Radii.lg),
                   ),
-                  child: Icon(Icons.savings_outlined, size: 32, color: BrandColors.primary),
+                  child: Icon(Icons.savings_outlined, size: 32, color: context.colors.primary),
                 ),
                 const SizedBox(height: Spacing.md),
-                Text('素记', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: BrandColors.ink)),
+                Text('素记', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: context.colors.ink)),
                 const SizedBox(height: Spacing.xs),
-                Text('本地优先的极简记账', style: TextStyle(fontSize: 12, color: BrandColors.inkTertiary)),
+                Text('本地优先的极简记账', style: TextStyle(fontSize: 12, color: context.colors.inkTertiary)),
               ]),
             ),
           ],
@@ -228,7 +239,7 @@ class _SectionHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(Spacing.xl, Spacing.lg, Spacing.lg, Spacing.sm),
-      child: Text(title, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: BrandColors.inkSecondary)),
+      child: Text(title, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: context.colors.inkSecondary)),
     );
   }
 }

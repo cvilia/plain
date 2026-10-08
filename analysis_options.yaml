@@ -1,3 +1,7 @@
+# Loads the full flutter_lints ruleset (~120 rules). Without this include,
+# only the explicit errors/lints below are active.
+include: package:flutter_lints/flutter.yaml
+
 analyzer:
   language:
     strict-casts: true
@@ -22,3 +26,7 @@ linter:
   rules:
     public_member_api_docs: false
     lines_longer_than_80_chars: false
+    # Disabled on purpose: repos/usecases expose public named params assigned to
+    # private fields (`X({required Foo foo}) : _foo = foo`). This lint would
+    # force `this._foo` and turn call sites into `X(_foo: ...)`.
+    prefer_initializing_formals: false

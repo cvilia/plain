@@ -5,7 +5,7 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:sqlite3/sqlite3.dart';
 
-const int kSchemaVersion = 2;
+const int kSchemaVersion = 3;
 
 class AppDatabase {
   AppDatabase._(this._db);
@@ -30,6 +30,12 @@ class AppDatabase {
 
   void _init() {
     _db.execute('PRAGMA journal_mode = WAL');
+    // Reject orphan rows at the DB layer (PRD: no orphan entries).
+    _db.execute('PRAGMA foreign_keys = ON');
+    // Concurrent writer (sync + UI) waits instead of throwing immediately.
+    _db.execute('PRAGMA busy_timeout = 5000');
+    // WAL + NORMAL is the standard mobile durability/throughput tradeoff.
+    _db.execute('PRAGMA synchronous = NORMAL');
     _db.execute(_ddlTransactions);
     _db.execute(_ddlCategories);
     _db.execute(_ddlAccounts);
@@ -46,19 +52,31 @@ class AppDatabase {
   }
 
   void _migrate() {
-    final cols = _db.select('PRAGMA table_info(transactions)');
-    final hasBatchId = cols.any((r) => r['name'] == 'batch_id');
-    if (!hasBatchId) {
+    final txCols = _db.select('PRAGMA table_info(transactions)');
+    if (!txCols.any((r) => r['name'] == 'batch_id')) {
       _db.execute('ALTER TABLE transactions ADD COLUMN batch_id TEXT NULL');
+    }
+    // v3: category boundary notes (12-分类体系设计). Pure additive; no backfill.
+    // Must check existence first — _init() creates the table WITH note on fresh
+    // installs, so unconditional ALTER would throw duplicate column.
+    final catCols = _db.select('PRAGMA table_info(categories)');
+    if (!catCols.any((r) => r['name'] == 'note')) {
+      _db.execute('ALTER TABLE categories ADD COLUMN note TEXT NULL');
     }
   }
 
+  /// Runs [action] inside a BEGIN/COMMIT transaction.
+  ///
+  /// Not re-entrant: nested calls will throw from SQLite (a connection cannot
+  /// open a transaction inside a transaction). Catches all [Object]s so that
+  /// [Error]s (TypeError/StateError from row casts) also roll back — catching
+  /// only [Exception] would leave the transaction hanging.
   void transaction(void Function() action) {
     _db.execute('BEGIN');
     try {
       action();
       _db.execute('COMMIT');
-    } on Exception {
+    } catch (_) {
       _db.execute('ROLLBACK');
       rethrow;
     }
@@ -83,6 +101,7 @@ const String _ddlCategories = '''
 CREATE TABLE IF NOT EXISTS categories (
   id TEXT NOT NULL PRIMARY KEY, parent_id TEXT NULL, name TEXT NOT NULL,
   kind TEXT NOT NULL, icon_ref TEXT NOT NULL, icon_asset TEXT NULL,
+  note TEXT NULL,
   sort_order INTEGER NOT NULL, is_hidden INTEGER NOT NULL DEFAULT 0,
   is_preset INTEGER NOT NULL DEFAULT 0,
   created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL, deleted_at INTEGER NULL,

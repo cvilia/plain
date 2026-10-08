@@ -1,10 +1,11 @@
 /// Theme resolver: resolveBrightness, resolveTokens, buildThemeData + 20-entry cache.
-/// ThemeData must be cached — never compute colors inside build(). See 需求变更.md §6.4.
+/// ThemeData must be cached — never compute colors inside build(). See 04-技术架构设计.md §16.1.
 library;
 
 import 'package:flutter/material.dart';
 import 'package:plain/app/theme/color_math.dart' as cm;
 import 'package:plain/app/theme/theme_registry.dart';
+import 'package:plain/app/theme/app_colors.dart';
 import 'package:plain/app/theme/tokens.dart';
 
 /// Resolve platform brightness + user preference → effective Brightness.
@@ -222,8 +223,8 @@ ThemeData buildThemeData(AppTokens tokens, Brightness brightness) {
     snackBarTheme: SnackBarThemeData(
       behavior: SnackBarBehavior.floating,
       backgroundColor: tokens.toastBg,
-      contentTextStyle: TextStyle(color: brightness == Brightness.dark ? tokens.appBg : tokens.surface),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      contentTextStyle: TextStyle(color: brightness == Brightness.dark ? tokens.appBg : tokens.surface, fontSize: 13),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
     ),
     filledButtonTheme: FilledButtonThemeData(
       style: FilledButton.styleFrom(
@@ -269,6 +270,7 @@ ThemeData buildThemeData(AppTokens tokens, Brightness brightness) {
         borderSide: BorderSide(color: tokens.primary, width: 1.5),
       ),
     ),
+    extensions: [AppColors.fromTokens(tokens)],
   );
 }
 

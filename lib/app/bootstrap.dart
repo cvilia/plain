@@ -6,6 +6,7 @@ import 'package:plain/core/id/uuid_v7.dart';
 import 'package:plain/core/logging/app_log.dart';
 import 'package:plain/core/time/clock.dart';
 import 'package:plain/data/db/database.dart';
+import 'package:plain/data/repositories/account_repository.dart';
 import 'package:plain/data/repositories/budget_repository.dart';
 import 'package:plain/data/repositories/category_repository.dart';
 import 'package:plain/data/repositories/ledger_repository.dart';
@@ -22,7 +23,7 @@ class AppDependencies {
   const AppDependencies({
     required this.db, required this.clock, required this.log, required this.idGen,
     required this.ledgerRepository, required this.categoryRepository,
-    required this.budgetRepository, required this.recurringRepository,
+    required this.accountRepository, required this.budgetRepository, required this.recurringRepository,
     required this.changeLogWriter, required this.calendar,
     required this.createEntry, required this.updateEntry, required this.deleteEntry,
     required this.restoreEntry, required this.purgeTrash, required this.listDeletedEntries,
@@ -38,6 +39,7 @@ class AppDependencies {
   final UuidV7 idGen;
   final LedgerRepository ledgerRepository;
   final CategoryRepository categoryRepository;
+  final AccountRepository accountRepository;
   final BudgetRepository budgetRepository;
   final RecurringRepository recurringRepository;
   final ChangeLogWriter changeLogWriter;
@@ -110,12 +112,13 @@ AppDependencies buildDependencies({
   final changeLogWriter = ChangeLogWriter(db);
   final ledgerRepo = LedgerRepositoryImpl(db: db, changeLogWriter: changeLogWriter, clock: effectiveClock, log: log);
   final categoryRepo = CategoryRepositoryImpl(db: db, changeLogWriter: changeLogWriter, clock: effectiveClock);
+  final accountRepo = AccountRepositoryImpl(db: db, changeLogWriter: changeLogWriter, clock: effectiveClock);
   final budgetRepo = BudgetRepositoryImpl(db: db, changeLogWriter: changeLogWriter, clock: effectiveClock);
   final recurringRepo = RecurringRepositoryImpl(db: db, changeLogWriter: changeLogWriter, clock: effectiveClock);
   final calendar = AccountingCalendar(clock: effectiveClock);
   return AppDependencies(
     db: db, clock: effectiveClock, log: log, idGen: idGen,
-    ledgerRepository: ledgerRepo, categoryRepository: categoryRepo,
+    ledgerRepository: ledgerRepo, categoryRepository: categoryRepo, accountRepository: accountRepo,
     budgetRepository: budgetRepo, recurringRepository: recurringRepo,
     changeLogWriter: changeLogWriter, calendar: calendar,
     createEntry: CreateEntryUseCase(repository: ledgerRepo, clock: effectiveClock, idGen: idGen),

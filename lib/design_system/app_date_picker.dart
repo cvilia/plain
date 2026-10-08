@@ -2,6 +2,7 @@
 /// Celadon green theme, clean calendar grid.
 library;
 
+import 'package:plain/app/theme/app_colors.dart';
 import 'package:flutter/material.dart';
 import 'package:plain/app/theme/design_tokens.dart';
 
@@ -51,7 +52,7 @@ class _AppDatePickerDialogState extends State<_AppDatePickerDialog> {
   @override
   Widget build(BuildContext context) {
     return Dialog(
-      backgroundColor: BrandColors.surface,
+      backgroundColor: context.colors.surface,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(Radii.lg)),
       child: Padding(
         padding: const EdgeInsets.all(Spacing.xl),
@@ -61,7 +62,7 @@ class _AppDatePickerDialogState extends State<_AppDatePickerDialog> {
             // Header: selected date
             Text(
               _formatHeaderDate(_selectedDate),
-              style: TextStyle(fontSize: 24, fontWeight: FontWeight.w600, color: BrandColors.ink),
+              style: TextStyle(fontSize: 24, fontWeight: FontWeight.w600, color: context.colors.ink),
             ),
             const SizedBox(height: Spacing.xl),
 
@@ -70,15 +71,15 @@ class _AppDatePickerDialogState extends State<_AppDatePickerDialog> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 IconButton(
-                  icon: Icon(Icons.chevron_left, color: BrandColors.inkSecondary),
+                  icon: Icon(Icons.chevron_left, color: context.colors.inkSecondary),
                   onPressed: _prevMonth,
                 ),
                 Text(
                   '${_displayMonth.year}年${_displayMonth.month}月',
-                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500, color: BrandColors.ink),
+                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500, color: context.colors.ink),
                 ),
                 IconButton(
-                  icon: Icon(Icons.chevron_right, color: BrandColors.inkSecondary),
+                  icon: Icon(Icons.chevron_right, color: context.colors.inkSecondary),
                   onPressed: _nextMonth,
                 ),
               ],
@@ -90,7 +91,7 @@ class _AppDatePickerDialogState extends State<_AppDatePickerDialog> {
               children: ['一', '二', '三', '四', '五', '六', '日'].map((d) {
                 return Expanded(
                   child: Center(
-                    child: Text(d, style: TextStyle(fontSize: 12, color: BrandColors.inkTertiary)),
+                    child: Text(d, style: TextStyle(fontSize: 12, color: context.colors.inkTertiary)),
                   ),
                 );
               }).toList(),
@@ -107,12 +108,12 @@ class _AppDatePickerDialogState extends State<_AppDatePickerDialog> {
               children: [
                 TextButton(
                   onPressed: () => Navigator.pop(context),
-                  child: Text('取消', style: TextStyle(color: BrandColors.inkSecondary)),
+                  child: Text('取消', style: TextStyle(color: context.colors.inkSecondary)),
                 ),
                 const SizedBox(width: Spacing.md),
                 TextButton(
                   onPressed: () => Navigator.pop(context, _selectedDate.toUtc()),
-                  child: Text('确定', style: TextStyle(color: BrandColors.primary, fontWeight: FontWeight.w600)),
+                  child: Text('确定', style: TextStyle(color: context.colors.primary, fontWeight: FontWeight.w600)),
                 ),
               ],
             ),
@@ -154,9 +155,9 @@ class _AppDatePickerDialogState extends State<_AppDatePickerDialog> {
             margin: const EdgeInsets.all(2),
             decoration: BoxDecoration(
               color: isSelected
-                  ? BrandColors.primary
+                  ? context.colors.primary
                   : isToday
-                      ? BrandColors.primary.withValues(alpha: 0.1)
+                      ? context.colors.primary.withValues(alpha: 0.1)
                       : null,
               borderRadius: BorderRadius.circular(Radii.sm),
             ),
@@ -167,12 +168,12 @@ class _AppDatePickerDialogState extends State<_AppDatePickerDialog> {
                   fontSize: 14,
                   fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
                   color: isDisabled
-                      ? BrandColors.inkTertiary.withValues(alpha: 0.4)
+                      ? context.colors.inkTertiary.withValues(alpha: 0.4)
                       : isSelected
-                          ? BrandColors.onPrimary
+                          ? context.colors.onPrimary
                           : isToday
-                              ? BrandColors.primary
-                              : BrandColors.ink,
+                              ? context.colors.primary
+                              : context.colors.ink,
                 ),
               ),
             ),
@@ -205,6 +206,6 @@ class _AppDatePickerDialogState extends State<_AppDatePickerDialog> {
   String _formatHeaderDate(DateTime date) {
     const weekdays = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
     final weekday = weekdays[(date.weekday - 1) % 7];
-    return '${date.month}�?{date.day}�?weekday';
+    return '${date.year}年${date.month}月${date.day}日 $weekday';
   }
 }

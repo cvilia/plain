@@ -1,5 +1,5 @@
 /// AppTokens: 46-field immutable value object resolved from ThemeSpec × Brightness.
-/// Field names map 1:1 from CSS variables (kebab → camelCase). See 需求变更.md §4.2.
+/// Field names map 1:1 from CSS variables (kebab → camelCase). See 04-技术架构设计.md §16.1.
 library;
 
 import 'package:flutter/material.dart';

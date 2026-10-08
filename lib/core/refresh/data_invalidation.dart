@@ -134,8 +134,10 @@ final recurringVersionProvider = Provider<int>(
   (ref) => ref.watch(dataInvalidationProvider)[DataScope.recurring] ?? 0,
 );
 
-/// Watch in anything painted from [BrandColors] that stays mounted
-/// (shell FAB, tab pages). See `watchBrandTheme` in design_tokens.dart.
+/// Watch in anything that used to call `watchBrandTheme`.
+/// Theme colors now live on ThemeData via AppColors ThemeExtension, so a
+/// theme change rebuilds dependents automatically — this provider remains
+/// for any non-widget listeners.
 final themeVersionProvider = Provider<int>(
   (ref) => ref.watch(dataInvalidationProvider)[DataScope.theme] ?? 0,
 );

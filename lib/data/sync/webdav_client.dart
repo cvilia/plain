@@ -4,6 +4,7 @@ library;
 
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 class WebDavConfig {
   const WebDavConfig({
@@ -58,7 +59,7 @@ class WebDavClient {
       req.contentLength = bytes.length;
       req.add(bytes);
       final resp = await req.close();
-      await resp.drain();
+      await resp.drain<void>();
       return resp.statusCode >= 200 && resp.statusCode < 300;
     } on Exception {
       return false;
@@ -88,7 +89,7 @@ class WebDavClient {
       final req = await _http.headUrl(config._uri(config.filePath(fileName)));
       config._headers.forEach(req.headers.set);
       final resp = await req.close();
-      await resp.drain();
+      await resp.drain<void>();
       return resp.statusCode == 200;
     } on Exception {
       return false;
@@ -104,7 +105,7 @@ class WebDavClient {
       req.headers.contentType = ContentType('text', 'xml', charset: 'utf-8');
       req.write('<?xml version="1.0"?><a:propfind xmlns:a="DAV:"><a:prop><a:resourcetype/></a:prop></a:propfind>');
       final resp = await req.close();
-      await resp.drain();
+      await resp.drain<void>();
       return resp.statusCode == 207 || resp.statusCode == 200;
     } on Exception {
       return false;
@@ -119,7 +120,7 @@ class WebDavClient {
       req.headers.contentType = ContentType('text', 'xml', charset: 'utf-8');
       req.write('<?xml version="1.0"?><a:propfind xmlns:a="DAV:"><a:prop><a:resourcetype/></a:prop></a:propfind>');
       final resp = await req.close();
-      await resp.drain();
+      await resp.drain<void>();
       return resp.statusCode == 207;
     } on Exception {
       return false;
@@ -131,7 +132,7 @@ class WebDavClient {
       final req = await _http.openUrl('MKCOL', config._uri(path));
       config._headers.forEach(req.headers.set);
       final resp = await req.close();
-      await resp.drain();
+      await resp.drain<void>();
       return resp.statusCode == 201 || resp.statusCode == 200;
     } on Exception {
       return false;

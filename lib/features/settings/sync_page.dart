@@ -1,7 +1,10 @@
 ﻿/// WebDAV sync settings page. PRD F7.3.
 library;
 
+import 'package:plain/app/theme/app_colors.dart';
+import 'package:plain/design_system/confirm_dialog.dart';
 import 'package:flutter/material.dart';
+import 'package:plain/design_system/app_toast.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:plain/app/bootstrap.dart';
 import 'package:plain/app/breakpoints.dart';
@@ -71,7 +74,7 @@ class _SyncPageState extends ConsumerState<SyncPage> {
     setK('webdav.pass', _passController.text);
     setK('webdav.path', _pathController.text.trim());
     setState(() => _configured = _urlController.text.trim().isNotEmpty);
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('配置已保存')));
+    showAppToast(context, '配置已保存');
   }
 
   WebDavConfig _buildConfig() => WebDavConfig(
@@ -118,20 +121,12 @@ class _SyncPageState extends ConsumerState<SyncPage> {
   }
 
   Future<void> _download() async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('从云端恢复'),
-        content: const Text('将用云端备份替换本地数据，当前数据会被覆盖。确定继续？'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('取消')),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            style: FilledButton.styleFrom(backgroundColor: BrandColors.expense),
-            child: const Text('确定恢复'),
-          ),
-        ],
-      ),
+    final confirmed = await showConfirmDialog(
+      context,
+      title: '从云端恢复',
+      message: '将用云端备份替换本地数据，当前数据会被覆盖。确定继续？',
+      confirmLabel: '确定恢复',
+      destructive: true,
     );
     if (confirmed != true || !mounted) return;
 
@@ -168,7 +163,7 @@ class _SyncPageState extends ConsumerState<SyncPage> {
                     const SizedBox(height: Spacing.sm),
                     Text(
                       '支持坚果云、NextCloud 等 WebDAV 服务。数据仅在你自己的服务器上，不经过第三方。',
-                      style: TextStyle(fontSize: 13, color: BrandColors.inkSecondary),
+                      style: TextStyle(fontSize: 13, color: context.colors.inkSecondary),
                     ),
                     const SizedBox(height: Spacing.lg),
                     TextField(
@@ -239,7 +234,7 @@ class _SyncPageState extends ConsumerState<SyncPage> {
                     const SizedBox(height: Spacing.sm),
                     Text(
                       '上传会将本地数据备份到云端；恢复会用云端备份覆盖本地数据。',
-                      style: TextStyle(fontSize: 13, color: BrandColors.inkSecondary),
+                      style: TextStyle(fontSize: 13, color: context.colors.inkSecondary),
                     ),
                     const SizedBox(height: Spacing.lg),
                     SizedBox(
@@ -265,8 +260,8 @@ class _SyncPageState extends ConsumerState<SyncPage> {
                         padding: const EdgeInsets.all(Spacing.md),
                         decoration: BoxDecoration(
                           color: _status!.contains('成功')
-                              ? BrandColors.income.withValues(alpha: 0.08)
-                              : BrandColors.expense.withValues(alpha: 0.08),
+                              ? context.colors.income.withValues(alpha: 0.08)
+                              : context.colors.expense.withValues(alpha: 0.08),
                           borderRadius: BorderRadius.circular(Radii.sm),
                         ),
                         child: Text(_status!, style: const TextStyle(fontSize: 13)),
@@ -290,7 +285,7 @@ class _SyncPageState extends ConsumerState<SyncPage> {
                       '• 恢复后需重启应用生效\n'
                       '• 密码仅存储在本地设备，不会上传到任何第三方服务器\n'
                       '• 坚果云用户请在「安全设置」中生成应用专用密码',
-                      style: TextStyle(fontSize: 12, color: BrandColors.inkSecondary, height: 1.6),
+                      style: TextStyle(fontSize: 12, color: context.colors.inkSecondary, height: 1.6),
                     ),
                   ],
                 ),

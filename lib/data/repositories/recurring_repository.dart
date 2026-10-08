@@ -5,6 +5,8 @@ import 'package:plain/core/money/money.dart';
 import 'package:plain/core/result/result.dart';
 import 'package:plain/core/time/clock.dart';
 import 'package:plain/data/db/database.dart';
+import 'package:plain/data/db/row_x.dart';
+import 'package:plain/data/db/run_write.dart';
 import 'package:plain/data/sync/change_log_writer.dart';
 import 'package:plain/domain/entities/enums.dart';
 import 'package:plain/domain/entities/recurring_rule.dart';
@@ -45,67 +47,67 @@ class RecurringRepositoryImpl implements RecurringRepository {
 
   @override
   Future<Result<RecurringRule>> create(RecurringRule rule) async {
-    try {
-      if (rule.frequency == RecurringFrequency.unknown) {
-        return err<RecurringRule>(const ValidationFailure('recurring.frequency_invalid', 'invalid'));
-      }
-      if (!rule.amount.withinProductLimit || rule.amount.isZero) {
-        return err<RecurringRule>(const ValidationFailure('recurring.amount_invalid', 'invalid'));
-      }
-      _db.transaction(() {
+    if (rule.frequency == RecurringFrequency.unknown) {
+      return err<RecurringRule>(const ValidationFailure('recurring.frequency_invalid', 'invalid'));
+    }
+    if (!rule.amount.withinProductLimit || rule.amount.isZero) {
+      return err<RecurringRule>(const ValidationFailure('recurring.amount_invalid', 'invalid'));
+    }
+    return runWrite(
+      _db,
+      failCode: 'db.insert_failed',
+      result: rule,
+      body: () {
         _insert(rule);
         _changeLog.write(
           entityType: EntityType.recurringRule, entityId: rule.id, op: ChangeOp.insert,
           deviceId: rule.deviceId, baseRevision: 0,
           before: const {}, after: _payload(rule),
         );
-      });
-      return ok(rule);
-    } on Exception catch (e) {
-      return err(StorageFailure('db.insert_failed', e.toString(), isRetryable: true));
-    }
+      },
+    );
   }
 
   @override
   Future<Result<RecurringRule>> update(RecurringRule rule) async {
-    try {
-      final old = _findById(rule.id);
-      if (old == null) return err<RecurringRule>(const NotFoundFailure('recurring.not_found', 'nf'));
-      _db.transaction(() {
+    final old = _findById(rule.id);
+    if (old == null) return err<RecurringRule>(const NotFoundFailure('recurring.not_found', 'nf'));
+    return runWrite(
+      _db,
+      failCode: 'db.update_failed',
+      result: rule,
+      body: () {
         _update(rule);
         _changeLog.write(
           entityType: EntityType.recurringRule, entityId: rule.id, op: ChangeOp.update,
           deviceId: rule.deviceId, baseRevision: rule.baseRevision,
           before: _payload(old), after: _payload(rule),
         );
-      });
-      return ok(rule);
-    } on Exception catch (e) {
-      return err(StorageFailure('db.update_failed', e.toString(), isRetryable: true));
-    }
+      },
+    );
   }
 
   @override
   Future<Result<void>> softDelete(String id) async {
-    try {
-      final old = _findById(id);
-      if (old == null) return err<void>(const NotFoundFailure('recurring.not_found', 'nf'));
-      final now = _clock.now();
-      final deleted = old.copyWith(
-        deletedAt: now, updatedAt: now,
-        isEnabled: false, revision: old.revision + 1, baseRevision: old.revision);
-      _db.transaction(() {
+    final old = _findById(id);
+    if (old == null) return err<void>(const NotFoundFailure('recurring.not_found', 'nf'));
+    final now = _clock.now();
+    final deleted = old.copyWith(
+      deletedAt: now, updatedAt: now,
+      isEnabled: false, revision: old.revision + 1, baseRevision: old.revision);
+    return runWrite<void>(
+      _db,
+      failCode: 'db.delete_failed',
+      result: null,
+      body: () {
         _update(deleted);
         _changeLog.write(
           entityType: EntityType.recurringRule, entityId: id, op: ChangeOp.delete,
           deviceId: old.deviceId, baseRevision: old.revision,
           before: _payload(old), after: const {},
         );
-      });
-      return ok(null);
-    } on Exception catch (e) {
-      return err(StorageFailure('db.delete_failed', e.toString(), isRetryable: true));
-    }
+      },
+    );
   }
 
   @override
@@ -124,7 +126,7 @@ class RecurringRepositoryImpl implements RecurringRepository {
         for (final row in rows) {
           _changeLog.write(
             entityType: EntityType.transaction, entityId: row['id']! as String, op: ChangeOp.delete,
-            deviceId: (row['device_id'] as String?) ?? '', baseRevision: (row['revision'] as int?) ?? 1,
+            deviceId: (row['device_id'] as String?) ?? '', baseRevision: row.intOr('revision', 1),
             before: Map<String, Object?>.from(row), after: const {}, changedAt: deletedAt,
           );
         }
@@ -198,10 +200,10 @@ class RecurringRepositoryImpl implements RecurringRepository {
     skipStrategy: RecurringSkipStrategy.fromWire(row['skip_strategy'] as String?),
     autoConfirm: ((row['auto_confirm'] as int?) ?? 1) == 1,
     endType: RecurringEndType.fromWire(row['end_type'] as String?),
-    endAt: row['end_at'] == null ? null : DateTime.fromMillisecondsSinceEpoch(row['end_at']! as int, isUtc: true),
+    endAt: row.nullableDateTime('end_at'),
     endCount: row['end_count'] as int?,
     generatedCount: (row['generated_count'] as int?) ?? 0,
-    nextRunAt: DateTime.fromMillisecondsSinceEpoch(row['next_run_at']! as int, isUtc: true),
+    nextRunAt: row.dateTime('next_run_at'),
     entryType: EntryType.fromWire(row['entry_type'] as String?),
     amount: Money(row['amount_cents']! as int),
     categoryId: row['category_id'] as String?,
@@ -210,10 +212,10 @@ class RecurringRepositoryImpl implements RecurringRepository {
     note: row['note'] as String?,
     lastBatchId: row['last_batch_id'] as String?,
     isEnabled: ((row['is_enabled'] as int?) ?? 1) == 1,
-    createdAt: DateTime.fromMillisecondsSinceEpoch(row['created_at']! as int, isUtc: true),
-    updatedAt: DateTime.fromMillisecondsSinceEpoch(row['updated_at']! as int, isUtc: true),
-    deletedAt: row['deleted_at'] == null ? null : DateTime.fromMillisecondsSinceEpoch(row['deleted_at']! as int, isUtc: true),
-    revision: (row['revision'] as int?) ?? 1,
+    createdAt: row.dateTime('created_at'),
+    updatedAt: row.dateTime('updated_at'),
+    deletedAt: row.nullableDateTime('deleted_at'),
+    revision: row.intOr('revision', 1),
     deviceId: row['device_id']! as String,
-    baseRevision: (row['base_revision'] as int?) ?? 0);
+    baseRevision: row.intOr('base_revision', 0));
 }

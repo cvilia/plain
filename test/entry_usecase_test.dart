@@ -1,4 +1,5 @@
 /// Entry use case integration tests (in-memory DB).
+library;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:plain/core/id/uuid_v7.dart';
 import 'package:plain/core/time/clock.dart';

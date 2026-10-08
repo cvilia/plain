@@ -1,13 +1,16 @@
 /// Full category picker page. See PRD STORY-1.1 (More grid).
 library;
 
+import 'package:plain/app/theme/app_colors.dart';
+import 'package:plain/design_system/category_avatar.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:plain/app/bootstrap.dart';
 import 'package:plain/app/theme/design_tokens.dart';
 import 'package:plain/core/refresh/data_invalidation.dart';
-import 'package:plain/design_system/category_icons.dart';
+import 'package:plain/design_system/app_toast.dart';
 import 'package:plain/domain/entities/category.dart' as domain;
+import 'package:plain/domain/services/category_naming.dart';
 import 'package:plain/domain/entities/enums.dart';
 
 final _allCategoriesProvider = FutureProvider<List<domain.Category>>((ref) async {
@@ -45,10 +48,10 @@ class _CategoryPickerPageState extends ConsumerState<CategoryPickerPage> {
                 prefixIcon: const Icon(Icons.search, size: 20),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(Radii.pill),
-                  borderSide: BorderSide(color: BrandColors.border),
+                  borderSide: BorderSide(color: context.colors.border),
                 ),
                 filled: true,
-                fillColor: BrandColors.surfaceMuted,
+                fillColor: context.colors.surfaceMuted,
                 contentPadding: const EdgeInsets.symmetric(horizontal: Spacing.md),
               ),
               onChanged: (v) => setState(() => _searchQuery = v.trim()),
@@ -67,7 +70,7 @@ class _CategoryPickerPageState extends ConsumerState<CategoryPickerPage> {
             return Center(
               child: Text(
                 _searchQuery.isEmpty ? '暂无分类' : '未找到匹配分类',
-                style: TextStyle(color: BrandColors.inkTertiary),
+                style: TextStyle(color: context.colors.inkTertiary),
               ),
             );
           }
@@ -98,7 +101,127 @@ class _CategoryPickerPageState extends ConsumerState<CategoryPickerPage> {
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(child: Text('加载失败: $e')),
       ),
+      floatingActionButton: FloatingActionButton.extended(
+        heroTag: 'fab_category_picker_add',
+        icon: const Icon(Icons.add),
+        label: const Text('新增'),
+        backgroundColor: context.colors.primary,
+        foregroundColor: context.colors.onPrimary,
+        onPressed: () => _showAddLeafSheet(context, ref),
+      ),
     );
+  }
+
+  /// Add a second-level category from the picker, then select it.
+  Future<void> _showAddLeafSheet(BuildContext context, WidgetRef ref) async {
+    final categories = ref.read(_allCategoriesProvider).value ?? const <domain.Category>[];
+    final roots = categories
+        .where((c) => !c.isDeleted && c.isRoot && c.kind == widget.kind)
+        .toList()
+      ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
+    if (roots.isEmpty) {
+      showAppToast(context, '请先在分类管理中新建一级分类');
+      return;
+    }
+    domain.Category? parent = roots.first;
+    final nameCtrl = TextEditingController();
+    final noteCtrl = TextEditingController();
+
+    final created = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheetState) => Padding(
+          padding: EdgeInsets.only(
+            left: Spacing.lg,
+            right: Spacing.lg,
+            top: Spacing.lg,
+            bottom: MediaQuery.of(ctx).viewInsets.bottom + Spacing.lg,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text('新增分类条目', style: Theme.of(ctx).textTheme.titleMedium),
+              const SizedBox(height: Spacing.lg),
+              DropdownButtonFormField<domain.Category>(
+                initialValue: parent,
+                decoration: const InputDecoration(
+                  labelText: '归属一级分类',
+                  border: OutlineInputBorder(),
+                ),
+                items: [
+                  for (final r in roots)
+                    DropdownMenuItem(value: r, child: Text(r.name)),
+                ],
+                onChanged: (v) => setSheetState(() => parent = v),
+              ),
+              const SizedBox(height: Spacing.md),
+              TextField(
+                controller: nameCtrl,
+                maxLength: 6,
+                decoration: const InputDecoration(
+                  labelText: '名称',
+                  hintText: '如：咖啡',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: Spacing.md),
+              TextField(
+                controller: noteCtrl,
+                maxLength: 30,
+                maxLines: 2,
+                decoration: const InputDecoration(
+                  labelText: '备注（可选）',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: Spacing.lg),
+              FilledButton(
+                onPressed: () {
+                  final p = parent;
+                  if (p == null) return;
+                  final name = nameCtrl.text.trim();
+                  if (name.isEmpty) return;
+                  final conflict = categoryTitleConflictMessage(
+                    all: categories,
+                    name: name,
+                    parentId: p.id,
+                    kind: p.kind,
+                  );
+                  if (conflict != null) {
+                    showAppToast(context, conflict);
+                    return;
+                  }
+                  final deps = ref.read(appDependenciesProvider);
+                  final now = DateTime.now().toUtc();
+                  final id = 'cat_${now.microsecondsSinceEpoch}';
+                  final note = noteCtrl.text.trim();
+                  deps.categoryRepository.create(domain.Category(
+                    id: id,
+                    parentId: p.id,
+                    name: name,
+                    kind: p.kind,
+                    iconRef: p.iconRef,
+                    note: note.isEmpty ? null : note,
+                    sortOrder: 999,
+                    createdAt: now,
+                    updatedAt: now,
+                    deviceId: deps.deviceId,
+                  ));
+                  ref.invalidateData.bumpCategoriesMutated();
+                  Navigator.pop(ctx, id);
+                },
+                child: const Text('添加并选用'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (created != null && context.mounted) {
+      Navigator.pop(context, created);
+    }
   }
 }
 
@@ -134,16 +257,18 @@ class _ExpandableCategoryGroupState extends State<_ExpandableCategoryGroup> {
                   child: AnimatedRotation(
                     turns: _expanded ? 0.25 : 0,
                     duration: const Duration(milliseconds: 200),
-                    child: Icon(Icons.chevron_right, size: 20, color: BrandColors.inkTertiary),
+                    child: Icon(Icons.chevron_right, size: 20, color: context.colors.inkTertiary),
                   ),
                 )
               : null,
           onTap: () {
-            if (hasChildren && !_expanded) {
-              setState(() => _expanded = true);
-            } else {
+            // Default 其他 is a first-level catch-all and IS selectable for
+            // accounting; every other first-level group only expands.
+            if (isDefaultOtherCategory(widget.root)) {
               widget.onSelected(widget.root);
+              return;
             }
+            setState(() => _expanded = !_expanded);
           },
         ),
         AnimatedCrossFade(
@@ -174,15 +299,11 @@ class _CategoryTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isExpense = category.kind == CategoryKind.expense;
-    final color = isExpense ? BrandColors.expense : BrandColors.income;
+    final color = isExpense ? context.colors.expense : context.colors.income;
 
     return ListTile(
       contentPadding: const EdgeInsets.symmetric(horizontal: Spacing.sm),
-      leading: CircleAvatar(
-        radius: 18,
-        backgroundColor: color.withValues(alpha: 0.1),
-        child: Icon(iconForCategory(category.iconRef), size: 18, color: color),
-      ),
+      leading: CategoryAvatar(iconRef: category.iconRef, color: color, size: 18),
       title: Text(
         category.name,
         style: TextStyle(

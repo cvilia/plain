@@ -4,7 +4,6 @@ library;
 import 'package:plain/core/id/uuid_v7.dart';
 import 'package:plain/core/result/result.dart';
 import 'package:plain/core/time/clock.dart';
-import 'package:plain/domain/entities/ledger_entry.dart';
 import 'package:plain/domain/repositories/repositories.dart';
 import 'package:plain/domain/services/csv_importer.dart';
 
@@ -60,7 +59,7 @@ class ImportCsvUseCase {
 
     for (final p in deduped.unique) {
       final categoryId = p.categoryName != null
-          ? (resolveCategoryId?.call(p.categoryName!) ?? null)
+          ? (resolveCategoryId?.call(p.categoryName!))
           : null;
       final entry = parsedToLedgerEntry(
         p,

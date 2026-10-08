@@ -1,4 +1,5 @@
 /// CSV importer tests: parsing, date/amount formats, dedup, fingerprint.
+library;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:plain/domain/entities/enums.dart';
 import 'package:plain/domain/services/csv_importer.dart';

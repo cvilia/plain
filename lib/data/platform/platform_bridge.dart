@@ -1,5 +1,5 @@
 /// Platform channel contracts. See 04-7.
-/// Only raw types across boundary: String / int / Map<String, Object?>.
+/// Only raw types across boundary: String / int / `Map<String, Object?>`.
 library;
 
 import 'package:flutter/services.dart';

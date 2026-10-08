@@ -1,7 +1,6 @@
 /// Repository interfaces. See 04-6.1, 05-A4.
 library;
 
-import 'package:plain/core/money/money.dart';
 import 'package:plain/core/result/result.dart';
 import 'package:plain/domain/entities/budget.dart';
 import 'package:plain/domain/entities/category.dart';
@@ -75,11 +74,43 @@ abstract interface class CategoryRepository {
   Future<Result<Category>> create(Category category);
   Future<Result<Category>> update(Category category);
   Future<Result<void>> softDelete(String id);
-  Future<Result<int>> merge({required String sourceId, required String targetId});
+  /// Move a second-level category under a different first-level parent.
+  ///
+  /// Transactions stay on the category — only [Category.parentId] changes.
+  /// First-level groups cannot be moved.
+  Future<Result<Category>> moveToParent({
+    required String categoryId,
+    required String newParentId,
+  });
+
+  /// Count live transactions on [categoryId] (and optionally its descendants).
+  Future<Result<int>> countLiveEntries({
+    required String categoryId,
+    bool includeDescendants = false,
+  });
+
+  /// Soft-delete [categoryId] (and descendants when requested), moving every
+  /// live transaction to [fallbackCategoryId] (typically the default 其他).
+  Future<Result<int>> deleteAndReassign({
+    required String categoryId,
+    required String fallbackCategoryId,
+    bool includeDescendants = false,
+  });
+}
+
+class AccountWithBalance {
+  const AccountWithBalance({
+    required this.account,
+    required this.balanceCents,
+  });
+  final Account account;
+  final int balanceCents;
 }
 
 abstract interface class AccountRepository {
   Future<Result<List<Account>>> listAll();
+  /// Accounts plus derived balance in one query (replaces UI-side N+1).
+  Future<Result<List<AccountWithBalance>>> listWithBalances();
   Future<Result<Account>> getById(String id);
   Future<Result<Account>> create(Account account);
   Future<Result<Account>> update(Account account);

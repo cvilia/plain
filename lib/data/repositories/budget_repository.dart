@@ -5,6 +5,8 @@ import 'package:plain/core/money/money.dart';
 import 'package:plain/core/result/result.dart';
 import 'package:plain/core/time/clock.dart';
 import 'package:plain/data/db/database.dart';
+import 'package:plain/data/db/row_x.dart';
+import 'package:plain/data/db/run_write.dart';
 import 'package:plain/data/sync/change_log_writer.dart';
 import 'package:plain/domain/entities/budget.dart';
 import 'package:plain/domain/entities/enums.dart';
@@ -40,67 +42,70 @@ class BudgetRepositoryImpl implements BudgetRepository {
 
   @override
   Future<Result<Budget>> create(Budget budget) async {
-    try {
-      if (budget.isTotal) {
-        final existing = await getTotal(budget.bookId);
-        if (existing.isSuccess) {
-          return err<Budget>(const ConflictFailure('budget.total_exists', 'exists'));
-        }
-      } else if (budget.categoryId == null) {
-        return err<Budget>(const ValidationFailure('budget.category_required', 'req'));
+    if (budget.isTotal) {
+      final existing = await getTotal(budget.bookId);
+      if (existing.isSuccess) {
+        return err<Budget>(const ConflictFailure('budget.total_exists', 'exists'));
       }
-      _db.transaction(() {
+    } else if (budget.categoryId == null) {
+      return err<Budget>(const ValidationFailure('budget.category_required', 'req'));
+    }
+    return runWrite(
+      _db,
+      failCode: 'db.insert_failed',
+      result: budget,
+      body: () {
         _insert(budget);
         _changeLog.write(
           entityType: EntityType.budget, entityId: budget.id, op: ChangeOp.insert,
           deviceId: budget.deviceId, baseRevision: 0,
           before: const {}, after: _payload(budget),
         );
-      });
-      return ok(budget);
-    } on Exception catch (e) {
-      return err(StorageFailure('db.insert_failed', e.toString(), isRetryable: true));
-    }
+      },
+    );
   }
 
   @override
   Future<Result<Budget>> update(Budget budget) async {
-    try {
-      final old = _findById(budget.id);
-      if (old == null) return err<Budget>(const NotFoundFailure('budget.not_found', 'nf'));
-      _db.transaction(() {
+    final old = _findById(budget.id);
+    if (old == null) return err<Budget>(const NotFoundFailure('budget.not_found', 'nf'));
+    return runWrite(
+      _db,
+      failCode: 'db.update_failed',
+      result: budget,
+      body: () {
         _update(budget);
         _changeLog.write(
           entityType: EntityType.budget, entityId: budget.id, op: ChangeOp.update,
           deviceId: budget.deviceId, baseRevision: budget.baseRevision,
           before: _payload(old), after: _payload(budget),
         );
-      });
-      return ok(budget);
-    } on Exception catch (e) {
-      return err(StorageFailure('db.update_failed', e.toString(), isRetryable: true));
-    }
+      },
+    );
   }
 
   @override
   Future<Result<void>> softDelete(String id) async {
-    try {
-      final old = _findById(id);
-      if (old == null) return err<void>(const NotFoundFailure('budget.not_found', 'nf'));
-      final now = _clock.now();
-      final deleted = old.copyWith(deletedAt: now, updatedAt: now, revision: old.revision + 1, baseRevision: old.revision);
-      _db.transaction(() {
+    final old = _findById(id);
+    if (old == null) return err<void>(const NotFoundFailure('budget.not_found', 'nf'));
+    final now = _clock.now();
+    final deleted = old.copyWith(
+      deletedAt: now, updatedAt: now,
+      revision: old.revision + 1, baseRevision: old.revision,
+    );
+    return runWrite<void>(
+      _db,
+      failCode: 'db.delete_failed',
+      result: null,
+      body: () {
         _update(deleted);
         _changeLog.write(
           entityType: EntityType.budget, entityId: id, op: ChangeOp.delete,
           deviceId: old.deviceId, baseRevision: old.revision,
           before: _payload(old), after: const {},
         );
-      });
-      return ok(null);
-    } on Exception catch (e) {
-      return err(StorageFailure('db.delete_failed', e.toString(), isRetryable: true));
-    }
+      },
+    );
   }
 
   @override
@@ -177,10 +182,10 @@ class BudgetRepositoryImpl implements BudgetRepository {
     amount: Money(row['amount_cents']! as int),
     rollover: ((row['rollover'] as int?) ?? 0) == 1,
     isEnabled: ((row['is_enabled'] as int?) ?? 1) == 1,
-    createdAt: DateTime.fromMillisecondsSinceEpoch(row['created_at']! as int, isUtc: true),
-    updatedAt: DateTime.fromMillisecondsSinceEpoch(row['updated_at']! as int, isUtc: true),
-    deletedAt: row['deleted_at'] == null ? null : DateTime.fromMillisecondsSinceEpoch(row['deleted_at']! as int, isUtc: true),
-    revision: (row['revision'] as int?) ?? 1,
+    createdAt: row.dateTime('created_at'),
+    updatedAt: row.dateTime('updated_at'),
+    deletedAt: row.nullableDateTime('deleted_at'),
+    revision: row.intOr('revision', 1),
     deviceId: row['device_id']! as String,
-    baseRevision: (row['base_revision'] as int?) ?? 0);
+    baseRevision: row.intOr('base_revision', 0));
 }

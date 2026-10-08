@@ -1,6 +1,14 @@
 /// Domain enums. See 08-4.4, 7.7.
 library;
 
+/// Shared `fromWire` lookup for wire-serialized enums.
+T wireEnumFrom<T>(String? v, List<T> values, T fallback, String Function(T) wireOf) {
+  for (final e in values) {
+    if (wireOf(e) == v) return e;
+  }
+  return fallback;
+}
+
 enum EntryType {
   expense('expense'), income('income'), transfer('transfer'),
   borrowOut('borrow_out'), borrowIn('borrow_in'), repayCredit('repay_credit'),
@@ -8,12 +16,8 @@ enum EntryType {
 
   const EntryType(this.wire);
   final String wire;
-  static EntryType fromWire(String? v) {
-    for (final t in values) {
-      if (t.wire == v) return t;
-    }
-    return EntryType.unknown;
-  }
+  static EntryType fromWire(String? v) =>
+      wireEnumFrom(v, values, EntryType.unknown, (e) => e.wire);
 
   bool get countsInOutflow => this == EntryType.expense || this == EntryType.income;
   bool get enabledInV1 => this == EntryType.expense || this == EntryType.income || this == EntryType.transfer;
@@ -25,12 +29,8 @@ enum EntrySource {
 
   const EntrySource(this.wire);
   final String wire;
-  static EntrySource fromWire(String? v) {
-    for (final t in values) {
-      if (t.wire == v) return t;
-    }
-    return EntrySource.unknown;
-  }
+  static EntrySource fromWire(String? v) =>
+      wireEnumFrom(v, values, EntrySource.unknown, (e) => e.wire);
 }
 
 enum AccountType {
@@ -39,12 +39,8 @@ enum AccountType {
 
   const AccountType(this.wire);
   final String wire;
-  static AccountType fromWire(String? v) {
-    for (final t in values) {
-      if (t.wire == v) return t;
-    }
-    return AccountType.unknown;
-  }
+  static AccountType fromWire(String? v) =>
+      wireEnumFrom(v, values, AccountType.unknown, (e) => e.wire);
 
   bool get enabledInV1 => this == AccountType.cash || this == AccountType.debit;
 }
@@ -54,12 +50,8 @@ enum CategoryKind {
 
   const CategoryKind(this.wire);
   final String wire;
-  static CategoryKind fromWire(String? v) {
-    for (final t in values) {
-      if (t.wire == v) return t;
-    }
-    return CategoryKind.unknown;
-  }
+  static CategoryKind fromWire(String? v) =>
+      wireEnumFrom(v, values, CategoryKind.unknown, (e) => e.wire);
 }
 
 enum ChangeOp {
@@ -67,12 +59,8 @@ enum ChangeOp {
 
   const ChangeOp(this.wire);
   final String wire;
-  static ChangeOp fromWire(String? v) {
-    for (final t in values) {
-      if (t.wire == v) return t;
-    }
-    return ChangeOp.unknown;
-  }
+  static ChangeOp fromWire(String? v) =>
+      wireEnumFrom(v, values, ChangeOp.unknown, (e) => e.wire);
 }
 
 enum EntityType {
@@ -81,12 +69,8 @@ enum EntityType {
 
   const EntityType(this.wire);
   final String wire;
-  static EntityType fromWire(String? v) {
-    for (final t in values) {
-      if (t.wire == v) return t;
-    }
-    return EntityType.unknown;
-  }
+  static EntityType fromWire(String? v) =>
+      wireEnumFrom(v, values, EntityType.unknown, (e) => e.wire);
 }
 
 enum BudgetScope {
@@ -94,12 +78,8 @@ enum BudgetScope {
 
   const BudgetScope(this.wire);
   final String wire;
-  static BudgetScope fromWire(String? v) {
-    for (final t in values) {
-      if (t.wire == v) return t;
-    }
-    return BudgetScope.unknown;
-  }
+  static BudgetScope fromWire(String? v) =>
+      wireEnumFrom(v, values, BudgetScope.unknown, (e) => e.wire);
 }
 
 enum BudgetPeriod {
@@ -107,12 +87,8 @@ enum BudgetPeriod {
 
   const BudgetPeriod(this.wire);
   final String wire;
-  static BudgetPeriod fromWire(String? v) {
-    for (final t in values) {
-      if (t.wire == v) return t;
-    }
-    return BudgetPeriod.unknown;
-  }
+  static BudgetPeriod fromWire(String? v) =>
+      wireEnumFrom(v, values, BudgetPeriod.unknown, (e) => e.wire);
 }
 
 enum BudgetLevel { ok, warn, over }
@@ -123,12 +99,8 @@ enum RecurringFrequency {
 
   const RecurringFrequency(this.wire);
   final String wire;
-  static RecurringFrequency fromWire(String? v) {
-    for (final t in values) {
-      if (t.wire == v) return t;
-    }
-    return RecurringFrequency.unknown;
-  }
+  static RecurringFrequency fromWire(String? v) =>
+      wireEnumFrom(v, values, RecurringFrequency.unknown, (e) => e.wire);
 }
 
 enum RecurringEndType {
@@ -136,12 +108,8 @@ enum RecurringEndType {
 
   const RecurringEndType(this.wire);
   final String wire;
-  static RecurringEndType fromWire(String? v) {
-    for (final t in values) {
-      if (t.wire == v) return t;
-    }
-    return RecurringEndType.unknown;
-  }
+  static RecurringEndType fromWire(String? v) =>
+      wireEnumFrom(v, values, RecurringEndType.unknown, (e) => e.wire);
 }
 
 /// How to handle months without the anchor day (e.g. 31 in February).
@@ -154,10 +122,6 @@ enum RecurringSkipStrategy {
 
   const RecurringSkipStrategy(this.wire);
   final String wire;
-  static RecurringSkipStrategy fromWire(String? v) {
-    for (final t in values) {
-      if (t.wire == v) return t;
-    }
-    return RecurringSkipStrategy.unknown;
-  }
+  static RecurringSkipStrategy fromWire(String? v) =>
+      wireEnumFrom(v, values, RecurringSkipStrategy.unknown, (e) => e.wire);
 }

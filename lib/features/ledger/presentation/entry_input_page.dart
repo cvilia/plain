@@ -1,7 +1,10 @@
 ﻿/// Entry input page (SP-1-01). See PRD STORY-1.1.
 library;
 
+import 'package:plain/app/theme/app_colors.dart';
+import 'package:plain/core/time/date_format.dart';
 import 'package:flutter/material.dart';
+import 'package:plain/design_system/app_toast.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:plain/app/bootstrap.dart';
 import 'package:plain/app/breakpoints.dart';
@@ -13,6 +16,7 @@ import 'package:plain/design_system/category_icons.dart';
 import 'package:plain/domain/entities/category.dart' as domain;
 import 'package:plain/domain/entities/enums.dart';
 import 'package:plain/features/ledger/controllers/entry_input_controller.dart';
+import 'package:plain/features/ledger/controllers/recent_categories.dart';
 import 'package:plain/features/ledger/presentation/category_picker_page.dart';
 
 final _categoriesProvider = FutureProvider<List<domain.Category>>((ref) async {
@@ -21,6 +25,8 @@ final _categoriesProvider = FutureProvider<List<domain.Category>>((ref) async {
   final result = await repo.listVisible(kind: CategoryKind.expense);
   return result.successOrNull ?? const [];
 });
+
+
 
 class EntryInputPage extends ConsumerStatefulWidget {
   const EntryInputPage({super.key, this.editEntryId});
@@ -65,11 +71,9 @@ class _EntryInputPageState extends ConsumerState<EntryInputPage> {
               onPressed: () async {
                 final ok = await controller.saveExplicit();
                 if (!ok || !context.mounted) return;
-                final msg = controller.state.toastMessage;
+                final msg = controller.currentToast;
                 if (msg != null) {
-                  ScaffoldMessenger.of(context)
-                    ..hideCurrentSnackBar()
-                    ..showSnackBar(SnackBar(content: Text(msg), duration: UiDurations.saveToast));
+                  showAppToast(context, msg);
                   controller.clearToast();
                 }
                 if (context.mounted) Navigator.pop(context);
@@ -114,11 +118,10 @@ class _EntryInputPageState extends ConsumerState<EntryInputPage> {
         final fontSize = AdaptiveFontSizes.display(context);
         final amountHeight = fontSize + 100;
 
-        // Keypad: proportional, clamped to reasonable range.
-        final keypadHeight = (totalHeight * keypadRatio).clamp(200.0, 320.0);
-
-        // Category grid + attr bar: remaining space.
-        final remaining = totalHeight - amountHeight - keypadHeight;
+        // Reserve room for category area + action chips so short screens never overflow.
+        const minBottom = 168; // ~2 category rows + attr bar
+        final maxKeypad = (totalHeight - amountHeight - minBottom).clamp(160.0, 320.0);
+        final keypadHeight = (totalHeight * keypadRatio).clamp(160.0, maxKeypad);
 
         return Column(
           children: [
@@ -130,24 +133,13 @@ class _EntryInputPageState extends ConsumerState<EntryInputPage> {
               height: keypadHeight,
               child: _Keypad(controller: controller),
             ),
-            if (remaining > 80)
-              Expanded(
-                child: _CategoryAndAttrs(
-                  controller: controller,
-                  state: state,
-                  categoriesAsync: categoriesAsync,
-                ),
-              )
-            else
-              Expanded(
-                child: SingleChildScrollView(
-                  child: _CategoryAndAttrs(
-                    controller: controller,
-                    state: state,
-                    categoriesAsync: categoriesAsync,
-                  ),
-                ),
+            Expanded(
+              child: _CategoryAndAttrs(
+                controller: controller,
+                state: state,
+                categoriesAsync: categoriesAsync,
               ),
+            ),
           ],
         );
       },
@@ -189,11 +181,11 @@ class _AmountDisplay extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(Spacing.lg, Spacing.md, Spacing.lg, Spacing.sm),
       child: Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
         Row(children: [
-          _TypeChip(label: '支出', selected: state.type == EntryType.expense, color: BrandColors.expense, onTap: () => controller.onTypeChanged(EntryType.expense)),
+          _TypeChip(label: '支出', selected: state.type == EntryType.expense, color: context.colors.expense, onTap: () => controller.onTypeChanged(EntryType.expense)),
           const SizedBox(width: Spacing.sm),
-          _TypeChip(label: '收入', selected: state.type == EntryType.income, color: BrandColors.income, onTap: () => controller.onTypeChanged(EntryType.income)),
+          _TypeChip(label: '收入', selected: state.type == EntryType.income, color: context.colors.income, onTap: () => controller.onTypeChanged(EntryType.income)),
           const SizedBox(width: Spacing.sm),
-          _TypeChip(label: '转账', selected: state.type == EntryType.transfer, color: BrandColors.transfer, onTap: () => controller.onTypeChanged(EntryType.transfer)),
+          _TypeChip(label: '转账', selected: state.type == EntryType.transfer, color: context.colors.transfer, onTap: () => controller.onTypeChanged(EntryType.transfer)),
           const Spacer(),
         ]),
         const SizedBox(height: Spacing.sm),
@@ -202,7 +194,7 @@ class _AmountDisplay extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.baseline,
           textBaseline: TextBaseline.alphabetic,
           children: [
-            Text('\u00a5', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w600, color: BrandColors.inkTertiary)),
+            Text('\u00a5', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w600, color: context.colors.inkTertiary)),
             const SizedBox(width: 4),
             Flexible(
               child: Text(
@@ -218,7 +210,7 @@ class _AmountDisplay extends StatelessWidget {
                           ? AdaptiveFontSizes.display(context) * 0.75
                           : AdaptiveFontSizes.display(context),
                   fontWeight: FontWeight.w600,
-                  color: BrandColors.ink,
+                  color: context.colors.ink,
                   height: 1.1,
                 ),
               ),
@@ -228,9 +220,9 @@ class _AmountDisplay extends StatelessWidget {
         SizedBox(
           height: 20,
           child: state.errorMessage != null
-              ? Text(_errorText(state.errorMessage!), style: theme.textTheme.bodySmall?.copyWith(color: BrandColors.expense))
+              ? Text(_errorText(state.errorMessage!), style: theme.textTheme.bodySmall?.copyWith(color: context.colors.expense))
               : state.wasIncompleteExpression
-                  ? Text('表达式未闭合', style: theme.textTheme.bodySmall?.copyWith(color: BrandColors.inkTertiary))
+                  ? Text('表达式未闭合', style: theme.textTheme.bodySmall?.copyWith(color: context.colors.inkTertiary))
                   : const SizedBox.shrink(),
         ),
       ]),
@@ -262,9 +254,9 @@ class _TypeChip extends StatelessWidget {
         decoration: BoxDecoration(
           color: selected ? color.withValues(alpha: 0.12) : Colors.transparent,
           borderRadius: BorderRadius.circular(Radii.pill),
-          border: Border.all(color: selected ? color : BrandColors.border),
+          border: Border.all(color: selected ? color : context.colors.border),
         ),
-        child: Text(label, style: TextStyle(fontSize: 13, fontWeight: selected ? FontWeight.w600 : FontWeight.w400, color: selected ? color : BrandColors.inkSecondary)),
+        child: Text(label, style: TextStyle(fontSize: 13, fontWeight: selected ? FontWeight.w600 : FontWeight.w400, color: selected ? color : context.colors.inkSecondary)),
       ),
     );
   }
@@ -329,12 +321,9 @@ class _Keypad extends StatelessWidget {
   Future<void> _saveAndToast(BuildContext context) async {
     final ok = await controller.saveExplicit();
     if (!ok || !context.mounted) return;
-    final msg = controller.state.toastMessage;
+    final msg = controller.currentToast;
     if (msg != null) {
-      ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..clearSnackBars()
-        ..showSnackBar(SnackBar(content: Text(msg), duration: UiDurations.saveToast));
+      showAppToast(context, msg, bottom: 120);
       controller.clearToast();
     }
   }
@@ -349,8 +338,8 @@ class _KeyButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bg = isConfirm ? BrandColors.primary : isEquals ? BrandColors.primary.withValues(alpha: 0.12) : BrandColors.surfaceCard;
-    final fg = isConfirm ? BrandColors.onPrimary : isEquals ? BrandColors.primary : BrandColors.ink;
+    final bg = isConfirm ? context.colors.primary : isEquals ? context.colors.primary.withValues(alpha: 0.12) : context.colors.surfaceCard;
+    final fg = isConfirm ? context.colors.onPrimary : isEquals ? context.colors.primary : context.colors.ink;
     return Material(
       color: bg,
       borderRadius: BorderRadius.circular(Radii.sm),
@@ -386,56 +375,88 @@ class _CategoryAndAttrs extends StatelessWidget {
   }
 }
 
-class _CategoryGrid extends StatelessWidget {
+class _CategoryGrid extends ConsumerWidget {
   const _CategoryGrid({required this.controller, required this.state, required this.categories});
   final EntryInputController controller;
   final EntryInputState state;
   final List<domain.Category> categories;
 
   @override
-  Widget build(BuildContext context) {
-    final visible = categories.take(8).toList();
-    return GridView.builder(
-      padding: const EdgeInsets.all(Spacing.sm),
-      physics: const NeverScrollableScrollPhysics(),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 4,
-        mainAxisSpacing: Spacing.xs,
-        crossAxisSpacing: Spacing.xs,
-        childAspectRatio: 1.1,
-      ),
-      itemCount: visible.length + (categories.length > 8 ? 1 : 0),
-      itemBuilder: (context, index) {
-        if (index >= visible.length) {
-          return _CategoryCell(
-            icon: Icons.more_horiz,
-            label: '更多',
-            selected: false,
-            color: BrandColors.inkTertiary,
-            onTap: () async {
-              final result = await Navigator.push<String>(
-                context,
-                MaterialPageRoute(builder: (_) => const CategoryPickerPage()),
-              );
-              if (result != null) {
-                controller.selectCategory(result);
+  Widget build(BuildContext context, WidgetRef ref) {
+    // Recent-first; first launch falls back to default leaves (by sort order).
+    final kind = state.type.wire;
+    final recents = ref.watch(recentCategoriesProvider)[kind] ?? const <String>[];
+    final leaves = categories.leaves;
+
+    final byId = {for (final c in leaves) c.id: c};
+    final visible = <domain.Category>[];
+    for (final id in recents) {
+      final c = byId[id]; // leaves only — parents never enter the grid
+      if (c != null && !visible.contains(c)) visible.add(c);
+      if (visible.length >= 7) break;
+    }
+    if (visible.isEmpty) {
+      visible.addAll(leaves.take(7));
+    }
+
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(Spacing.sm, Spacing.xs, Spacing.sm, 0),
+          child: Row(
+            children: [
+              Text(
+                recents.isEmpty ? '默认分类' : '最近使用',
+                style: TextStyle(fontSize: 11, color: context.colors.inkTertiary),
+              ),
+              const Spacer(),
+            ],
+          ),
+        ),
+        Expanded(
+          child: GridView.builder(
+            padding: const EdgeInsets.all(Spacing.sm),
+            physics: const AlwaysScrollableScrollPhysics(),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 4,
+              mainAxisSpacing: Spacing.xs,
+              crossAxisSpacing: Spacing.xs,
+              childAspectRatio: 1.05,
+            ),
+            itemCount: visible.length + 1,
+            itemBuilder: (context, index) {
+              if (index >= visible.length) {
+                return _CategoryCell(
+                  icon: Icons.more_horiz,
+                  label: '更多',
+                  selected: false,
+                  color: context.colors.inkTertiary,
+                  onTap: () async {
+                    final result = await Navigator.push<String>(
+                      context,
+                      MaterialPageRoute(builder: (_) => const CategoryPickerPage()),
+                    );
+                    if (result != null) {
+                      controller.selectCategory(result);
+                    }
+                  },
+                );
               }
+              final cat = visible[index];
+              final selected = state.selectedCategoryId == cat.id;
+              return _CategoryCell(
+                icon: iconForCategory(cat.iconRef),
+                label: cat.name,
+                selected: selected,
+                color: context.colors.primary,
+                onTap: () {
+                  controller.submitOnCategoryTap(cat.id);
+                },
+              );
             },
-          );
-        }
-        final cat = visible[index];
-        final selected = state.selectedCategoryId == cat.id;
-        return _CategoryCell(
-          icon: iconForCategory(cat.iconRef),
-          label: cat.name,
-          selected: selected,
-          color: BrandColors.primary,
-          onTap: () {
-            // Select only — save happens on OK / 保存 (explicit confirm).
-            controller.submitOnCategoryTap(cat.id);
-          },
-        );
-      },
+          ),
+        ),
+      ],
     );
   }
 }
@@ -459,10 +480,10 @@ class _CategoryCell extends StatelessWidget {
           borderRadius: BorderRadius.circular(Radii.md),
         ),
         child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-          Icon(icon, size: 26, color: selected ? color : BrandColors.inkSecondary),
+          Icon(icon, size: 26, color: selected ? color : context.colors.inkSecondary),
           const SizedBox(height: 4),
           Text(label, maxLines: 1, overflow: TextOverflow.ellipsis,
-              style: TextStyle(fontSize: 12, fontWeight: selected ? FontWeight.w600 : FontWeight.w400, color: selected ? color : BrandColors.inkSecondary)),
+              style: TextStyle(fontSize: 12, fontWeight: selected ? FontWeight.w600 : FontWeight.w400, color: selected ? color : context.colors.inkSecondary)),
         ]),
       ),
     );
@@ -479,7 +500,7 @@ class _AttrBar extends ConsumerWidget {
     final isTransfer = state.type == EntryType.transfer;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: Spacing.md, vertical: Spacing.sm),
-      decoration: BoxDecoration(border: Border(top: BorderSide(color: BrandColors.divider))),
+      decoration: BoxDecoration(border: Border(top: BorderSide(color: context.colors.divider))),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -491,7 +512,7 @@ class _AttrBar extends ConsumerWidget {
                 onTap: () => _showAccountPicker(context, ref, isSource: true),
               )),
               const SizedBox(width: Spacing.sm),
-              Icon(Icons.arrow_forward, size: 16, color: BrandColors.inkTertiary),
+              Icon(Icons.arrow_forward, size: 16, color: context.colors.inkTertiary),
               const SizedBox(width: Spacing.sm),
               Expanded(child: _AttrChip(
                 icon: Icons.arrow_downward_outlined,
@@ -510,7 +531,7 @@ class _AttrBar extends ConsumerWidget {
               const SizedBox(width: Spacing.sm),
             ]),
           Row(children: [
-            _AttrChip(icon: Icons.calendar_today_outlined, label: _dateLabel(state.occurredAt), onTap: () => _pickDate(context)),
+            _AttrChip(icon: Icons.calendar_today_outlined, label: _dateChipLabel(state.occurredAt), onTap: () => _pickDate(context)),
             const SizedBox(width: Spacing.sm),
             Expanded(child: _AttrChip(icon: Icons.edit_note_outlined, label: state.note ?? '备注', expanded: true, onTap: () => _showNoteSheet(context))),
           ]),
@@ -519,12 +540,12 @@ class _AttrBar extends ConsumerWidget {
     );
   }
 
-  String _dateLabel(DateTime? at) {
+
+
+  String _dateChipLabel(DateTime? at) {
     if (at == null) return '今天';
-    final local = at.toLocal();
-    final now = DateTime.now();
-    if (local.year == now.year && local.month == now.month && local.day == now.day) return '今天';
-    return '${local.month}/${local.day}';
+    if (isSameLocalDay(at, DateTime.now())) return '今天';
+    return shortDateLabel(at);
   }
 
   Future<void> _pickDate(BuildContext context) async {
@@ -627,7 +648,7 @@ class _AttrChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final child = Material(
-      color: BrandColors.surfaceMuted,
+      color: context.colors.surfaceMuted,
       borderRadius: BorderRadius.circular(Radii.pill),
       child: InkWell(
         onTap: onTap,
@@ -635,10 +656,10 @@ class _AttrChip extends StatelessWidget {
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: Spacing.md, vertical: Spacing.sm),
           child: Row(mainAxisSize: MainAxisSize.min, children: [
-            Icon(icon, size: 16, color: BrandColors.inkSecondary),
+            Icon(icon, size: 16, color: context.colors.inkSecondary),
             const SizedBox(width: 6),
             Flexible(
-              child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 13, color: BrandColors.inkSecondary)),
+              child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 13, color: context.colors.inkSecondary)),
             ),
           ]),
         ),

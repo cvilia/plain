@@ -2,11 +2,11 @@
 /// See PRD STORY-2.1 AC4.
 library;
 
+import 'package:plain/app/theme/app_colors.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:plain/app/theme/design_tokens.dart';
 import 'package:plain/core/constants/app_constants.dart';
 import 'package:plain/core/format/amount_formatter.dart';
 
@@ -72,10 +72,10 @@ class _AmountTextState extends ConsumerState<AmountText> {
 
     final color = widget.color ??
         (widget.isExpense
-            ? BrandColors.expense
+            ? context.colors.expense
             : widget.isIncome
-                ? BrandColors.income
-                : BrandColors.ink);
+                ? context.colors.income
+                : context.colors.ink);
 
     return GestureDetector(
       onTap: _toggleReveal,
@@ -122,10 +122,10 @@ class AmountWithCurrency extends ConsumerWidget {
 
     final displayColor = color ??
         (isExpense
-            ? BrandColors.expense
+            ? context.colors.expense
             : isIncome
-                ? BrandColors.income
-                : BrandColors.ink);
+                ? context.colors.income
+                : context.colors.ink);
 
     return Text(
       '$sign$text',

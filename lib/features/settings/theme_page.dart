@@ -1,10 +1,12 @@
 /// Theme selection page (SP-5-02). 10 themes × color cards + appearance 3-state.
-/// See 需求变更.md §2.1. Switch takes effect immediately — no save button.
+/// See 04-技术架构设计.md §16.1. Switch takes effect immediately — no save button.
 library;
 
+import 'package:plain/app/theme/app_colors.dart';
+import 'package:plain/design_system/section_title.dart';
 import 'package:flutter/material.dart';
+import 'package:plain/design_system/app_toast.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:plain/app/theme/design_tokens.dart';
 import 'package:plain/app/theme/theme_prefs.dart';
 import 'package:plain/app/theme/theme_registry.dart';
 
@@ -21,7 +23,7 @@ class ThemePage extends ConsumerWidget {
         padding: const EdgeInsets.all(16),
         children: [
           // ── Appearance 3-state ──
-          Text('外观', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: BrandColors.inkTertiary)),
+          SectionTitle('外观', color: context.colors.inkTertiary),
           const SizedBox(height: 8),
           SegmentedButton<ThemeMode>(
             style: SegmentedButton.styleFrom(textStyle: const TextStyle(fontSize: 13)),
@@ -38,16 +40,14 @@ class ThemePage extends ConsumerWidget {
           const SizedBox(height: 24),
 
           // ── Theme grid ──
-          Text('主题', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: BrandColors.inkTertiary)),
+          SectionTitle('主题', color: context.colors.inkTertiary),
           const SizedBox(height: 8),
           ...ThemeId.values.map((id) => _ThemeCard(
             spec: themeSpecOf(id),
             selected: prefs.themeId == id,
             onTap: () {
               ref.read(themePrefsProvider.notifier).setTheme(id);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('已切换主题：${id.name}'), duration: const Duration(seconds: 1)),
-              );
+              showAppToast(context, '已切换主题：${id.name}', duration: const Duration(seconds: 1));
             },
           )),
         ],
@@ -74,7 +74,7 @@ class _ThemeCard extends StatelessWidget {
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
         side: BorderSide(
-          color: selected ? Color(brand.pd) : BrandColors.divider,
+          color: selected ? Color(brand.pd) : context.colors.divider,
           width: selected ? 2 : 1,
         ),
       ),
@@ -106,7 +106,7 @@ class _ThemeCard extends StatelessWidget {
                   children: [
                     Text(spec.name, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
                     const SizedBox(height: 2),
-                    Text(spec.tag, style: TextStyle(fontSize: 12, color: BrandColors.inkTertiary)),
+                    Text(spec.tag, style: TextStyle(fontSize: 12, color: context.colors.inkTertiary)),
                   ],
                 ),
               ),
@@ -114,7 +114,7 @@ class _ThemeCard extends StatelessWidget {
               if (selected)
                 Icon(Icons.check_circle, color: Color(brand.pd), size: 22)
               else
-                Icon(Icons.circle_outlined, color: BrandColors.inkTertiary, size: 22),
+                Icon(Icons.circle_outlined, color: context.colors.inkTertiary, size: 22),
             ],
           ),
         ),
@@ -135,7 +135,7 @@ class _Dot extends StatelessWidget {
       decoration: BoxDecoration(
         color: color,
         shape: BoxShape.circle,
-        border: Border.all(color: BrandColors.divider, width: 1),
+        border: Border.all(color: context.colors.divider, width: 1),
       ),
     );
   }

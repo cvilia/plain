@@ -1,16 +1,43 @@
 /// Entry detail page (SP-1-02). See PRD STORY-1.2.
 library;
 
+import 'package:plain/app/theme/app_colors.dart';
+import 'package:plain/core/time/date_format.dart';
 import 'package:flutter/material.dart';
+import 'package:plain/design_system/app_toast.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:plain/app/bootstrap.dart';
 import 'package:plain/app/theme/design_tokens.dart';
-import 'package:plain/core/constants/app_constants.dart';
+import 'package:plain/core/format/amount_formatter.dart';
 import 'package:plain/core/refresh/data_invalidation.dart';
 import 'package:plain/domain/entities/category.dart' as domain;
 import 'package:plain/domain/entities/enums.dart';
 import 'package:plain/domain/entities/ledger_entry.dart';
+
+
+class _DetailData {
+  const _DetailData({required this.entry, required this.category});
+  final LedgerEntry entry;
+  final domain.Category? category;
+}
+
+final _detailProvider = FutureProvider.family<_DetailData, String>((ref, entryId) async {
+  ref.watch(ledgerVersionProvider);
+  ref.watch(categoriesVersionProvider);
+  final deps = ref.watch(appDependenciesProvider);
+  final entryResult = await deps.ledgerRepository.getById(entryId);
+  final entry = entryResult.successOrNull;
+  if (entry == null) {
+    throw StateError('entry.not_found');
+  }
+  domain.Category? cat;
+  if (entry.categoryId != null) {
+    final catResult = await deps.categoryRepository.getById(entry.categoryId!);
+    cat = catResult.successOrNull;
+  }
+  return _DetailData(entry: entry, category: cat);
+});
 
 class EntryDetailPage extends ConsumerStatefulWidget {
   const EntryDetailPage({super.key, required this.entryId});
@@ -21,42 +48,14 @@ class EntryDetailPage extends ConsumerStatefulWidget {
 }
 
 class _EntryDetailPageState extends ConsumerState<EntryDetailPage> {
-  LedgerEntry? _entry;
-  domain.Category? _category;
-  bool _loading = true;
-
-  @override
-  void initState() {
-    super.initState();
-    _load();
-  }
-
-  Future<void> _load() async {
-    final deps = ref.read(appDependenciesProvider);
-    final entryResult = await deps.ledgerRepository.getById(widget.entryId);
-    final entry = entryResult.successOrNull;
-    if (entry == null) {
-      setState(() => _loading = false);
-      return;
-    }
-    domain.Category? cat;
-    if (entry.categoryId != null) {
-      final catResult = await deps.categoryRepository.getById(entry.categoryId!);
-      cat = catResult.successOrNull;
-    }
-    setState(() {
-      _entry = entry;
-      _category = cat;
-      _loading = false;
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
-    if (_loading) {
+    final async = ref.watch(_detailProvider(widget.entryId));
+    final loading = async.isLoading;
+    final entry = async.value?.entry;
+    if (loading) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
-    final entry = _entry;
     if (entry == null) {
       return Scaffold(
         appBar: AppBar(title: const Text('详情')),
@@ -66,7 +65,7 @@ class _EntryDetailPageState extends ConsumerState<EntryDetailPage> {
 
     final isExpense = entry.type == EntryType.expense;
     final isIncome = entry.type == EntryType.income;
-    final amountColor = isExpense ? BrandColors.expense : isIncome ? BrandColors.income : BrandColors.transfer;
+    final amountColor = isExpense ? context.colors.expense : isIncome ? context.colors.income : context.colors.transfer;
     final prefix = isExpense ? '-' : isIncome ? '+' : '';
 
     return Scaffold(
@@ -84,7 +83,7 @@ class _EntryDetailPageState extends ConsumerState<EntryDetailPage> {
             child: Column(
               children: [
                 Text(
-                  '$prefix${(entry.amount.cents / 100).toStringAsFixed(2)}',
+                  '$prefix${formatAmount(entry.amount.cents, hide: ref.watch(hideAmountsProvider))}',
                   style: TextStyle(fontSize: 40, fontWeight: FontWeight.w600, color: amountColor),
                 ),
                 const SizedBox(height: Spacing.sm),
@@ -93,13 +92,13 @@ class _EntryDetailPageState extends ConsumerState<EntryDetailPage> {
             ),
           ),
           const SizedBox(height: Spacing.xl),
-          _DetailRow(icon: Icons.category_outlined, label: '分类', value: _category?.name ?? '未分类'),
-          _DetailRow(icon: Icons.calendar_today_outlined, label: '日期', value: _formatDate(entry.occurredAt)),
+          _DetailRow(icon: Icons.category_outlined, label: '分类', value: async.value?.category?.name ?? '未分类'),
+          _DetailRow(icon: Icons.calendar_today_outlined, label: '日期', value: formatDateTime(entry.occurredAt)),
           if (entry.note != null && entry.note!.isNotEmpty)
             _DetailRow(icon: Icons.edit_note_outlined, label: '备注', value: entry.note!),
           _DetailRow(icon: Icons.source_outlined, label: '来源', value: _sourceLabel(entry.source)),
-          _DetailRow(icon: Icons.access_time_outlined, label: '创建时间', value: _formatDateTime(entry.createdAt)),
-          _DetailRow(icon: Icons.update_outlined, label: '更新时间', value: _formatDateTime(entry.updatedAt)),
+          _DetailRow(icon: Icons.access_time_outlined, label: '创建时间', value: formatDateTime(entry.createdAt)),
+          _DetailRow(icon: Icons.update_outlined, label: '更新时间', value: formatDateTime(entry.updatedAt)),
         ],
       ),
     );
@@ -125,9 +124,7 @@ class _EntryDetailPageState extends ConsumerState<EntryDetailPage> {
               if (result.isSuccess && context.mounted) {
                 ref.invalidateData.bumpEntryMutated();
                 Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: const Text('已删除'), duration: UiDurations.undoWindow),
-                );
+                showAppToast(context, '已删除');
               }
             },
             child: const Text('删除'),
@@ -152,13 +149,7 @@ class _EntryDetailPageState extends ConsumerState<EntryDetailPage> {
         _ => source.wire,
       };
 
-  String _formatDate(DateTime at) {
-    final local = at.toLocal();
-    return '${local.year}-${local.month.toString().padLeft(2, '0')}-${local.day.toString().padLeft(2, '0')} '
-        '${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')}';
-  }
 
-  String _formatDateTime(DateTime at) => _formatDate(at);
 }
 
 class _DetailRow extends StatelessWidget {
@@ -174,9 +165,9 @@ class _DetailRow extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: Spacing.md),
       child: Row(
         children: [
-          Icon(icon, size: 20, color: BrandColors.inkTertiary),
+          Icon(icon, size: 20, color: context.colors.inkTertiary),
           const SizedBox(width: Spacing.md),
-          Text(label, style: TextStyle(fontSize: 14, color: BrandColors.inkSecondary)),
+          Text(label, style: TextStyle(fontSize: 14, color: context.colors.inkSecondary)),
           const Spacer(),
           Flexible(
             child: Text(
@@ -184,7 +175,7 @@ class _DetailRow extends StatelessWidget {
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
               textAlign: TextAlign.right,
-              style: TextStyle(fontSize: 14, color: BrandColors.ink),
+              style: TextStyle(fontSize: 14, color: context.colors.ink),
             ),
           ),
         ],

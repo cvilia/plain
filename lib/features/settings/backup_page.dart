@@ -1,6 +1,8 @@
-﻿/// Backup export: VACUUM INTO + share. See PRD STORY-4.1, 08-9.
+/// Backup export: VACUUM INTO + share. See PRD STORY-4.1, 08-9.
 library;
 
+import 'package:plain/app/theme/app_colors.dart';
+import 'package:plain/design_system/confirm_dialog.dart';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -40,7 +42,7 @@ class _BackupPageState extends ConsumerState<BackupPage> {
                   const SizedBox(height: Spacing.sm),
                   Text(
                     '创建包含所有记账数据的备份文件。',
-                    style: TextStyle(fontSize: 13, color: BrandColors.inkSecondary),
+                    style: TextStyle(fontSize: 13, color: context.colors.inkSecondary),
                   ),
                   const SizedBox(height: Spacing.lg),
                   SizedBox(
@@ -55,11 +57,11 @@ class _BackupPageState extends ConsumerState<BackupPage> {
                   ),
                   if (_error != null) ...[
                     const SizedBox(height: Spacing.md),
-                    Text(_error!, style: TextStyle(fontSize: 12, color: BrandColors.expense)),
+                    Text(_error!, style: TextStyle(fontSize: 12, color: context.colors.expense)),
                   ],
                   if (_lastExportPath != null) ...[
                     const SizedBox(height: Spacing.md),
-                    Text('上次导出: $_lastExportPath', style: TextStyle(fontSize: 11, color: BrandColors.inkTertiary)),
+                    Text('上次导出: $_lastExportPath', style: TextStyle(fontSize: 11, color: context.colors.inkTertiary)),
                   ],
                 ],
               ),
@@ -76,7 +78,7 @@ class _BackupPageState extends ConsumerState<BackupPage> {
                   const SizedBox(height: Spacing.sm),
                   Text(
                     '从备份文件恢复数据。',
-                    style: TextStyle(fontSize: 13, color: BrandColors.inkSecondary),
+                    style: TextStyle(fontSize: 13, color: context.colors.inkSecondary),
                   ),
                   const SizedBox(height: Spacing.lg),
                   SizedBox(
@@ -110,7 +112,9 @@ class _BackupPageState extends ConsumerState<BackupPage> {
       final timestamp = DateTime.now().millisecondsSinceEpoch;
       final backupPath = p.join(docsDir.path, 'sujibackup_$timestamp.db');
 
-      db.raw.execute("VACUUM INTO '$backupPath'");
+      // VACUUM INTO requires a literal path (no bound params) — escape quotes.
+      final escapedPath = backupPath.replaceAll("'", "''");
+      db.raw.execute("VACUUM INTO '$escapedPath'");
 
       final file = File(backupPath);
       if (await file.exists()) {
@@ -129,16 +133,12 @@ class _BackupPageState extends ConsumerState<BackupPage> {
 
   Future<void> _import() async {
     // Show confirmation dialog
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('导入备份'),
-        content: const Text('导入将替换当前所有数据，此操作不可恢复。确定继续？'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('取消')),
-          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('确定导入')),
-        ],
-      ),
+    final confirmed = await showConfirmDialog(
+      context,
+      title: '导入备份',
+      message: '导入将替换当前所有数据，此操作不可恢复。确定继续？',
+      confirmLabel: '确定导入',
+      destructive: true,
     );
 
     if (confirmed != true || !mounted) return;

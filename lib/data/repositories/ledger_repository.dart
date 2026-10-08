@@ -1,6 +1,7 @@
 /// Ledger repository implementation. See 04-6.1, 8.1, 08-8.
 library;
 
+import 'package:plain/data/db/row_x.dart';
 import 'package:plain/core/logging/app_log.dart';
 import 'package:plain/core/money/money.dart';
 import 'package:plain/core/result/result.dart';
@@ -198,6 +199,28 @@ class LedgerRepositoryImpl implements LedgerRepository {
       if (old.deletedAt == null) return err<void>(const ConflictFailure('entry.not_deleted', 'alive'));
       _db.transaction(() {
         _db.raw.execute('DELETE FROM transactions WHERE id = ?', [id]);
+        // Physical delete must still be visible to sync peers.
+        _changeLog.write(
+          entityType: EntityType.transaction,
+          entityId: id,
+          op: ChangeOp.delete,
+          deviceId: old.deviceId,
+          baseRevision: old.revision,
+          before: entryPayload(
+            id: old.id, bookId: old.bookId, type: old.type.wire,
+            amountCents: old.amount.cents, currency: old.currency,
+            categoryId: old.categoryId, accountId: old.accountId,
+            toAccountId: old.toAccountId,
+            occurredAtMs: old.occurredAt.millisecondsSinceEpoch,
+            note: old.note, source: old.source.wire, batchId: old.batchId,
+            createdAtMs: old.createdAt.millisecondsSinceEpoch,
+            updatedAtMs: old.updatedAt.millisecondsSinceEpoch,
+            deletedAtMs: old.deletedAt?.millisecondsSinceEpoch,
+            revision: old.revision, deviceId: old.deviceId,
+            baseRevision: old.baseRevision,
+          ),
+          after: const {},
+        );
       });
       return ok(null);
     } on Exception catch (e) {
@@ -214,8 +237,37 @@ class LedgerRepositoryImpl implements LedgerRepository {
       final count = (rows.first['c'] as int?) ?? 0;
       if (count == 0) return ok(0);
       _db.transaction(() {
+        // Capture rows before delete so each gets a change_log entry.
+        final doomed = _db.raw.select(
+          'SELECT * FROM transactions WHERE deleted_at IS NOT NULL AND deleted_at < ?',
+          [beforeMs],
+        );
         _db.raw.execute(
           'DELETE FROM transactions WHERE deleted_at IS NOT NULL AND deleted_at < ?', [beforeMs]);
+        for (final row in doomed) {
+          final old = _fromRow(row);
+          _changeLog.write(
+            entityType: EntityType.transaction,
+            entityId: old.id,
+            op: ChangeOp.delete,
+            deviceId: old.deviceId,
+            baseRevision: old.revision,
+            before: entryPayload(
+              id: old.id, bookId: old.bookId, type: old.type.wire,
+              amountCents: old.amount.cents, currency: old.currency,
+              categoryId: old.categoryId, accountId: old.accountId,
+              toAccountId: old.toAccountId,
+              occurredAtMs: old.occurredAt.millisecondsSinceEpoch,
+              note: old.note, source: old.source.wire, batchId: old.batchId,
+              createdAtMs: old.createdAt.millisecondsSinceEpoch,
+              updatedAtMs: old.updatedAt.millisecondsSinceEpoch,
+              deletedAtMs: old.deletedAt?.millisecondsSinceEpoch,
+              revision: old.revision, deviceId: old.deviceId,
+              baseRevision: old.baseRevision,
+            ),
+            after: const {},
+          );
+        }
       });
       return ok(count);
     } on Exception catch (e) {
@@ -232,10 +284,10 @@ class LedgerRepositoryImpl implements LedgerRepository {
         [fromMs, toMs]);
       final result = <String>{};
       for (final r in rows) {
-        final at = DateTime.fromMillisecondsSinceEpoch(r['occurred_at']! as int, isUtc: true);
+        final at = r.dateTime('occurred_at');
         final cents = (r['amount_cents']! as int).abs();
         final note = r['note'] as String?;
-        final dayKey = '${at.year}-${at.month.toString().padLeft(2, '0')}-${at.day.toString().padLeft(2, '0')}';
+        final dayKey = Clock.dayKeyOf(at);
         result.add('$dayKey|$cents|${note ?? ''}');
       }
       return ok(result);
@@ -270,7 +322,7 @@ class LedgerRepositoryImpl implements LedgerRepository {
     final nowMs = DateTime.now().toUtc().millisecondsSinceEpoch;
     _db.raw.execute(
       'INSERT INTO daily_stats (book_id,day_key,category_id,account_id,expense_cents,income_cents,tx_count,updated_at) VALUES (?,?,?,?,?,?,?,?) '
-      'ON CONFLICT(book_id,day_key,category_id,account_id) DO UPDATE SET expense_cents=MAX(0,expense_cents+?),income_cents=MAX(0,income_cents+?),tx_count=MAX(0,tx_count+?),updated_at=?',
+      'ON CONFLICT(book_id,day_key,category_id,account_id) DO UPDATE SET expense_cents=expense_cents+?,income_cents=income_cents+?,tx_count=tx_count+?,updated_at=?',
       [entry.bookId, dayKey, entry.categoryId ?? '', entry.accountId ?? '', exp, inc, sign, nowMs, exp, inc, sign, nowMs]);
   }
 
@@ -289,12 +341,12 @@ class LedgerRepositoryImpl implements LedgerRepository {
     amount: Money(row['amount_cents']! as int), currency: (row['currency'] as String?) ?? 'CNY',
     categoryId: row['category_id'] as String?, accountId: row['account_id'] as String?,
     toAccountId: row['to_account_id'] as String?,
-    occurredAt: DateTime.fromMillisecondsSinceEpoch(row['occurred_at']! as int, isUtc: true),
+    occurredAt: row.dateTime('occurred_at'),
     note: row['note'] as String?, source: EntrySource.fromWire(row['source'] as String?),
     batchId: row['batch_id'] as String?,
-    createdAt: DateTime.fromMillisecondsSinceEpoch(row['created_at']! as int, isUtc: true),
-    updatedAt: DateTime.fromMillisecondsSinceEpoch(row['updated_at']! as int, isUtc: true),
-    deletedAt: row['deleted_at'] == null ? null : DateTime.fromMillisecondsSinceEpoch(row['deleted_at']! as int, isUtc: true),
-    revision: (row['revision'] as int?) ?? 1, deviceId: row['device_id']! as String,
-    baseRevision: (row['base_revision'] as int?) ?? 0);
+    createdAt: row.dateTime('created_at'),
+    updatedAt: row.dateTime('updated_at'),
+    deletedAt: row.nullableDateTime('deleted_at'),
+    revision: row.intOr('revision', 1), deviceId: row['device_id']! as String,
+    baseRevision: row.intOr('base_revision', 0));
 }

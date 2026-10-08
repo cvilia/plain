@@ -2,6 +2,7 @@
 /// Dedup fingerprint = date + amount + merchant/note. See PRD F7.5.
 library;
 
+import 'package:plain/core/time/clock.dart';
 import 'package:plain/core/constants/app_constants.dart';
 import 'package:plain/core/money/money.dart';
 import 'package:plain/domain/entities/enums.dart';
@@ -217,7 +218,7 @@ String buildFingerprint({
   required int amountCents,
   String? label,
 }) {
-  final dayKey = '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+  final dayKey = Clock.dayKeyOf(date);
   return '$dayKey|${amountCents.abs()}|${label ?? ''}';
 }
 

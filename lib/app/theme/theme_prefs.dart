@@ -1,4 +1,4 @@
-/// Theme preferences: local key-value storage. See 需求变更.md §5.
+/// Theme preferences: local key-value storage. See 04-技术架构设计.md §16.1.
 /// Keys: `pref.theme.id` (ThemeId), `pref.theme.mode` (ThemeMode).
 /// Theme/appearance are local-only — never synced to cloud (INV-3).
 library;

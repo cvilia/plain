@@ -11,12 +11,12 @@ import 'package:plain/app/bootstrap.dart';
 import 'package:plain/app/first_launch.dart';
 import 'package:plain/app/l10n/app_strings.dart';
 import 'package:plain/app/router/app_router.dart';
-import 'package:plain/app/theme/design_tokens.dart';
 import 'package:plain/app/theme/theme_prefs.dart';
 import 'package:plain/app/theme/theme_resolver.dart';
 import 'package:plain/core/id/uuid_v7.dart';
 import 'package:plain/data/db/database.dart';
 import 'package:plain/data/seed/preset_categories.dart';
+import 'package:plain/features/security/app_lock_prefs.dart';
 import 'package:plain/features/security/app_lock_screen.dart';
 import 'package:plain/features/settings/onboarding_page.dart';
 
@@ -25,6 +25,7 @@ Future<void> main() async {
 
   // Theme prefs must be known before first frame (§5.2). Failure → defaults.
   await preloadThemePrefs();
+  final appLock = await AppLockPrefs.load();
   final onboardPending = await isOnboardingPending();
 
   AppDatabase? db;
@@ -54,14 +55,15 @@ Future<void> main() async {
   runApp(
     ProviderScope(
       overrides: [appDependenciesProvider.overrideWithValue(deps)],
-      child: PlainApp(showOnboarding: onboardPending),
+      child: PlainApp(showOnboarding: onboardPending, appLockInitiallyEnabled: appLock.isConfigured),
     ),
   );
 }
 
 class PlainApp extends ConsumerStatefulWidget {
-  const PlainApp({super.key, this.showOnboarding = false});
+  const PlainApp({super.key, this.showOnboarding = false, this.appLockInitiallyEnabled = false});
   final bool showOnboarding;
+  final bool appLockInitiallyEnabled;
 
   @override
   ConsumerState<PlainApp> createState() => _PlainAppState();
@@ -70,11 +72,15 @@ class PlainApp extends ConsumerStatefulWidget {
 class _PlainAppState extends ConsumerState<PlainApp> with WidgetsBindingObserver {
   late final _router = buildRouter();
   late bool _onboarding = widget.showOnboarding;
+  late final bool _appLockReady = widget.appLockInitiallyEnabled;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(appLockEnabledProvider.notifier).set(_appLockReady);
+    });
     // Fire-and-forget: generate any due recurring entries + purge expired trash after first frame.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(generateDueRecurringProvider)().ignore();
@@ -105,12 +111,8 @@ class _PlainAppState extends ConsumerState<PlainApp> with WidgetsBindingObserver
   Widget build(BuildContext context) {
     final lockState = ref.watch(appLockControllerProvider);
     final prefs = ref.watch(themePrefsProvider);
-    final platformBrightness = MediaQuery.platformBrightnessOf(context);
 
-    final effectiveBrightness = resolveBrightness(prefs.themeMode, platformBrightness);
 
-    // Update global BrandColors so all existing UI follows the theme.
-    setActiveTheme(prefs.themeId, effectiveBrightness);
 
     final (_, lightTheme) = themeDataFor(prefs.themeId, Brightness.light);
     final (_, darkTheme) = themeDataFor(prefs.themeId, Brightness.dark);

@@ -1,16 +1,27 @@
 /// Recurring rules page. See PRD F6.1.
 library;
 
+import 'package:plain/app/theme/app_colors.dart';
 import 'package:flutter/material.dart';
+import 'package:plain/design_system/app_toast.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:plain/app/bootstrap.dart';
 import 'package:plain/app/breakpoints.dart';
 import 'package:plain/app/theme/design_tokens.dart';
 import 'package:plain/core/format/amount_formatter.dart';
+import 'package:plain/core/money/money.dart';
 import 'package:plain/core/refresh/data_invalidation.dart';
 import 'package:plain/domain/entities/enums.dart';
 import 'package:plain/domain/entities/recurring_rule.dart';
 import 'package:plain/domain/usecases/recurring_usecases.dart';
+
+
+final _rulesProvider = FutureProvider<List<RecurringRule>>((ref) async {
+  ref.watch(recurringVersionProvider);
+  final deps = ref.watch(appDependenciesProvider);
+  final res = await deps.recurringRepository.listByBook(deps.bookId);
+  return res.successOrNull ?? const [];
+});
 
 class RecurringPage extends ConsumerStatefulWidget {
   const RecurringPage({super.key});
@@ -20,34 +31,15 @@ class RecurringPage extends ConsumerStatefulWidget {
 }
 
 class _RecurringPageState extends ConsumerState<RecurringPage> {
-  List<RecurringRule> _rules = const [];
-  bool _loading = true;
-
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _load());
-  }
-
-  Future<void> _load() async {
-    final deps = ref.read(appDependenciesProvider);
-    final res = await deps.recurringRepository.listByBook(deps.bookId);
-    if (!mounted) return;
-    setState(() {
-      _rules = res.successOrNull ?? const [];
-      _loading = false;
-    });
-  }
 
   Future<void> _runDueNow() async {
     final deps = ref.read(appDependenciesProvider);
     final res = await deps.generateDueRecurring();
     if (!mounted) return;
     final count = res.successOrNull?.created.length ?? 0;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text(count == 0 ? '当前没有到期的周期记账' : '已生成 $count 笔账单'),
-    ));
-    await _load();
+    showAppToast(context, count == 0 ? '当前没有到期的周期记账' : '已生成 $count 笔账单');
+    ref.invalidateData.bumpEntryMutated();
+    ref.invalidateData.bumpRecurringMutated();
   }
 
   Future<void> _undoLastBatch(RecurringRule rule) async {
@@ -57,23 +49,22 @@ class _RecurringPageState extends ConsumerState<RecurringPage> {
     final res = await deps.undoRecurringBatch(batchId);
     if (!mounted) return;
     final n = res.successOrNull ?? 0;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text(n == 0 ? '没有可撤销的账单' : '已撤销 $n 笔账单'),
-    ));
-    await _load();
+    showAppToast(context, n == 0 ? '没有可撤销的账单' : '已撤销 $n 笔账单');
+    ref.invalidateData.bumpEntryMutated();
+    ref.invalidateData.bumpRecurringMutated();
   }
 
   Future<void> _create() async {
-    final created = await Navigator.push<bool>(
+    await Navigator.push<bool>(
       context,
       MaterialPageRoute(builder: (_) => const RecurringEditPage()),
     );
-    if (created == true) await _load();
   }
 
   @override
   Widget build(BuildContext context) {
     final hide = ref.watch(hideAmountsProvider);
+    final async = ref.watch(_rulesProvider);
     return Scaffold(
       appBar: AppBar(
         title: const Text('周期记账'),
@@ -88,35 +79,37 @@ class _RecurringPageState extends ConsumerState<RecurringPage> {
       floatingActionButton: FloatingActionButton.extended(
         heroTag: 'fab_recurring_add',
         onPressed: _create,
-        backgroundColor: BrandColors.primary,
-        foregroundColor: BrandColors.onPrimary,
+        backgroundColor: context.colors.primary,
+        foregroundColor: context.colors.onPrimary,
         icon: const Icon(Icons.add),
         label: const Text('新建规则'),
       ),
       body: ContentWidthConstraint(
-        child: _loading
-            ? const Center(child: CircularProgressIndicator())
-            : _rules.isEmpty
+        child: async.when(
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (e, _) => Center(child: Text('加载失败: $e')),
+          data: (rules) => rules.isEmpty
                 ? Center(
                     child: Padding(
                       padding: const EdgeInsets.all(Spacing.xl),
                       child: Text(
                         '还没有周期记账。\n房租、订阅、工资都可以自动入账。',
                         textAlign: TextAlign.center,
-                        style: TextStyle(color: BrandColors.inkTertiary, fontSize: AdaptiveFontSizes.body),
+                        style: TextStyle(color: context.colors.inkTertiary, fontSize: AdaptiveFontSizes.body),
                       ),
                     ),
                   )
                 : ListView.builder(
                     padding: const EdgeInsets.fromLTRB(Spacing.lg, Spacing.md, Spacing.lg, 100),
-                    itemCount: _rules.length,
+                    itemCount: rules.length,
                     itemBuilder: (context, i) => _RuleTile(
-                      rule: _rules[i], hide: hide,
-                      onUndo: _rules[i].lastBatchId == null
+                      rule: rules[i], hide: hide,
+                      onUndo: rules[i].lastBatchId == null
                           ? null
-                          : () => _undoLastBatch(_rules[i]),
+                          : () => _undoLastBatch(rules[i]),
                     ),
                   ),
+        ),
       ),
     );
   }
@@ -196,7 +189,7 @@ class _RecurringEditPageState extends ConsumerState<RecurringEditPage> {
     if (!(_formKey.currentState?.validate() ?? false)) return;
     setState(() => _saving = true);
     final deps = ref.read(appDependenciesProvider);
-    final amountCents = (double.tryParse(_amountCtrl.text.trim()) ?? 0) * 100;
+    final amountCents = Money.parseYuan(_amountCtrl.text.trim()).cents;
     final anchor = int.tryParse(_anchorCtrl.text.trim());
     final interval = int.tryParse(_intervalCtrl.text.trim()) ?? 1;
     final res = await deps.createRecurringRule(CreateRecurringRuleInput(
@@ -209,14 +202,12 @@ class _RecurringEditPageState extends ConsumerState<RecurringEditPage> {
           : null,
       autoConfirm: _autoConfirm,
       endType: _endType, endCount: _endCount,
-      entryType: _entryType, amountCents: amountCents.round(),
+      entryType: _entryType, amountCents: amountCents,
     ));
     if (!mounted) return;
     setState(() => _saving = false);
     if (res.isFailure) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('保存失败，请检查金额与规则')),
-      );
+      showAppToast(context, '保存失败，请检查金额与规则');
       return;
     }
     ref.invalidateData.bumpRecurringMutated();
@@ -243,8 +234,13 @@ class _RecurringEditPageState extends ConsumerState<RecurringEditPage> {
                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
                 decoration: const InputDecoration(labelText: '金额', prefixText: '¥ '),
                 validator: (v) {
-                  final d = double.tryParse((v ?? '').trim());
-                  if (d == null || d <= 0) return '请输入有效金额';
+                  final text = (v ?? '').trim();
+                  if (text.isEmpty) return '请输入有效金额';
+                  try {
+                    if (Money.parseYuan(text).cents <= 0) return '请输入有效金额';
+                  } on FormatException {
+                    return '请输入有效金额';
+                  }
                   return null;
                 },
               ),
@@ -323,7 +319,7 @@ class _RecurringEditPageState extends ConsumerState<RecurringEditPage> {
               FilledButton(
                 onPressed: _saving ? null : _save,
                 style: FilledButton.styleFrom(
-                  backgroundColor: BrandColors.primary,
+                  backgroundColor: context.colors.primary,
                   minimumSize: const Size.fromHeight(48),
                 ),
                 child: Text(_saving ? '保存中…' : '保存'),

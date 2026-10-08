@@ -1,12 +1,17 @@
 /// Reports page (SP-3-01). See PRD STORY-3.1.
 library;
 
+import 'package:plain/app/theme/app_colors.dart';
+import 'package:plain/domain/entities/category.dart';
+import 'package:plain/design_system/app_empty_state.dart';
 import 'package:flutter/material.dart';
+import 'package:plain/design_system/app_toast.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:plain/app/bootstrap.dart';
 import 'package:plain/app/breakpoints.dart';
 import 'package:plain/app/theme/design_tokens.dart';
 import 'package:plain/app/theme/theme_registry.dart';
+import 'package:plain/core/format/amount_formatter.dart';
 import 'package:plain/core/refresh/data_invalidation.dart';
 import 'package:plain/design_system/donut_chart.dart';
 
@@ -66,84 +71,83 @@ final _selectedMonthProvider = NotifierProvider<SelectedMonthNotifier, DateTime>
 
 final _reportProvider = FutureProvider<MonthlyReport>((ref) async {
   ref.watch(ledgerVersionProvider);
+  ref.watch(categoriesVersionProvider);
   final month = ref.watch(_selectedMonthProvider);
   final deps = ref.watch(appDependenciesProvider);
-  final db = deps.db;
 
   final dayFrom = '${month.year}-${month.month.toString().padLeft(2, '0')}-01';
-  final nextMonth = month.month == 12 ? DateTime(month.year + 1, 1) : DateTime(month.year, month.month + 1);
-  final dayTo = '${nextMonth.year}-${nextMonth.month.toString().padLeft(2, '0')}-01';
+  final lastDay = DateTime(month.year, month.month + 1, 0).day;
+  final dayTo = '${month.year}-${month.month.toString().padLeft(2, '0')}-${lastDay.toString().padLeft(2, '0')}';
 
-  final rows = db.raw.select(
-    'SELECT category_id, SUM(expense_cents) AS exp, SUM(income_cents) AS inc, SUM(tx_count) AS cnt '
-    'FROM daily_stats WHERE book_id = ? AND day_key >= ? AND day_key < ? '
-    'GROUP BY category_id ORDER BY exp DESC',
-    [deps.bookId, dayFrom, dayTo],
+  final summaryRes = await deps.ledgerRepository.monthSummary(
+    bookId: deps.bookId, dayFrom: dayFrom, dayTo: dayTo,
   );
+  final summary = summaryRes.successOrNull;
+  if (summary == null) {
+    return MonthlyReport(
+      year: month.year, month: month.month,
+      expenseCents: 0, incomeCents: 0, txCount: 0,
+      categoryBreakdown: const [],
+    );
+  }
 
-  var totalExpense = 0;
-  var totalIncome = 0;
-  var totalCount = 0;
-  final breakdown = <CategorySlice>[];
+  final catRes = await deps.categoryRepository.listAll();
+  final cats = catRes.successOrNull ?? const <Category>[];
+  final catNameMap = {for (final c in cats) c.id: c.name};
+  final catIconMap = {for (final c in cats) c.id: c.iconRef};
 
-  final catRows = db.raw.select('SELECT id, name FROM categories WHERE deleted_at IS NULL');
-  final catMap = {for (final r in catRows) r['id']! as String: r['name']! as String};
-
-  // Category slices prefer the fixed CATCOL palette (INV-1).
-  final fallbackColors = [
-    BrandColors.expense, BrandColors.primary, BrandColors.accent,
-    BrandColors.transfer, BrandColors.income,
+  // Category slices prefer the fixed categoryColorMap palette (INV-1).
+  // Fallbacks for uncategorized slices — fixed palette, no BuildContext here.
+  const fallbackColors = [
+    Color(0xFFD97C7C), Color(0xFF7FA8DC), Color(0xFFE69A6D),
+    Color(0xFF97BC81), Color(0xFFBFA8E9),
   ];
 
+  final breakdown = <CategorySlice>[];
   var colorIdx = 0;
-  for (final row in rows) {
-    final exp = (row['exp'] as int?) ?? 0;
-    final inc = (row['inc'] as int?) ?? 0;
-    final cnt = (row['cnt'] as int?) ?? 0;
-    totalExpense += exp;
-    totalIncome += inc;
-    totalCount += cnt;
-
-    if (exp > 0) {
-      final catId = row['category_id']! as String;
-      final catName = catMap[catId] ?? '其他';
-      breakdown.add(CategorySlice(
-        name: catName,
-        expenseCents: exp,
-        color: CATCOL[catName] != null
-            ? Color(CATCOL[catName]!)
-            : fallbackColors[colorIdx % fallbackColors.length],
-      ));
-      colorIdx++;
-    }
+  final sorted = summary.byCategory.entries.toList()
+    ..sort((a, b) => b.value.expenseCents.compareTo(a.value.expenseCents));
+  for (final e in sorted) {
+    final exp = e.value.expenseCents;
+    if (exp <= 0) continue;
+    final catId = e.key;
+    final catName = catNameMap[catId] ?? '其他';
+    final iconRef = catIconMap[catId] ?? 'other';
+    final palette = categoryColorMap[iconRef];
+    breakdown.add(CategorySlice(
+      name: catName,
+      expenseCents: exp,
+      color: palette != null
+          ? Color(palette)
+          : fallbackColors[colorIdx % fallbackColors.length],
+    ));
+    colorIdx++;
   }
 
   // Daily expense for 日支出走势
+  final db = deps.db;
   final dayRows = db.raw.select(
     'SELECT day_key, SUM(expense_cents) AS exp FROM daily_stats '
-    'WHERE book_id = ? AND day_key >= ? AND day_key < ? GROUP BY day_key',
+    'WHERE book_id = ? AND day_key >= ? AND day_key <= ? GROUP BY day_key',
     [deps.bookId, dayFrom, dayTo],
   );
   final dailyExpense = <int, int>{};
-  for (final row in dayRows) {
-    final key = row['day_key']! as String;
-    final day = int.tryParse(key.substring(key.length - 2)) ?? 0;
-    if (day > 0) {
-      dailyExpense[day] = (dailyExpense[day] ?? 0) + ((row['exp'] as int?) ?? 0);
-    }
+  for (final r in dayRows) {
+    final key = r['day_key']! as String;
+    final d = int.tryParse(key.substring(8, 10)) ?? 0;
+    if (d > 0) dailyExpense[d] = ((r['exp'] as int?) ?? 0);
   }
 
   return MonthlyReport(
     year: month.year,
     month: month.month,
-    expenseCents: totalExpense,
-    incomeCents: totalIncome,
-    txCount: totalCount,
+    expenseCents: summary.expenseCents,
+    incomeCents: summary.incomeCents,
+    txCount: summary.txCount,
     categoryBreakdown: breakdown,
     dailyExpense: dailyExpense,
   );
 });
-
 final _prevReportProvider = FutureProvider<MonthlyReport>((ref) async {
   ref.watch(ledgerVersionProvider);
   final month = ref.watch(_selectedMonthProvider);
@@ -176,7 +180,6 @@ class ReportsPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    watchBrandTheme(ref);
     final selectedMonth = ref.watch(_selectedMonthProvider);
     final reportAsync = ref.watch(_reportProvider);
     final prevAsync = ref.watch(_prevReportProvider);
@@ -198,16 +201,10 @@ class ReportsPage extends ConsumerWidget {
       body: reportAsync.when(
         data: (report) {
           if (report.txCount == 0) {
-            return ContentWidthConstraint(
-              child: Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.pie_chart_outline, size: 80, color: BrandColors.inkTertiary),
-                    const SizedBox(height: Spacing.lg),
-                    Text('本月还没有记录', style: Theme.of(context).textTheme.titleMedium?.copyWith(color: BrandColors.inkSecondary)),
-                  ],
-                ),
+            return const ContentWidthConstraint(
+              child: AppEmptyState(
+                icon: Icons.pie_chart_outline,
+                title: '本月还没有记录',
               ),
             );
           }
@@ -254,9 +251,7 @@ class _ReportContentState extends State<_ReportContent> {
                 onSegmentTap: (seg) => setState(() => _drillSegment = seg),
                 onDrillBack: () => setState(() => _drillSegment = null),
                 onSubcategoryTap: (sub) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('查看 ${sub.name} 的账单')),
-                  );
+                  showAppToast(context, '查看 ${sub.name} 的账单');
                 },
               ),
             ),
@@ -288,14 +283,15 @@ class _ReportContentState extends State<_ReportContent> {
 }
 
 /// 日支出柱状图（高保真 .bars）
-class _DailyBars extends StatelessWidget {
+class _DailyBars extends ConsumerWidget {
   const _DailyBars({required this.dailyExpense, required this.month, required this.year});
   final Map<int, int> dailyExpense;
   final int month;
   final int year;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final hideAmounts = ref.watch(hideAmountsProvider);
     final daysInMonth = DateTime(year, month + 1, 0).day;
     final maxExp = dailyExpense.values.fold<int>(0, (m, v) => v > m ? v : m);
     final now = DateTime.now();
@@ -308,9 +304,9 @@ class _DailyBars extends StatelessWidget {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text('$month/1', style: TextStyle(fontSize: 10, color: BrandColors.inkTertiary)),
-            Text('$month/${daysInMonth ~/ 2}', style: TextStyle(fontSize: 10, color: BrandColors.inkTertiary)),
-            Text('$month/$daysInMonth', style: TextStyle(fontSize: 10, color: BrandColors.inkTertiary)),
+            Text('$month/1', style: TextStyle(fontSize: 10, color: context.colors.inkTertiary)),
+            Text('$month/${daysInMonth ~/ 2}', style: TextStyle(fontSize: 10, color: context.colors.inkTertiary)),
+            Text('$month/$daysInMonth', style: TextStyle(fontSize: 10, color: context.colors.inkTertiary)),
           ],
         ),
         const SizedBox(height: 8),
@@ -324,13 +320,13 @@ class _DailyBars extends StatelessWidget {
                   child: Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 1.5),
                     child: Tooltip(
-                      message: '$month月$d日 ¥${((dailyExpense[d] ?? 0) / 100).toStringAsFixed(2)}',
+                      message: '$month月$d日 ¥${formatAmount(dailyExpense[d] ?? 0, hide: hideAmounts)}',
                       child: Container(
                         height: ((dailyExpense[d] ?? 0) / (maxExp == 0 ? 1 : maxExp) * 92).clamp(3.0, 92.0),
                         decoration: BoxDecoration(
                           color: (isCurrentMonth && d == today)
-                              ? BrandColors.primary
-                              : BrandColors.barFill,
+                              ? context.colors.primary
+                              : context.colors.barFill,
                           borderRadius: BorderRadius.circular(4),
                         ),
                       ),
@@ -340,51 +336,6 @@ class _DailyBars extends StatelessWidget {
             ],
           ),
         ),
-      ],
-    );
-  }
-}
-
-class _SummaryCard extends StatelessWidget {
-  const _SummaryCard({required this.report});
-  final MonthlyReport report;
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(Spacing.xl),
-        child: Column(
-          children: [
-            Row(
-              children: [
-                Expanded(child: _SummaryItem(label: '支出', value: (report.expenseCents / 100).toStringAsFixed(2), color: BrandColors.expense)),
-                Expanded(child: _SummaryItem(label: '收入', value: (report.incomeCents / 100).toStringAsFixed(2), color: BrandColors.income)),
-                Expanded(child: _SummaryItem(label: '结余', value: (report.balanceCents / 100).toStringAsFixed(2), color: report.balanceCents >= 0 ? BrandColors.income : BrandColors.expense)),
-              ],
-            ),
-            const SizedBox(height: Spacing.lg),
-            Text('${report.txCount} 笔交易', style: TextStyle(fontSize: 12, color: BrandColors.inkTertiary)),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _SummaryItem extends StatelessWidget {
-  const _SummaryItem({required this.label, required this.value, required this.color});
-  final String label;
-  final String value;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Text(label, style: TextStyle(fontSize: 12, color: BrandColors.inkSecondary)),
-        const SizedBox(height: Spacing.xs),
-        Text(value, style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600, color: color)),
       ],
     );
   }
@@ -421,7 +372,7 @@ class _ComparisonCard extends StatelessWidget {
   }
 }
 
-class _ChangeItem extends StatelessWidget {
+class _ChangeItem extends ConsumerWidget {
   const _ChangeItem({required this.label, required this.current, required this.previous, required this.change, required this.isExpense});
   final String label;
   final int current;
@@ -430,17 +381,18 @@ class _ChangeItem extends StatelessWidget {
   final bool isExpense;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final hideAmounts = ref.watch(hideAmountsProvider);
     final changeColor = change == null
-        ? BrandColors.inkTertiary
-        : (isExpense ? (change! > 0 ? BrandColors.expense : BrandColors.income) : (change! > 0 ? BrandColors.income : BrandColors.expense));
+        ? context.colors.inkTertiary
+        : (isExpense ? (change! > 0 ? context.colors.expense : context.colors.income) : (change! > 0 ? context.colors.income : context.colors.expense));
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: TextStyle(fontSize: 12, color: BrandColors.inkSecondary)),
+        Text(label, style: TextStyle(fontSize: 12, color: context.colors.inkSecondary)),
         const SizedBox(height: Spacing.xs),
-        Text((current / 100).toStringAsFixed(2), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+        Text(formatAmount(current, hide: hideAmounts), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
         if (change != null)
           Text('${change! > 0 ? '+' : ''}${change!.toStringAsFixed(1)}%', style: TextStyle(fontSize: 12, color: changeColor)),
       ],

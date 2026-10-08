@@ -3,6 +3,7 @@ import java.util.Properties
 
 plugins {
     id("com.android.application")
+    id("org.jetbrains.kotlin.android")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
 }
@@ -33,15 +34,13 @@ android {
         versionName = flutter.versionName
     }
 
-    // Build variants (flavors): dev / prod — see 04-技术架构设计.md §12
-    // ABI 不写在 ndk.abiFilters：与 Flutter 的 splits.abi（--split-per-abi）冲突。
-    // 用 flutter build 的 --target-platform 控制架构，如:
-    //   android-arm,android-x64  → armeabi-v7a + x86_64（排除 arm64-v8a）
+    // Build variants (flavors): dev / prod. applicationId is FIXED at
+    // com.cvilia.plain for every flavor — do not use applicationIdSuffix
+    // (flavor split is by build config only, never by package name).
     flavorDimensions += "env"
     productFlavors {
         create("dev") {
             dimension = "env"
-            applicationIdSuffix = ".dev"
             versionNameSuffix = "-dev"
         }
         create("prod") {
@@ -61,6 +60,23 @@ android {
     buildTypes {
         release {
             signingConfig = signingConfigs.getByName("release")
+            // APK slimming: R8 + resource shrink (main lever vs ~19MB).
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro",
+            )
+            ndk {
+                debugSymbolLevel = "none"
+            }
+        }
+    }
+
+    packaging {
+        jniLibs {
+            // Uncompressed JNI can help install size on some devices; keep default package.
+            useLegacyPackaging = false
         }
     }
 }
