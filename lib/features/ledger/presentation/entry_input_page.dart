@@ -120,8 +120,10 @@ class _EntryInputPageState extends ConsumerState<EntryInputPage> {
 
         // Reserve room for category area + action chips so short screens never overflow.
         const minBottom = 168; // ~2 category rows + attr bar
-        final maxKeypad = (totalHeight - amountHeight - minBottom).clamp(160.0, 320.0);
-        final keypadHeight = (totalHeight * keypadRatio).clamp(160.0, maxKeypad);
+        // 5 rows × ~40px + gaps is the practical minimum for a usable keypad.
+        const minKeypad = 200.0;
+        final maxKeypad = (totalHeight - amountHeight - minBottom).clamp(minKeypad, 320.0);
+        final keypadHeight = (totalHeight * keypadRatio).clamp(minKeypad, maxKeypad);
 
         return Column(
           children: [
@@ -268,29 +270,30 @@ class _Keypad extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Rows stretch to the parent keypad region. Fixed 56px rows overflowed
+    // when Form A allocated a shorter height (e.g. desktop window).
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: Spacing.sm),
       child: Column(
-        mainAxisSize: MainAxisSize.min,
         children: [
-          _keyRow(context, ['7', '8', '9', '\u00f7']),
-          _keyRow(context, ['4', '5', '6', '\u00d7']),
-          _keyRow(context, ['1', '2', '3', '-']),
-          _keyRow(context, ['.', '0', '=', '+']),
-          _keyRow(context, ['\u232b', 'C', 'OK']),
+          Expanded(child: _keyRow(context, ['7', '8', '9', '\u00f7'])),
+          Expanded(child: _keyRow(context, ['4', '5', '6', '\u00d7'])),
+          Expanded(child: _keyRow(context, ['1', '2', '3', '-'])),
+          Expanded(child: _keyRow(context, ['.', '0', '=', '+'])),
+          Expanded(child: _keyRow(context, ['\u232b', 'C', 'OK'])),
         ],
       ),
     );
   }
 
   Widget _keyRow(BuildContext context, List<String> labels) {
-    return SizedBox(
-      height: 56,
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
       child: Row(children: [
         for (final label in labels)
           Expanded(
             child: Padding(
-              padding: const EdgeInsets.all(3),
+              padding: const EdgeInsets.symmetric(horizontal: 3),
               child: _KeyButton(label: label, onTap: () => _onKey(context, label), isConfirm: label == 'OK', isEquals: label == '='),
             ),
           ),
