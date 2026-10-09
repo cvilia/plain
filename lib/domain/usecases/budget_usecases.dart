@@ -50,10 +50,29 @@ class ResolveBudgetStatusUseCase {
       toMs: window.end.toUtc().millisecondsSinceEpoch,
     );
     if (spentRes.isFailure) return err(spentRes.failureOrNull!);
+
+    // Rollover: unused allowance from the previous period adds to this one.
+    var carryOver = 0;
+    if (budget.rollover) {
+      final prevWindow = budgetPeriodWindow(
+        today: window.start.subtract(const Duration(days: 1)),
+        startDay: budget.startDay,
+      );
+      final prevSpentRes = await _repository.spentCents(
+        bookId: budget.bookId, categoryId: budget.categoryId,
+        fromMs: prevWindow.start.toUtc().millisecondsSinceEpoch,
+        toMs: prevWindow.end.toUtc().millisecondsSinceEpoch,
+      );
+      if (prevSpentRes.isFailure) return err(prevSpentRes.failureOrNull!);
+      final prevRemaining = budget.amount.cents - prevSpentRes.requireValue;
+      if (prevRemaining > 0) carryOver = prevRemaining;
+    }
+
     return ok(BudgetStatus(
       budget: budget, spentCents: spentRes.requireValue,
       periodStart: window.start, periodEnd: window.end,
       today: _clock.now().toLocal(),
+      carryOverCents: carryOver,
     ));
   }
 }

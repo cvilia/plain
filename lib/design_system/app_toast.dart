@@ -12,6 +12,11 @@ import 'package:plain/core/constants/app_constants.dart';
 /// Android toast background (framework `Toast` surface).
 const Color _toastBg = Color(0xFF323232);
 
+/// Fixed bottom inset for every toast — matches the post-save toast on
+/// the entry page (记一笔 → OK). All toasts share this anchor so they
+/// never jump between screens.
+const double kToastBottomInset = 120;
+
 OverlayEntry? _activeToast;
 
 /// Show an Android-native style toast.
@@ -21,7 +26,7 @@ void showAppToast(
   BuildContext context,
   String message, {
   Duration duration = UiDurations.saveToast,
-  double bottom = 100,
+  double bottom = kToastBottomInset,
 }) {
   _showToast(
     context,
@@ -41,7 +46,7 @@ void showAppToastWithAction(
   required String actionLabel,
   required VoidCallback onAction,
   Duration duration = UiDurations.undoWindow,
-  double bottom = 100,
+  double bottom = kToastBottomInset,
 }) {
   _showToast(
     context,
@@ -189,10 +194,9 @@ class _ToastPill extends StatelessWidget {
           maxWidth: MediaQuery.sizeOf(context).width * 0.8,
         ),
         child: Padding(
-          padding: EdgeInsets.symmetric(
-            horizontal: actionLabel == null ? 20 : 8,
-            vertical: 12,
-          ),
+          // Same padding with or without an action — action must not
+          // inflate pill height or shrink horizontal inset.
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -217,9 +221,10 @@ class _ToastPill extends StatelessWidget {
                   onPressed: onAction,
                   style: TextButton.styleFrom(
                     foregroundColor: const Color(0xFF80CBC4),
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    minimumSize: const Size(0, 36),
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    minimumSize: Size.zero,
                     tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    visualDensity: VisualDensity.compact,
                   ),
                   child: Text(
                     actionLabel!,

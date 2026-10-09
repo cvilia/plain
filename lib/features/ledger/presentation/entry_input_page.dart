@@ -1,4 +1,4 @@
-﻿/// Entry input page (SP-1-01). See PRD STORY-1.1.
+/// Entry input page (SP-1-01). See PRD STORY-1.1.
 library;
 
 import 'package:plain/app/theme/app_colors.dart';
@@ -182,14 +182,17 @@ class _AmountDisplay extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.fromLTRB(Spacing.lg, Spacing.md, Spacing.lg, Spacing.sm),
       child: Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-        Row(children: [
-          _TypeChip(label: '支出', selected: state.type == EntryType.expense, color: context.colors.expense, onTap: () => controller.onTypeChanged(EntryType.expense)),
-          const SizedBox(width: Spacing.sm),
-          _TypeChip(label: '收入', selected: state.type == EntryType.income, color: context.colors.income, onTap: () => controller.onTypeChanged(EntryType.income)),
-          const SizedBox(width: Spacing.sm),
-          _TypeChip(label: '转账', selected: state.type == EntryType.transfer, color: context.colors.transfer, onTap: () => controller.onTypeChanged(EntryType.transfer)),
-          const Spacer(),
-        ]),
+        // Wrap avoids RenderFlex overflow when the window is narrow
+        // (3 chips + gaps exceeded the row width by ~10px).
+        Wrap(
+          spacing: Spacing.sm,
+          runSpacing: Spacing.xs,
+          children: [
+            _TypeChip(label: '支出', selected: state.type == EntryType.expense, color: context.colors.expense, onTap: () => controller.onTypeChanged(EntryType.expense)),
+            _TypeChip(label: '收入', selected: state.type == EntryType.income, color: context.colors.income, onTap: () => controller.onTypeChanged(EntryType.income)),
+            _TypeChip(label: '转账', selected: state.type == EntryType.transfer, color: context.colors.transfer, onTap: () => controller.onTypeChanged(EntryType.transfer)),
+          ],
+        ),
         const SizedBox(height: Spacing.sm),
         Row(
           mainAxisAlignment: MainAxisAlignment.end,
@@ -326,7 +329,7 @@ class _Keypad extends StatelessWidget {
     if (!ok || !context.mounted) return;
     final msg = controller.currentToast;
     if (msg != null) {
-      showAppToast(context, msg, bottom: 120);
+      showAppToast(context, msg);
       controller.clearToast();
     }
   }

@@ -278,7 +278,7 @@ class _EntryTileState extends ConsumerState<_EntryTile> {
           '已删除',
           actionLabel: '撤销',
           onAction: () => controller.undoDelete(),
-          bottom: 120,
+          
         );
         return ok;
       },

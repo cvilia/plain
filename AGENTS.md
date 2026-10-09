@@ -67,18 +67,21 @@ C:\Users\lizhenyu\flutter\bin\flutter.bat test
 Flavor：`dev`（`com.cvilia.plain.dev`，模拟器调试）/ `prod`（`com.cvilia.plain`，正式包）。
 产物命名：`Plain-{versionName}-{flavor}-{buildType}.apk`，如 `Plain-1.0.0-prod-release.apk`。
 
-**ABI 不要写进 `ndk.abiFilters`**（会和 Flutter `--split-per-abi` 的 `splits.abi` 冲突）。用 `--target-platform` 控制：`android-arm,android-x64` = armeabi-v7a + x86_64（排除 arm64-v8a）。
+**ABI 不要写进 `ndk.abiFilters`**（会和 Flutter `--split-per-abi` 的 `splits.abi` 冲突）。用 `--target-platform` 控制：
+`android-arm,android-arm64,android-x64` = armeabi-v7a + **arm64-v8a** + x86_64。
+arm64-v8a **必须包含**，否则 HarmonyOS / 部分 64 位机型启动即崩
+（`libflutter.so is 32-bit instead of 64-bit`）。旧写法 `android-arm,android-x64` = armeabi-v7a + x86_64（排除 arm64-v8a）。
 
 ```bat
 :: 调试装模拟器
 flutter run --flavor dev
 
-:: 正式包（armeabi-v7a + x86_64）
-flutter build apk --flavor prod --release --target-platform android-arm,android-x64
-flutter build appbundle --flavor prod --release --target-platform android-arm,android-x64
+:: 正式包（armeabi-v7a + arm64-v8a + x86_64）
+flutter build apk --flavor prod --release --target-platform android-arm,android-arm64,android-x64
+flutter build appbundle --flavor prod --release --target-platform android-arm,android-arm64,android-x64
 
 :: 按 ABI 拆分
-flutter build apk --flavor prod --release --split-per-abi --target-platform android-arm,android-x64
+flutter build apk --flavor prod --release --split-per-abi --target-platform android-arm,android-arm64,android-x64
 ```
 
 **Android Studio Run**：必须带 flavor，否则 Flutter 找 `app-debug.apk` 会报

@@ -26,6 +26,7 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
+
     defaultConfig {
         applicationId = "com.cvilia.plain"
         minSdk = flutter.minSdkVersion
@@ -85,6 +86,7 @@ android {
 base {
     archivesName.set("Plain-${flutter.versionName}")
 }
+
 
 kotlin {
     compilerOptions {

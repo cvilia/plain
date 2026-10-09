@@ -1,4 +1,4 @@
-﻿/// Settings page. See PRD STORY-5.1, M9.
+/// Settings page. See PRD STORY-5.1, M9.
 library;
 
 import 'package:plain/app/theme/app_colors.dart';
@@ -10,6 +10,7 @@ import 'package:plain/app/theme/theme_prefs.dart';
 import 'package:plain/core/format/amount_formatter.dart';
 import 'package:plain/features/security/app_lock_prefs.dart';
 import 'package:plain/features/security/app_lock_screen.dart';
+import 'package:plain/features/settings/action_log_page.dart';
 import 'package:plain/features/settings/backup_page.dart';
 import 'package:plain/features/settings/budget_page.dart';
 import 'package:plain/features/settings/category_manage_page.dart';
@@ -107,6 +108,12 @@ class SettingsPage extends ConsumerWidget {
                   subtitle: const Text('查看和恢复已删除的账单'),
                   trailing: const Icon(Icons.chevron_right),
                   onTap: () => _openDetail(context, const TrashPage()),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.history),
+                  title: const Text('操作日志'),
+                  subtitle: const Text('查看最近的记账与设置变更'),
+                  onTap: () => _openDetail(context, const ActionLogPage()),
                 ),
               ]),
             ),

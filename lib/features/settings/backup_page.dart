@@ -2,6 +2,7 @@
 library;
 
 import 'package:plain/app/theme/app_colors.dart';
+import 'package:plain/design_system/app_toast.dart';
 import 'package:plain/design_system/confirm_dialog.dart';
 import 'dart:io';
 
@@ -11,6 +12,8 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:plain/app/bootstrap.dart';
+import 'package:plain/data/platform/file_picker_bridge.dart';
+import 'package:plain/core/refresh/data_invalidation.dart';
 import 'package:plain/app/theme/design_tokens.dart';
 
 class BackupPage extends ConsumerStatefulWidget {
@@ -132,7 +135,9 @@ class _BackupPageState extends ConsumerState<BackupPage> {
   }
 
   Future<void> _import() async {
-    // Show confirmation dialog
+    final path = await FilePickerBridge.pickFile(mime: '*/*', extension: 'db');
+    if (path == null || !mounted) return;
+
     final confirmed = await showConfirmDialog(
       context,
       title: '导入备份',
@@ -140,7 +145,6 @@ class _BackupPageState extends ConsumerState<BackupPage> {
       confirmLabel: '确定导入',
       destructive: true,
     );
-
     if (confirmed != true || !mounted) return;
 
     setState(() {
@@ -149,15 +153,21 @@ class _BackupPageState extends ConsumerState<BackupPage> {
     });
 
     try {
-      // TODO: integrate with file_picker when available
-      // For now, show a message about where to put the backup file
-      setState(() {
-        _error = '请将备份文件放到应用文档目录后重试';
-      });
+      final deps = ref.read(appDependenciesProvider);
+      deps.db.restoreFrom(path);
+      // Everything changed at once — bump every scope so UI refetches.
+      ref.invalidateData.bumpEntryMutated();
+      ref.invalidateData.bumpCategoriesMutated();
+      ref.invalidateData.bumpAccountsMutated();
+      ref.invalidateData.bumpBudgetMutated();
+      ref.invalidateData.bumpRecurringMutated();
+      if (mounted) {
+        showAppToast(context, '导入完成');
+      }
     } on Exception catch (e) {
       setState(() => _error = '导入失败: $e');
     } finally {
-      setState(() => _exporting = false);
+      if (mounted) setState(() => _exporting = false);
     }
   }
 }

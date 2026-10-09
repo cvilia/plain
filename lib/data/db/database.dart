@@ -82,6 +82,48 @@ class AppDatabase {
     }
   }
 
+  /// Replace all app data with the contents of a backup `.db` file.
+  ///
+  /// The backup is attached read-only; every user table is cleared and
+  /// refilled in one transaction. Callers should bump all data scopes after.
+  void restoreFrom(String backupPath) {
+    final escaped = backupPath.replaceAll("'", "''");
+    _db.execute("ATTACH DATABASE '$escaped' AS backup");
+    try {
+      const tables = [
+        'transactions',
+        'categories',
+        'accounts',
+        'change_log',
+        'daily_stats',
+        'budgets',
+        'recurring_rules',
+        'app_meta',
+      ];
+      _db.execute('BEGIN');
+      for (final table in tables) {
+        // Older backups may miss newer tables (e.g. budgets) — skip those.
+        final exists = _db.select(
+          "SELECT name FROM backup.sqlite_master WHERE type='table' AND name = ?",
+          [table],
+        );
+        if (exists.isEmpty) continue;
+        _db.execute('DELETE FROM $table');
+        _db.execute('INSERT INTO $table SELECT * FROM backup.$table');
+      }
+      _db.execute('COMMIT');
+    } catch (_) {
+      try {
+        _db.execute('ROLLBACK');
+      } on Exception {
+        // transaction may not have started
+      }
+      rethrow;
+    } finally {
+      _db.execute('DETACH DATABASE backup');
+    }
+  }
+
   void close() => _db.close();
 }
 

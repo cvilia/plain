@@ -118,17 +118,24 @@ class _BudgetPageState extends ConsumerState<BudgetPage> {
   Future<void> _editTotal() async {
     final deps = ref.read(appDependenciesProvider);
     final current = ref.read(_budgetDataProvider).value?.totalStatus?.budget;
-    final amount = await _askAmount(context, initial: current?.amount);
-    if (amount == null || !mounted) return;
+    final picked = await _askAmount(
+      context,
+      initial: current?.amount,
+      initialRollover: current?.rollover ?? false,
+    );
+    if (picked == null || !mounted) return;
+    final amount = picked.amount;
+    final rollover = picked.rollover;
     final now = deps.clock.now();
     if (current == null) {
       await deps.budgetRepository.create(Budget(
         id: deps.idGen.generate(), bookId: deps.bookId, scope: BudgetScope.total,
-        amount: amount, createdAt: now, updatedAt: now, deviceId: deps.deviceId,
+        amount: amount, rollover: rollover,
+        createdAt: now, updatedAt: now, deviceId: deps.deviceId,
       ));
     } else {
       await deps.budgetRepository.update(current.copyWith(
-        amount: amount, updatedAt: now,
+        amount: amount, rollover: rollover, updatedAt: now,
         revision: current.revision + 1, baseRevision: current.revision,
       ));
     }
@@ -138,26 +145,34 @@ class _BudgetPageState extends ConsumerState<BudgetPage> {
   Future<void> _addCategoryBudget() async {
     final cat = await _pickCategory();
     if (cat == null || !mounted) return;
-    final amount = await _askAmount(context);
-    if (amount == null || !mounted) return;
+    final picked = await _askAmount(context);
+    if (picked == null || !mounted) return;
+    final amount = picked.amount;
+    final rollover = picked.rollover;
     final deps = ref.read(appDependenciesProvider);
     final now = deps.clock.now();
     await deps.budgetRepository.create(Budget(
       id: deps.idGen.generate(), bookId: deps.bookId, scope: BudgetScope.category,
-      categoryId: cat.id, amount: amount, createdAt: now, updatedAt: now,
-      deviceId: deps.deviceId,
+      categoryId: cat.id, amount: amount, rollover: rollover,
+      createdAt: now, updatedAt: now, deviceId: deps.deviceId,
     ));
     ref.invalidateData.bumpBudgetMutated();
   }
 
   Future<void> _editCategory(BudgetStatus status) async {
-    final amount = await _askAmount(context, initial: status.budget.amount);
-    if (amount == null || !mounted) return;
+    final picked = await _askAmount(
+      context,
+      initial: status.budget.amount,
+      initialRollover: status.budget.rollover,
+    );
+    if (picked == null || !mounted) return;
+    final amount = picked.amount;
+    final rollover = picked.rollover;
     final deps = ref.read(appDependenciesProvider);
     final now = deps.clock.now();
     final b = status.budget;
     await deps.budgetRepository.update(b.copyWith(
-      amount: amount, updatedAt: now,
+      amount: amount, rollover: rollover, updatedAt: now,
       revision: b.revision + 1, baseRevision: b.revision,
     ));
     ref.invalidateData.bumpBudgetMutated();
@@ -188,30 +203,61 @@ class _BudgetPageState extends ConsumerState<BudgetPage> {
     );
   }
 
-  Future<Money?> _askAmount(BuildContext context, {Money? initial}) async {
+  /// Returns amount + rollover flag, or null when cancelled / invalid.
+  Future<({Money amount, bool rollover})?> _askAmount(
+    BuildContext context, {
+    Money? initial,
+    bool initialRollover = false,
+  }) async {
     final controller = TextEditingController(
       text: initial == null ? '' : initial.toYuanString());
-    final result = await showDialog<String>(
+    var rollover = initialRollover;
+    final result = await showDialog<({String text, bool rollover})>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('预算金额'),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-          decoration: const InputDecoration(prefixText: '¥ ', hintText: '0.00'),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          title: const Text('预算金额'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: controller,
+                autofocus: true,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                decoration: const InputDecoration(prefixText: '¥ ', hintText: '0.00'),
+              ),
+              const SizedBox(height: Spacing.sm),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                dense: true,
+                title: const Text('结余滚存'),
+                subtitle: const Text('上期未用完的额度计入本期'),
+                value: rollover,
+                onChanged: (v) => setDialogState(() => rollover = v),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('取消'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(
+                ctx,
+                (text: controller.text, rollover: rollover),
+              ),
+              child: const Text('确定'),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('取消')),
-          TextButton(onPressed: () => Navigator.pop(ctx, controller.text), child: const Text('确定')),
-        ],
       ),
     );
-    if (result == null || result.trim().isEmpty) return null;
+    if (result == null || result.text.trim().isEmpty) return null;
     try {
-      final m = Money.parseYuan(result.trim());
+      final m = Money.parseYuan(result.text.trim());
       if (m.isZero || !m.withinProductLimit) return null;
-      return m;
+      return (amount: m, rollover: result.rollover);
     } on FormatException {
       return null;
     }

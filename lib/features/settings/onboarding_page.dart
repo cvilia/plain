@@ -128,23 +128,8 @@ class _ObStep extends StatelessWidget {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Container(
-            width: 88,
-            height: 88,
-            decoration: BoxDecoration(
-              color: context.colors.primaryLight,
-              borderRadius: BorderRadius.circular(24),
-            ),
-            alignment: Alignment.center,
-            child: Text(
-              logo,
-              style: TextStyle(
-                fontSize: logo.length == 1 ? 36 : 28,
-                fontWeight: FontWeight.w700,
-                color: context.colors.primaryDark,
-              ),
-            ),
-          ),
+          // Same mark as Settings footer — theme-colored icon, no background.
+          Icon(Icons.savings_outlined, size: 80, color: context.colors.primary),
           const SizedBox(height: Spacing.xxl),
           Text(
             title,

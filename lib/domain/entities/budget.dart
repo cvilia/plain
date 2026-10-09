@@ -61,6 +61,7 @@ class BudgetStatus {
   const BudgetStatus({
     required this.budget, required this.spentCents,
     required this.periodStart, required this.periodEnd, required this.today,
+    this.carryOverCents = 0,
   });
 
   final Budget budget;
@@ -69,7 +70,11 @@ class BudgetStatus {
   final DateTime periodEnd;
   final DateTime today;
 
-  int get limitCents => budget.amount.cents;
+  /// Unused budget rolled forward from the previous period (rollover budgets).
+  final int carryOverCents;
+
+  /// Base allowance plus carry — the user's real spending headroom.
+  int get limitCents => budget.amount.cents + carryOverCents;
   int get remainingCents => limitCents - spentCents;
   double get ratio => limitCents == 0 ? 0 : spentCents / limitCents;
 
