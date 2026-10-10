@@ -56,13 +56,29 @@ class FlowListState {
 }
 
 class FlowListController extends Notifier<FlowListState> {
+  bool _pendingRefresh = false;
+
   @override
   FlowListState build() {
     // Any entry mutation bumps ledgerVersion — list follows automatically.
     // MUST defer: listen can fire while the widget tree is building (TickerMode
     // / layout callbacks), and `state=` inside a build phase throws.
     ref.listen(ledgerVersionProvider, (prev, next) {
-      if (prev == next || state.isLoading) return;
+      if (prev == next) return;
+      // 正在加载时不要丢掉这次变更，记下待刷新，加载完再补
+      if (state.isLoading) {
+        _pendingRefresh = true;
+        return;
+      }
+      Future.microtask(refresh);
+    });
+    // 分类筛选变化必须重载，否则列表停留在旧过滤结果
+    ref.listen(flowCategoryFilterProvider, (prev, next) {
+      if (prev == next) return;
+      if (state.isLoading) {
+        _pendingRefresh = true;
+        return;
+      }
       Future.microtask(refresh);
     });
     // Auto-load on first access
@@ -87,7 +103,7 @@ class FlowListController extends Notifier<FlowListState> {
     final catMap = {for (final c in cats) c.id: c};
 
     final result = await _repository.listPage(
-      filter: EntryFilter(bookId: _bookId),
+      filter: EntryFilter(bookId: _bookId, categoryId: ref.read(flowCategoryFilterProvider)),
       limit: 50,
     );
 
@@ -100,11 +116,20 @@ class FlowListController extends Notifier<FlowListState> {
           hasMore: page.hasMore,
           categoryMap: catMap,
         );
+        _flushPendingRefresh();
       },
       failure: (f) {
         state = state.copyWith(isLoading: false, errorMessage: f.code);
+        _flushPendingRefresh();
       },
     );
+  }
+
+  /// 加载过程中又发生了写入：补一次刷新（防止丢更新）。
+  void _flushPendingRefresh() {
+    if (!_pendingRefresh) return;
+    _pendingRefresh = false;
+    Future.microtask(loadInitial);
   }
 
   Future<void> loadMore() async {
@@ -112,7 +137,7 @@ class FlowListController extends Notifier<FlowListState> {
     state = state.copyWith(isLoading: true);
 
     final result = await _repository.listPage(
-      filter: EntryFilter(bookId: _bookId),
+      filter: EntryFilter(bookId: _bookId, categoryId: ref.read(flowCategoryFilterProvider)),
       cursor: _cursor,
       limit: 50,
     );
@@ -141,16 +166,32 @@ class FlowListController extends Notifier<FlowListState> {
   /// Soft-deleted entry stash for undo (PRD STORY-1.2 AC3).
   LedgerEntry? _lastDeleted;
 
+  /// 同步从本地列表移除（Dismissible onDismissed 必须立刻让控件离开树）。
+  void removeLocal(String id) {
+    final groups = <DayGroup>[];
+    for (final g in state.groups) {
+      final kept = g.entries.where((e) => e.id != id).toList();
+      if (kept.isEmpty) continue;
+      groups.add(DayGroup(dayKey: g.dayKey, entries: kept));
+    }
+    state = state.copyWith(groups: groups);
+  }
+
   Future<bool> deleteEntry(String id) async {
     // Stash for undo before deleting
     final entryResult = await _repository.getById(id);
     _lastDeleted = entryResult.successOrNull;
 
+    // 幂等：UI 已先 removeLocal，这里再移一次无害
+    removeLocal(id);
+
     final result = await _repository.softDelete(id);
     if (result.isSuccess) {
+      // 不立刻 refresh，避免与 Dismissible 动画抢树；由页面 listen 在后续帧刷新
       ref.invalidateData.bumpEntryMutated();
       return true;
     }
+    await loadInitial();
     return false;
   }
 
@@ -181,3 +222,15 @@ class FlowListController extends Notifier<FlowListState> {
 
 final flowListControllerProvider =
     NotifierProvider<FlowListController, FlowListState>(FlowListController.new);
+
+/// 报表下钻用：流水列表的分类过滤（null = 不过滤）。
+class FlowCategoryFilter extends Notifier<String?> {
+  @override
+  String? build() => null;
+  void set(String? id) => state = id;
+  /// 恢复完整流水（用户点「显示全部」）。
+  void clear() => state = null;
+}
+
+final flowCategoryFilterProvider =
+    NotifierProvider<FlowCategoryFilter, String?>(FlowCategoryFilter.new);

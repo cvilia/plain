@@ -9,11 +9,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:plain/app/bootstrap.dart';
 import 'package:plain/app/theme/design_tokens.dart';
+import 'package:plain/core/constants/app_constants.dart';
 import 'package:plain/core/format/amount_formatter.dart';
 import 'package:plain/core/refresh/data_invalidation.dart';
 import 'package:plain/domain/entities/category.dart' as domain;
 import 'package:plain/domain/entities/enums.dart';
 import 'package:plain/domain/entities/ledger_entry.dart';
+import 'package:plain/domain/usecases/split_usecases.dart';
 
 
 class _DetailData {
@@ -72,6 +74,17 @@ class _EntryDetailPageState extends ConsumerState<EntryDetailPage> {
       appBar: AppBar(
         title: const Text('详情'),
         actions: [
+          if (entry.splitRole == SplitRole.normal &&
+              (isExpense || isIncome))
+            TextButton(
+              onPressed: () => _showSplitSheet(context, entry),
+              child: const Text('拆分'),
+            ),
+          if (entry.isSplitParent)
+            TextButton(
+              onPressed: () => _mergeSplit(context, entry),
+              child: const Text('合并'),
+            ),
           TextButton(onPressed: () => _edit(context), child: const Text('编辑')),
           IconButton(icon: const Icon(Icons.delete_outline), onPressed: () => _confirmDelete(context)),
         ],
@@ -97,6 +110,12 @@ class _EntryDetailPageState extends ConsumerState<EntryDetailPage> {
           if (entry.note != null && entry.note!.isNotEmpty)
             _DetailRow(icon: Icons.edit_note_outlined, label: '备注', value: entry.note!),
           _DetailRow(icon: Icons.source_outlined, label: '来源', value: _sourceLabel(entry.source)),
+          if (entry.splitRole != SplitRole.normal)
+            _DetailRow(
+              icon: Icons.call_split,
+              label: '分割',
+              value: entry.isSplitParent ? '父笔（不进分类统计）' : '子笔',
+            ),
           _DetailRow(icon: Icons.access_time_outlined, label: '创建时间', value: formatDateTime(entry.createdAt)),
           _DetailRow(icon: Icons.update_outlined, label: '更新时间', value: formatDateTime(entry.updatedAt)),
         ],
@@ -106,6 +125,127 @@ class _EntryDetailPageState extends ConsumerState<EntryDetailPage> {
 
   void _edit(BuildContext context) {
     context.push('/entry/edit/${widget.entryId}');
+  }
+
+  Future<void> _showSplitSheet(BuildContext context, LedgerEntry entry) async {
+    final rows = List.generate(SplitRules.minChildren, (_) {
+      return (amountCtrl: TextEditingController(), catCtrl: TextEditingController());
+    });
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheet) => Padding(
+          padding: EdgeInsets.only(
+            left: Spacing.lg,
+            right: Spacing.lg,
+            top: Spacing.lg,
+            bottom: MediaQuery.of(ctx).viewInsets.bottom + Spacing.lg,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                '拆分 ${formatAmount(entry.amount.cents)}（合计需对平）',
+                style: Theme.of(ctx).textTheme.titleMedium,
+              ),
+              const SizedBox(height: Spacing.md),
+              for (var i = 0; i < rows.length; i++) ...[
+                Row(children: [
+                  Expanded(
+                    child: TextField(
+                      controller: rows[i].amountCtrl,
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      decoration: InputDecoration(
+                        labelText: '子笔 ${i + 1} 金额',
+                        border: const OutlineInputBorder(),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: Spacing.sm),
+                  Expanded(
+                    child: TextField(
+                      controller: rows[i].catCtrl,
+                      decoration: const InputDecoration(
+                        labelText: '分类 ID',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                  ),
+                ]),
+                const SizedBox(height: Spacing.sm),
+              ],
+              Row(children: [
+                TextButton.icon(
+                  onPressed: rows.length >= SplitRules.maxChildren
+                      ? null
+                      : () => setSheet(() => rows.add((
+                            amountCtrl: TextEditingController(),
+                            catCtrl: TextEditingController(),
+                          ))),
+                  icon: const Icon(Icons.add, size: 18),
+                  label: const Text('加子笔'),
+                ),
+                const Spacer(),
+                FilledButton(
+                  onPressed: () async {
+                    final items = <SplitItem>[];
+                    for (final r in rows) {
+                      final a = r.amountCtrl.text.trim();
+                      if (a.isEmpty) continue;
+                      final cents = (double.tryParse(a) ?? 0) * 100;
+                      items.add(SplitItem(
+                        amountCents: cents.round(),
+                        categoryId: r.catCtrl.text.trim().isEmpty
+                            ? null
+                            : r.catCtrl.text.trim(),
+                      ));
+                    }
+                    if (items.length < SplitRules.minChildren) return;
+                    final deps = ref.read(appDependenciesProvider);
+                    final result = await SplitEntryUseCase(
+                      repository: deps.ledgerRepository,
+                      clock: deps.clock,
+                      idGen: deps.idGen,
+                    )(parent: entry, items: items);
+                    if (ctx.mounted) Navigator.pop(ctx);
+                    if (!mounted) return;
+                    result.when(
+                      success: (_) {
+                        ref.invalidateData.bumpEntryMutated();
+                        showAppToast(context, '已拆分');
+                        setState(() {});
+                      },
+                      failure: (f) => showAppToast(context, '拆分失败: ${f.code}'),
+                    );
+                  },
+                  child: const Text('保存拆分'),
+                ),
+              ]),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _mergeSplit(BuildContext context, LedgerEntry parent) async {
+    final deps = ref.read(appDependenciesProvider);
+    final result = await MergeSplitUseCase(
+      repository: deps.ledgerRepository,
+      clock: deps.clock,
+    )(parent: parent);
+    if (!mounted) return;
+    result.when(
+      success: (_) {
+        ref.invalidateData.bumpEntryMutated();
+        showAppToast(context, '已合并回父笔，请补充分类');
+        setState(() {});
+      },
+      failure: (f) => showAppToast(context, '合并失败: ${f.code}'),
+    );
   }
 
   void _confirmDelete(BuildContext context) {

@@ -3,6 +3,9 @@ library;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:plain/app/bootstrap.dart';
+import 'package:plain/app/settings/display_prefs.dart';
+import 'package:plain/app/settings/ledger_settings.dart';
+import 'package:plain/core/format/amount_formatter.dart';
 import 'package:plain/core/money/expression_evaluator.dart';
 import 'package:plain/core/money/money.dart';
 import 'package:plain/core/refresh/data_invalidation.dart';
@@ -13,6 +16,7 @@ import 'package:plain/domain/entities/ledger_entry.dart';
 import 'package:plain/domain/services/category_suggester.dart';
 import 'package:plain/domain/usecases/entry_usecases.dart';
 import 'package:plain/features/ledger/controllers/draft_store.dart';
+import 'package:plain/features/ledger/controllers/flow_list_controller.dart';
 import 'package:plain/features/ledger/controllers/recent_categories.dart';
 
 class EntryInputState {
@@ -97,7 +101,7 @@ class EntryInputController extends Notifier<EntryInputState> {
   EntryInputState build() {
     // Don't access ref in build() - use post-frame for draft restore
     Future.microtask(_restoreDraftIfAny);
-    return EntryInputState(occurredAt: DateTime.now().toUtc());
+    return EntryInputState(occurredAt: _clock.now());
   }
 
   void _restoreDraftIfAny() {
@@ -121,9 +125,28 @@ class EntryInputController extends Notifier<EntryInputState> {
   }
 
   CreateEntryUseCase get _createEntry => ref.read(appDependenciesProvider).createEntry;
+  UpdateEntryUseCase get _updateEntry => ref.read(appDependenciesProvider).updateEntry;
+  DeleteEntryUseCase get _deleteEntry => ref.read(appDependenciesProvider).deleteEntry;
   Clock get _clock => ref.read(appDependenciesProvider).clock;
   String get _bookId => ref.read(appDependenciesProvider).bookId;
   String get _deviceId => ref.read(appDependenciesProvider).deviceId;
+
+  /// 未选账户时自动落到第一个可用账户（通常是种子的「现金」）。
+  Future<String?> _resolveAccountId(String? selected) async {
+    if (selected != null) return selected;
+    final res = await ref.read(appDependenciesProvider).accountRepository.listAll();
+    final list = res.successOrNull;
+    return (list != null && list.isNotEmpty) ? list.first.id : null;
+  }
+
+  /// 编辑态时持有原实体，供 update 使用。
+  LedgerEntry? _editingEntry;
+
+  /// 最近一次新建成功的账单 id，供保存 toast「撤销」使用。
+  String? lastSavedEntryId;
+
+  /// STORY-5.1「保存后停留」设置。
+  bool get stayAfterSave => ref.read(displayPrefsProvider).stayAfterSave;
 
   void onDigit(String d) {
     final expr = state.amountExpression;
@@ -247,10 +270,23 @@ class EntryInputController extends Notifier<EntryInputState> {
     }
   }
 
-  void onDateSelected(DateTime date) => state = state.copyWith(occurredAt: date);
+  /// 日期变更：若跨出当前记账月，给出「该账单计入 X 月」提示（G-1 / AC11）。
+  void onDateSelected(DateTime date) {
+    state = state.copyWith(occurredAt: date);
+    final calendar = ref.read(calendarProvider);
+    final today = _clock.now();
+    final cur = calendar.periodFor(today.year, today.month);
+    final target = calendar.periodFor(date.year, date.month, day: date.day);
+    if (target.label != cur.label) {
+      state = state.copyWith(
+        toastMessage: '该账单计入 ${target.month} 月',
+      );
+    }
+  }
 
   void loadForEdit({required LedgerEntry entry}) {
     final expr = entry.amount.toYuanString();
+    _editingEntry = entry;
     state = EntryInputState(
       amountExpression: expr,
       displayAmount: expr,
@@ -281,7 +317,13 @@ class EntryInputController extends Notifier<EntryInputState> {
   Future<bool> _save() async {
     if (state.isSubmitting) return false;
     final eval = _evaluator.eval(state.amountExpression);
-    if (eval.money.isZero) {
+    if (eval.error != null) {
+      // AC8：除零等非法表达式不得入账
+      state = state.copyWith(errorMessage: 'expression_invalid', clearToast: true);
+      return false;
+    }
+    // 新建态：0 元拦截；编辑态：允许存 0（AC9，轻提示）
+    if (eval.money.isZero && !state.isEditing) {
       state = state.copyWith(errorMessage: 'amount_zero', clearToast: true);
       return false;
     }
@@ -289,17 +331,55 @@ class EntryInputController extends Notifier<EntryInputState> {
       state = state.copyWith(errorMessage: 'amount_over_limit', clearToast: true);
       return false;
     }
-    if (state.selectedCategoryId == null) {
+    // 转账不选分类（G-2 / AC12）；其余类型必须选分类
+    final isTransfer = state.type == EntryType.transfer;
+    if (!isTransfer && state.selectedCategoryId == null) {
       state = state.copyWith(errorMessage: 'category_required', clearToast: true);
+      return false;
+    }
+    if (isTransfer && (state.selectedAccountId == null || state.toAccountId == null)) {
+      state = state.copyWith(errorMessage: 'transfer_accounts_required', clearToast: true);
       return false;
     }
     state = state.copyWith(isSubmitting: true, clearError: true);
 
+    if (state.isEditing && _editingEntry != null) {
+      final result = await _updateEntry(
+        existing: _editingEntry!,
+        amount: eval.money,
+        categoryId: state.selectedCategoryId,
+        clearCategoryId: state.selectedCategoryId == null,
+        accountId: await _resolveAccountId(state.selectedAccountId),
+        toAccountId: state.toAccountId,
+        note: state.note,
+        occurredAt: state.occurredAt,
+        type: state.type,
+      );
+      return result.when(
+        success: (entry) {
+          _editingEntry = entry;
+          state = state.copyWith(
+            toastMessage: '已保存',
+            isSubmitting: false,
+            clearError: true,
+          );
+          draftStore.clear();
+          _updateWidgetSnapshot();
+          _notifyEntryChanged();
+          return true;
+        },
+        failure: (f) {
+          state = state.copyWith(isSubmitting: false, errorMessage: f.code, clearToast: true);
+          return false;
+        },
+      );
+    }
+
     final result = await _createEntry(CreateEntryInput(
       amountExpression: state.amountExpression,
       type: state.type,
-      categoryId: state.selectedCategoryId!,
-      accountId: state.selectedAccountId,
+      categoryId: state.selectedCategoryId ?? '',
+      accountId: await _resolveAccountId(state.selectedAccountId),
       toAccountId: state.toAccountId,
       note: state.note,
       occurredAt: state.occurredAt,
@@ -313,6 +393,7 @@ class EntryInputController extends Notifier<EntryInputState> {
         final toast = eval.wasIncomplete
             ? '已记 ¥$amt（前缀）'
             : '已记 ¥$amt';
+        lastSavedEntryId = entry.id;
         state = state.copyWith(
           amountExpression: '',
           displayAmount: '',
@@ -323,7 +404,7 @@ class EntryInputController extends Notifier<EntryInputState> {
         );
         draftStore.clear(); // Clear draft after successful save
         _updateWidgetSnapshot();
-        ref.invalidateData.bumpEntryMutated();
+        _notifyEntryChanged();
         ref.read(recentCategoriesProvider.notifier).use(
           state.type.wire, state.selectedCategoryId ?? '',
         );
@@ -334,6 +415,30 @@ class EntryInputController extends Notifier<EntryInputState> {
         return false;
       },
     );
+  }
+
+  /// 保存 toast「撤销」：软删除刚新建的那一笔（5 秒窗口）。
+  Future<bool> undoLastSaved() async {
+    final id = lastSavedEntryId;
+    if (id == null) return false;
+    lastSavedEntryId = null;
+    final r = await _deleteEntry(id);
+    if (r.isSuccess) {
+      _notifyEntryChanged();
+    }
+    return r.isSuccess;
+  }
+
+  /// 写库后统一通知：bump + 首页流水立即重载。
+  void _notifyEntryChanged() {
+    ref.invalidateData.bumpEntryMutated();
+    Future.microtask(() {
+      try {
+        ref.read(flowListControllerProvider.notifier).refresh();
+      } catch (_) {
+        // 首页尚未构建时忽略
+      }
+    });
   }
 
   void clearToast() => state = state.copyWith(clearToast: true);
@@ -349,7 +454,7 @@ class EntryInputController extends Notifier<EntryInputState> {
       toAccountId: draft.toAccountId,
       note: draft.note,
       type: draft.type,
-      occurredAt: state.occurredAt ?? DateTime.now().toUtc(),
+      occurredAt: state.occurredAt ?? _clock.now(),
     );
     _refreshDisplay();
   }
@@ -392,7 +497,7 @@ class EntryInputController extends Notifier<EntryInputState> {
       toAccountId: state.toAccountId,
       note: state.note,
       type: state.type,
-      savedAt: DateTime.now().toUtc(),
+      savedAt: _clock.now(),
     ));
   }
 
@@ -435,10 +540,23 @@ class EntryInputController extends Notifier<EntryInputState> {
   void _updateWidgetSnapshot() {
     Future.microtask(() async {
       try {
+        final deps = ref.read(appDependenciesProvider);
+        final calendar = ref.read(calendarProvider);
+        final monthStartDay = ref.read(monthStartDayProvider);
+        final now = _clock.now();
+        final period = calendar.periodFor(now.year, now.month, day: monthStartDay);
+        final summary = await deps.ledgerRepository.monthSummary(
+          bookId: _bookId,
+          dayFrom: period.dayFrom,
+          dayTo: period.dayTo,
+        );
+        final s = summary.successOrNull;
+        // G-7：隐藏余额时小组件一并遮蔽，不吐真实金额
+        final hide = ref.read(hideAmountsProvider);
         final snapshot = SnapshotBuilder.build(
-          monthExpenseCents: 0,
-          monthIncomeCents: 0,
-          entryCount: 1,
+          monthExpenseCents: hide ? 0 : (s?.expenseCents ?? 0),
+          monthIncomeCents: hide ? 0 : (s?.incomeCents ?? 0),
+          entryCount: hide ? 0 : (s?.txCount ?? 0),
         );
         await PlatformBridge.updateWidgetSnapshot(snapshot);
         await PlatformBridge.reloadWidgetTimelines();

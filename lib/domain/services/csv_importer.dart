@@ -211,15 +211,23 @@ int? parseAmountCents(String raw) {
   return negative ? -total : total;
 }
 
-/// Build the dedup fingerprint: date + amount + label.
-/// [label] must match what is stored in the note field after import.
+/// 构建去重指纹：日期 + 金额 + 标签 + 币种（+ 可选来源）。
+/// 默认不含来源 → 跨来源交叉去重（STORY-9.1 AC6）。
+/// [includeSource] 为 true 时指纹附加来源，仅同来源内去重。
 String buildFingerprint({
   required DateTime date,
   required int amountCents,
   String? label,
+  String currency = 'CNY',
+  String? source,
+  bool includeSource = false,
 }) {
   final dayKey = Clock.dayKeyOf(date);
-  return '$dayKey|${amountCents.abs()}|${label ?? ''}';
+  final base = '$dayKey|${amountCents.abs()}|${label ?? ''}|$currency';
+  if (includeSource && source != null && source.isNotEmpty) {
+    return '$base|$source';
+  }
+  return base;
 }
 
 /// Compose the note/label from merchant + note, matching what stored entries carry.
@@ -347,5 +355,35 @@ LedgerEntry parsedToLedgerEntry(
     note: note, source: EntrySource.import,
     createdAt: now, updatedAt: now,
     revision: 1, deviceId: deviceId, baseRevision: 0,
+  );
+}
+
+/// STORY-9.1：常见账单来源的 CSV 列映射预设。
+class ImportSourcePresets {
+  ImportSourcePresets._();
+
+  /// 支付宝（典型导出列：交易时间 / 交易分类 / 交易对方 / 商品说明 / 金额）
+  static const CsvColumnMapping alipay = CsvColumnMapping(
+    dateCol: 0,
+    amountCol: 4,
+    noteCol: 3,
+    merchantCol: 2,
+    typeCol: 1,
+  );
+
+  /// 微信支付（典型：交易时间 / 交易类型 / 交易对方 / 商品 / 收/支 / 金额）
+  static const CsvColumnMapping wechat = CsvColumnMapping(
+    dateCol: 0,
+    amountCol: 5,
+    typeCol: 4,
+    merchantCol: 2,
+    noteCol: 3,
+    incomeMarkers: ['收入', '+', '存入'],
+  );
+
+  /// 通用：日期、金额
+  static const CsvColumnMapping generic = CsvColumnMapping(
+    dateCol: 0,
+    amountCol: 1,
   );
 }

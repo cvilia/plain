@@ -4,6 +4,7 @@ library;
 import 'package:plain/app/theme/app_colors.dart';
 import 'package:flutter/material.dart';
 import 'package:plain/app/theme/design_tokens.dart';
+import 'package:plain/design_system/brand_mark.dart';
 
 class OnboardingPage extends StatefulWidget {
   const OnboardingPage({super.key, this.onDone});
@@ -52,9 +53,10 @@ class _OnboardingPageState extends State<OnboardingPage> {
                 onPageChanged: (i) => setState(() => _currentPage = i),
                 children: [
                   _ObStep(
+                    brandMark: true,
                     logo: '记',
                     title: '3 秒，记一笔',
-                    subtitle: '点分类即保存，比传统记账少一步\n支持四则运算 · 离线全功能',
+                    subtitle: '选好分类点 OK 即可，键盘极简\n数字/小数点/OK · 离线全功能',
                     onPrimary: '开始使用',
                     onNext: _next,
                   ),
@@ -112,6 +114,7 @@ class _ObStep extends StatelessWidget {
     required this.onNext,
     this.subtitle,
     this.promises,
+    this.brandMark = false,
   });
 
   final String logo;
@@ -121,6 +124,9 @@ class _ObStep extends StatelessWidget {
   final String onPrimary;
   final VoidCallback onNext;
 
+  /// 首屏用手绘品牌标（透明底、跟主题色）。
+  final bool brandMark;
+
   @override
   Widget build(BuildContext context) {
     return Padding(
@@ -128,8 +134,11 @@ class _ObStep extends StatelessWidget {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          // Same mark as Settings footer — theme-colored icon, no background.
-          Icon(Icons.savings_outlined, size: 80, color: context.colors.primary),
+          // 手绘小猪品牌标：颜色随主题，背景透明
+          if (brandMark)
+            const BrandMark(size: 120, showLabel: true)
+          else
+            Icon(Icons.savings_outlined, size: 80, color: context.colors.primary),
           const SizedBox(height: Spacing.xxl),
           Text(
             title,

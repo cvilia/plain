@@ -11,9 +11,11 @@ import 'package:plain/design_system/app_toast.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:plain/app/breakpoints.dart';
+import 'package:plain/app/bootstrap.dart';
 import 'package:plain/app/theme/design_tokens.dart';
 import 'package:plain/app/theme/tokens.dart';
 import 'package:plain/core/format/amount_formatter.dart';
+import 'package:plain/core/refresh/data_invalidation.dart';
 import 'package:plain/domain/entities/category.dart' as domain;
 import 'package:plain/domain/entities/enums.dart';
 import 'package:plain/domain/entities/ledger_entry.dart';
@@ -26,13 +28,50 @@ class FlowListPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(flowListControllerProvider);
     final controller = ref.read(flowListControllerProvider.notifier);
+    final filterCatId = ref.watch(flowCategoryFilterProvider);
+
+    // 写→bump→读：页面级 listen 确保返回本页时列表已重载
+    // （Notifier 内 listen 依赖 notifier 存活，页面监听更稳）。
+    ref.listen(ledgerVersionProvider, (prev, next) {
+      if (prev == next) return;
+      controller.refresh();
+    });
 
     return Scaffold(
-      body: state.groups.isEmpty && !state.isLoading
-          ? ContentWidthConstraint(child: _EmptyState(onEntryTap: () => _openEntry(context)))
-          : ContentWidthConstraint(
-              child: _FlowList(state: state, controller: controller),
+      body: SafeArea(
+        child: Column(
+          children: [
+            if (filterCatId != null)
+              Material(
+                color: context.colors.surfaceMuted,
+                child: ListTile(
+                  dense: true,
+                  leading: const Icon(Icons.filter_alt_outlined, size: 18),
+                  title: Text(
+                    '已筛选：${state.categoryMap[filterCatId]?.name ?? '该分类'}',
+                    style: const TextStyle(fontSize: 13),
+                  ),
+                  trailing: TextButton(
+                    onPressed: () {
+                      ref.read(flowCategoryFilterProvider.notifier).clear();
+                      controller.refresh();
+                    },
+                    child: const Text('显示全部'),
+                  ),
+                ),
+              ),
+            Expanded(
+              child: state.groups.isEmpty && !state.isLoading
+                  ? ContentWidthConstraint(
+                      child: _EmptyState(onEntryTap: () => _openEntry(context)),
+                    )
+                  : ContentWidthConstraint(
+                      child: _FlowList(state: state, controller: controller),
+                    ),
             ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -65,21 +104,58 @@ class _FlowList extends StatelessWidget {
   Widget build(BuildContext context) {
     final groups = state.groups;
     // Keep the balance card clear of the status bar / notch.
-    final topPad = MediaQuery.paddingOf(context).top + Spacing.sm;
+    // 顶部安全区由外层 SafeArea 统一处理，这里只留间距
+    const topPad = Spacing.sm;
+
+    // 拍平成单一列表：日标题 + 账单各自为 ListView 顶层子项。
+    // 嵌套 Column 里的 Dismissible 在删一条后会失效（手势丢失）。
+    final rows = <_FlowRow>[
+      const _FlowRow.balance(),
+      for (final g in groups) ...[
+        _FlowRow.dayHeader(g),
+        for (final e in g.entries) _FlowRow.entry(e),
+      ],
+      if (state.hasMore) const _FlowRow.more(),
+    ];
+
     return ListView.builder(
       padding: EdgeInsets.fromLTRB(Spacing.lg, topPad, Spacing.lg, 96),
-      itemCount: 1 + groups.length + (state.hasMore ? 1 : 0),
+      itemCount: rows.length,
       itemBuilder: (context, index) {
-        if (index == 0) return _BalanceCard(state: state);
-        final gi = index - 1;
-        if (gi == groups.length) {
-          WidgetsBinding.instance.addPostFrameCallback((_) => controller.loadMore());
-          return const Center(child: Padding(padding: EdgeInsets.all(Spacing.lg), child: CircularProgressIndicator()));
+        final row = rows[index];
+        switch (row.kind) {
+          case _FlowRowKind.balance:
+            return _BalanceCard(state: state);
+          case _FlowRowKind.dayHeader:
+            return _DayHeader(group: row.group!, key: ValueKey('day-${row.group!.dayKey}'));
+          case _FlowRowKind.entry:
+            final e = row.entry!;
+            return _EntryTile(
+              key: ValueKey('e-${e.id}'),
+              entry: e,
+              category: state.categoryMap[e.categoryId],
+              controller: controller,
+            );
+          case _FlowRowKind.more:
+            WidgetsBinding.instance.addPostFrameCallback((_) => controller.loadMore());
+            return const Center(child: Padding(padding: EdgeInsets.all(Spacing.lg), child: CircularProgressIndicator()));
         }
-        return _DayGroupWidget(group: groups[gi], controller: controller, categoryMap: state.categoryMap);
       },
     );
   }
+}
+
+enum _FlowRowKind { balance, dayHeader, entry, more }
+
+class _FlowRow {
+  const _FlowRow.balance() : kind = _FlowRowKind.balance, group = null, entry = null;
+  const _FlowRow.dayHeader(DayGroup this.group) : kind = _FlowRowKind.dayHeader, entry = null;
+  const _FlowRow.entry(LedgerEntry this.entry) : kind = _FlowRowKind.entry, group = null;
+  const _FlowRow.more() : kind = _FlowRowKind.more, group = null, entry = null;
+
+  final _FlowRowKind kind;
+  final DayGroup? group;
+  final LedgerEntry? entry;
 }
 
 /// 结余卡：hero 渐变 + 漂浮光斑（高保真记忆点）。
@@ -97,7 +173,7 @@ class _BalanceCard extends ConsumerWidget {
       expense += g.dayExpense;
     }
     final balance = income - expense;
-    final now = DateTime.now();
+    final now = ref.read(appDependenciesProvider).clock.now().toLocal();
     final monthLabel = '${now.year}年${now.month}月';
 
     return Padding(
@@ -201,38 +277,31 @@ class _BalanceStat extends StatelessWidget {
   }
 }
 
-class _DayGroupWidget extends ConsumerWidget {
-  const _DayGroupWidget({required this.group, required this.controller, required this.categoryMap});
+class _DayHeader extends ConsumerWidget {
+  const _DayHeader({super.key, required this.group});
   final DayGroup group;
-  final FlowListController controller;
-  final Map<String, domain.Category> categoryMap;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final hideAmounts = ref.watch(hideAmountsProvider);
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Padding(
-        padding: const EdgeInsets.fromLTRB(Spacing.lg, Spacing.lg, Spacing.lg, Spacing.sm),
-        child: Row(children: [
-          Text(_dayLabel(group.dayKey), style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600, color: context.colors.ink)),
-          const Spacer(),
-          if (group.dayExpense > 0)
-            Text('-${formatAmount(group.dayExpense, hide: hideAmounts)}', style: TextStyle(fontSize: 12, color: context.colors.expense)),
-          if (group.dayIncome > 0) ...[
-            const SizedBox(width: Spacing.sm),
-            Text('+${formatAmount(group.dayIncome, hide: hideAmounts)}', style: TextStyle(fontSize: 12, color: context.colors.income)),
-          ],
-        ]),
-      ),
-      ...group.entries.map((e) => _EntryTile(entry: e, category: categoryMap[e.categoryId], controller: controller)),
-    ]);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(Spacing.lg, Spacing.lg, Spacing.lg, Spacing.sm),
+      child: Row(children: [
+        Text(dayLabel(group.dayKey), style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600, color: context.colors.ink)),
+        const Spacer(),
+        if (group.dayExpense > 0)
+          Text('-${formatAmount(group.dayExpense, hide: hideAmounts)}', style: TextStyle(fontSize: 12, color: context.colors.expense)),
+        if (group.dayIncome > 0) ...[
+          const SizedBox(width: Spacing.sm),
+          Text('+${formatAmount(group.dayIncome, hide: hideAmounts)}', style: TextStyle(fontSize: 12, color: context.colors.income)),
+        ],
+      ]),
+    );
   }
-
-  String _dayLabel(String dayKey) => dayLabel(dayKey);
 }
 
 class _EntryTile extends ConsumerStatefulWidget {
-  const _EntryTile({required this.entry, required this.category, required this.controller});
+  const _EntryTile({super.key, required this.entry, required this.category, required this.controller});
   final LedgerEntry entry;
   final domain.Category? category;
   final FlowListController controller;
@@ -251,9 +320,16 @@ class _EntryTileState extends ConsumerState<_EntryTile> {
     final controller = widget.controller;
     final isExpense = entry.type == EntryType.expense;
     final isIncome = entry.type == EntryType.income;
+    final isTransfer = entry.type == EntryType.transfer;
     final amountColor = isExpense ? context.colors.expense : isIncome ? context.colors.income : context.colors.transfer;
     final prefix = isExpense ? '-' : isIncome ? '+' : '';
-    final amountText = '$prefix${formatAmount(entry.amount.cents, hide: ref.watch(hideAmountsProvider))}';
+    final amountText = isTransfer
+        ? formatAmount(entry.amount.cents, hide: ref.watch(hideAmountsProvider))
+        : '$prefix${formatAmount(entry.amount.cents, hide: ref.watch(hideAmountsProvider))}';
+    // STORY-1.7 AC4：转账双行（去向 / 来源）
+    final subtitle = isTransfer
+        ? '转账 · ${entry.accountId ?? ''} → ${entry.toAccountId ?? ''}'
+        : _subtitleOf(entry);
 
     return Dismissible(
       key: Key(entry.id),
@@ -264,30 +340,42 @@ class _EntryTileState extends ConsumerState<_EntryTile> {
         color: context.colors.expense.withValues(alpha: 0.15),
         child: Icon(Icons.delete_outline, color: context.colors.expense),
       ),
-      confirmDismiss: (direction) async {
-        // Prevent multiple calls during dismiss animation
+      // confirmDismiss 只做防重入；真正移除必须在 onDismissed 同步完成
+      // （Flutter 要求 dismissed 后控件立刻离开树，否则触发断言）。
+      confirmDismiss: (_) async {
         if (_dismissing) return false;
         _dismissing = true;
-
-        final ok = await controller.deleteEntry(entry.id);
-        if (!ok) return ok;
-        // Guard State.context across the async gap before using it.
-        if (!context.mounted) return ok;
-        showAppToastWithAction(
-          context,
-          '已删除',
-          actionLabel: '撤销',
-          onAction: () => controller.undoDelete(),
-          
-        );
-        return ok;
+        return true;
+      },
+      onDismissed: (_) {
+        // ① 同步移除本地条目（不可 await）
+        controller.removeLocal(entry.id);
+        // ② 异步删库 + toast
+        controller.deleteEntry(entry.id).then((ok) {
+          if (!context.mounted) return;
+          if (ok) {
+            showAppToastWithAction(
+              context,
+              '已删除',
+              actionLabel: '撤销',
+              onAction: () => controller.undoDelete(),
+            );
+          } else {
+            showAppToast(context, '删除失败');
+          }
+        });
       },
       child: ListTile(
         contentPadding: const EdgeInsets.symmetric(horizontal: Spacing.lg, vertical: Spacing.xs),
-        leading: CategoryAvatar(iconRef: category?.iconRef ?? 'other', color: amountColor),
-        title: Text(category?.name ?? '未分类', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500)),
+        leading: CategoryAvatar(iconRef: category?.iconRef ?? 'other', iconAsset: category?.iconAsset, color: amountColor),
+        title: Text(
+          '${category?.name ?? '未分类'}${entry.isSplitParent ? ' · 拆分' : entry.isSplitChild ? ' · 子笔' : ''}',
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500),
+        ),
         subtitle: Text(
-          _subtitleOf(entry),
+          subtitle,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
           style: TextStyle(fontSize: 12, color: context.colors.inkTertiary),

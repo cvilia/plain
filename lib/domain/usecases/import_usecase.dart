@@ -4,19 +4,23 @@ library;
 import 'package:plain/core/id/uuid_v7.dart';
 import 'package:plain/core/result/result.dart';
 import 'package:plain/core/time/clock.dart';
+import 'package:plain/domain/entities/automation_rule.dart';
 import 'package:plain/domain/repositories/repositories.dart';
 import 'package:plain/domain/services/csv_importer.dart';
+import 'package:plain/domain/services/rule_applier.dart';
 
 class ImportCsvUseCase {
   ImportCsvUseCase({
     required LedgerRepository repository,
     required Clock clock,
     required UuidV7 idGen,
+    this.ruleRepository,
   })  : _repository = repository, _clock = clock, _idGen = idGen;
 
   final LedgerRepository _repository;
   final Clock _clock;
   final UuidV7 _idGen;
+  final AutomationRuleRepository? ruleRepository;
 
   /// Import CSV text with the given column mapping.
   /// [resolveCategoryId] maps a category name to an existing category id (or null).
@@ -61,7 +65,7 @@ class ImportCsvUseCase {
       final categoryId = p.categoryName != null
           ? (resolveCategoryId?.call(p.categoryName!))
           : null;
-      final entry = parsedToLedgerEntry(
+      var entry = parsedToLedgerEntry(
         p,
         id: _idGen.generate(at: p.occurredAt),
         bookId: bookId,
@@ -70,6 +74,13 @@ class ImportCsvUseCase {
         accountId: defaultAccountId,
         now: now,
       );
+      if (ruleRepository != null) {
+        entry = await applyAutomationRules(
+          ruleRepository: ruleRepository!,
+          entry: entry,
+          scope: RuleScope.import,
+        );
+      }
       final result = await _repository.create(entry);
       if (result.isSuccess) {
         importedIds.add(entry.id);

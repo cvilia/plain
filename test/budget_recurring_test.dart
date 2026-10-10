@@ -290,5 +290,21 @@ void main() {
       final cols = db.raw.select('PRAGMA table_info(transactions)');
       expect(cols.any((r) => r['name'] == 'batch_id'), true);
     });
+
+    test('v4 adds split_role / parent_id / is_rigid with safe defaults', () {
+      final tx = db.raw.select('PRAGMA table_info(transactions)');
+      expect(tx.any((r) => r['name'] == 'split_role'), true);
+      expect(tx.any((r) => r['name'] == 'parent_id'), true);
+      final cat = db.raw.select('PRAGMA table_info(categories)');
+      expect(cat.any((r) => r['name'] == 'is_rigid'), true);
+      final ver = db.raw.select('PRAGMA user_version').first.values.first;
+      expect(ver, 11);
+    });
+
+    test('v4 index idx_entry_parent exists', () {
+      final idx = db.raw.select(
+        "SELECT name FROM sqlite_master WHERE type='index' AND name='idx_entry_parent'");
+      expect(idx.length, 1);
+    });
   });
 }

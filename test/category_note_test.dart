@@ -11,13 +11,13 @@ import 'package:plain/domain/entities/enums.dart';
 import 'package:plain/app/theme/theme_registry.dart';
 
 void main() {
-  test('A1 fresh install has categories.note and user_version 3', () {
+  test('A1 fresh install has categories.note and user_version 11', () {
     final db = AppDatabase.inMemory();
     addTearDown(db.close);
     final cols = db.raw.select('PRAGMA table_info(categories)');
     expect(cols.any((r) => r['name'] == 'note'), isTrue);
     final ver = db.raw.select('PRAGMA user_version').first.values.first;
-    expect(ver, 3);
+    expect(ver, 11);
   });
 
   test('A2 migrate adds note idempotently', () {
@@ -92,6 +92,6 @@ void main() {
     // Stable iconRef keys survive user renames (P0-9).
     expect(categoryColorMap.containsKey('fruit'), isTrue);
     expect(categoryColorMap.containsKey('蔬果'), isFalse);
-    expect(categoryColorMap['fruit'], 0xFF97BC81);
+    expect(categoryColorMap['fruit'], 0xFF4ADE80);
   });
 }

@@ -2,20 +2,29 @@
 library;
 
 import 'package:plain/app/theme/app_colors.dart';
+import 'package:plain/design_system/app_toast.dart';
+import 'package:plain/design_system/brand_mark.dart';
+import 'package:plain/design_system/confirm_dialog.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:plain/app/breakpoints.dart';
 import 'package:plain/app/theme/design_tokens.dart';
+import 'package:plain/app/settings/display_prefs.dart';
+import 'package:plain/app/settings/ledger_settings.dart';
 import 'package:plain/app/theme/theme_prefs.dart';
 import 'package:plain/core/format/amount_formatter.dart';
 import 'package:plain/features/security/app_lock_prefs.dart';
 import 'package:plain/features/security/app_lock_screen.dart';
 import 'package:plain/features/settings/action_log_page.dart';
+import 'package:plain/features/settings/automation_rules_page.dart';
 import 'package:plain/features/settings/backup_page.dart';
 import 'package:plain/features/settings/budget_page.dart';
 import 'package:plain/features/settings/category_manage_page.dart';
 import 'package:plain/features/settings/import_page.dart';
+import 'package:plain/features/settings/privacy_policy_page.dart';
 import 'package:plain/features/settings/recurring_page.dart';
+import 'package:plain/features/settings/reminders_page.dart';
+import 'package:plain/features/settings/savings_goals_page.dart';
 import 'package:plain/features/settings/sync_page.dart';
 import 'package:plain/features/settings/theme_page.dart';
 import 'package:plain/features/settings/trash_page.dart';
@@ -35,6 +44,8 @@ class SettingsPage extends ConsumerWidget {
     final hideAmounts = ref.watch(hideAmountsProvider);
     final appLockEnabled = ref.watch(appLockEnabledProvider);
     final prefs = ref.watch(themePrefsProvider);
+    final monthStartDay = ref.watch(monthStartDayProvider);
+    final display = ref.watch(displayPrefsProvider);
 
     return Scaffold(
       appBar: AppBar(title: const Text('设置')),
@@ -72,8 +83,8 @@ class SettingsPage extends ConsumerWidget {
                 const Divider(height: 1),
                 ListTile(
                   leading: const Icon(Icons.backup_outlined),
-                  title: const Text('备份'),
-                  subtitle: const Text('导出数据到文件'),
+                  title: const Text('备份与恢复'),
+                  subtitle: const Text('导出加密备份 / 从备份恢复'),
                   trailing: const Icon(Icons.chevron_right),
                   onTap: () => _openDetail(context, const BackupPage()),
                 ),
@@ -87,11 +98,27 @@ class SettingsPage extends ConsumerWidget {
                 ),
                 const Divider(height: 1),
                 ListTile(
-                  leading: const Icon(Icons.restore_outlined),
-                  title: const Text('恢复'),
-                  subtitle: const Text('从文件导入数据'),
+                  leading: const Icon(Icons.savings_outlined),
+                  title: const Text('储蓄目标'),
+                  subtitle: const Text('沉淀基金与专项预留'),
                   trailing: const Icon(Icons.chevron_right),
-                  onTap: () {},
+                  onTap: () => _openDetail(context, const SavingsGoalsPage()),
+                ),
+                const Divider(height: 1),
+                ListTile(
+                  leading: const Icon(Icons.notifications_outlined),
+                  title: const Text('提醒'),
+                  subtitle: const Text('预算、周期等待办提醒'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => _openDetail(context, const RemindersPage()),
+                ),
+                const Divider(height: 1),
+                ListTile(
+                  leading: const Icon(Icons.auto_fix_high_outlined),
+                  title: const Text('自动化规则'),
+                  subtitle: const Text('按规则自动分类等'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => _openDetail(context, const AutomationRulesPage()),
                 ),
                 const Divider(height: 1),
                 ListTile(
@@ -122,26 +149,49 @@ class SettingsPage extends ConsumerWidget {
             _SectionHeader(title: '安全'),
             Card(
               margin: const EdgeInsets.symmetric(horizontal: Spacing.lg),
-              child: SwitchListTile(
-                secondary: const Icon(Icons.lock_outline),
-                title: const Text('应用锁'),
-                subtitle: const Text('需要生物识别或 PIN 码'),
-                value: appLockEnabled,
-                onChanged: (v) async {
-                  if (v) {
-                    // Must set PIN first — never lock without credentials.
-                    final ok = await showAppLockSetupDialog(context);
-                    if (!ok || !context.mounted) return;
-                    ref.read(appLockEnabledProvider.notifier).set(true);
-                    ref.read(appLockControllerProvider.notifier).lock();
-                  } else {
-                    await AppLockPrefs.disable();
-                    if (!context.mounted) return;
-                    ref.read(appLockEnabledProvider.notifier).set(false);
-                    ref.read(appLockControllerProvider.notifier).unlock();
-                  }
-                },
-              ),
+              child: Column(children: [
+                SwitchListTile(
+                  secondary: const Icon(Icons.lock_outline),
+                  title: const Text('应用锁'),
+                  subtitle: const Text('需要生物识别或 PIN 码'),
+                  value: appLockEnabled,
+                  onChanged: (v) async {
+                    if (v) {
+                      // Must set PIN first — never lock without credentials.
+                      final ok = await showAppLockSetupDialog(context);
+                      if (!ok || !context.mounted) return;
+                      ref.read(appLockEnabledProvider.notifier).set(true);
+                      ref.read(appLockControllerProvider.notifier).lock();
+                    } else {
+                      await AppLockPrefs.disable();
+                      if (!context.mounted) return;
+                      ref.read(appLockEnabledProvider.notifier).set(false);
+                      ref.read(appLockControllerProvider.notifier).unlock();
+                    }
+                  },
+                ),
+                if (appLockEnabled)
+                  ListTile(
+                    leading: const Icon(Icons.lock_reset),
+                    title: const Text('重置应用锁'),
+                    subtitle: const Text('清除 PIN 与生物识别；记账数据不受影响'),
+                    onTap: () async {
+                      final ok = await showConfirmDialog(
+                        context,
+                        title: '重置应用锁',
+                        message: '将清除 PIN 与生物识别绑定，记账数据保持加密、不会被删除。',
+                        confirmLabel: '重置',
+                        destructive: true,
+                      );
+                      if (ok != true || !context.mounted) return;
+                      await AppLockPrefs.disable();
+                      if (!context.mounted) return;
+                      ref.read(appLockEnabledProvider.notifier).set(false);
+                      ref.read(appLockControllerProvider.notifier).unlock();
+                      showAppToast(context, '应用锁已重置');
+                    },
+                  ),
+              ]),
             ),
             const SizedBox(height: Spacing.lg),
 
@@ -152,20 +202,52 @@ class SettingsPage extends ConsumerWidget {
                 ListTile(
                   leading: const Icon(Icons.calendar_month_outlined),
                   title: const Text('月起始日'),
-                  subtitle: const Text('每月从第几天开始计算'),
+                  subtitle: Text(monthStartDay == 1 ? '自然月（每月 1 日起）' : '每月从 $monthStartDay 日开始计算'),
                   trailing: DropdownButton<int>(
-                    value: 1,
+                    value: monthStartDay,
                     underline: const SizedBox.shrink(),
-                    items: const [
-                      DropdownMenuItem(value: 1, child: Text('1日')),
-                      DropdownMenuItem(value: 5, child: Text('5日')),
-                      DropdownMenuItem(value: 10, child: Text('10日')),
-                      DropdownMenuItem(value: 15, child: Text('15日')),
-                      DropdownMenuItem(value: 20, child: Text('20日')),
-                      DropdownMenuItem(value: 25, child: Text('25日')),
+                    items: [
+                      for (var d = 1; d <= 28; d++)
+                        DropdownMenuItem(value: d, child: Text('$d 日')),
                     ],
-                    onChanged: (v) {},
+                    onChanged: (v) {
+                      if (v == null) return;
+                      ref.read(ledgerSettingsProvider.notifier).setMonthStartDay(v);
+                    },
                   ),
+                ),
+                const Divider(height: 1),
+                ListTile(
+                  leading: const Icon(Icons.format_size),
+                  title: const Text('字体大小'),
+                  trailing: DropdownButton<int>(
+                    value: display.fontScaleIndex,
+                    underline: const SizedBox.shrink(),
+                    items: [
+                      for (var i = 0; i < kFontScaleLabels.length; i++)
+                        DropdownMenuItem(value: i, child: Text(kFontScaleLabels[i])),
+                    ],
+                    onChanged: (v) {
+                      if (v == null) return;
+                      ref.read(displayPrefsProvider.notifier).setFontScaleIndex(v);
+                    },
+                  ),
+                ),
+                const Divider(height: 1),
+                SwitchListTile(
+                  secondary: const Icon(Icons.volume_up_outlined),
+                  title: const Text('记账确认音效'),
+                  subtitle: const Text('保存时播放提示音'),
+                  value: display.soundEnabled,
+                  onChanged: (v) => ref.read(displayPrefsProvider.notifier).setSoundEnabled(v),
+                ),
+                const Divider(height: 1),
+                SwitchListTile(
+                  secondary: const Icon(Icons.pause_circle_outline),
+                  title: const Text('保存后停留'),
+                  subtitle: const Text('关闭后保存即退出输入页'),
+                  value: display.stayAfterSave,
+                  onChanged: (v) => ref.read(displayPrefsProvider.notifier).setStayAfterSave(v),
                 ),
                 const Divider(height: 1),
                 ListTile(
@@ -194,14 +276,14 @@ class SettingsPage extends ConsumerWidget {
                 ListTile(
                   leading: Icon(Icons.info_outline),
                   title: Text('版本'),
-                  trailing: Text('1.0.0', style: TextStyle(color: context.colors.inkTertiary)),
+                  trailing: Text('1.0.2', style: TextStyle(color: context.colors.inkTertiary)),
                 ),
                 const Divider(height: 1),
                 ListTile(
                   leading: const Icon(Icons.description_outlined),
                   title: const Text('隐私政策'),
                   trailing: const Icon(Icons.chevron_right),
-                  onTap: () {},
+                  onTap: () => _openDetail(context, const PrivacyPolicyPage()),
                 ),
                 const Divider(height: 1),
                 ListTile(
@@ -216,15 +298,8 @@ class SettingsPage extends ConsumerWidget {
 
             Center(
               child: Column(children: [
-                Container(
-                  width: 64,
-                  height: 64,
-                  decoration: BoxDecoration(
-                    color: context.colors.primary.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(Radii.lg),
-                  ),
-                  child: Icon(Icons.savings_outlined, size: 32, color: context.colors.primary),
-                ),
+                // 与启动/引导页同一品牌标（savings_outlined 小猪）
+                const BrandMark(size: 64, showLabel: false),
                 const SizedBox(height: Spacing.md),
                 Text('素记', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: context.colors.ink)),
                 const SizedBox(height: Spacing.xs),

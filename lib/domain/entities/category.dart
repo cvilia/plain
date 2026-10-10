@@ -58,11 +58,12 @@ class Category {
   Category copyWith({
     String? name, String? iconRef, String? iconAsset, int? sortOrder,
     bool? isHidden, DateTime? updatedAt, DateTime? deletedAt,
-    int? revision, int? baseRevision,
+    int? revision, int? baseRevision, bool clearIconAsset = false,
   }) {
     return Category(
       id: id, parentId: parentId, name: name ?? this.name, kind: kind,
-      iconRef: iconRef ?? this.iconRef, iconAsset: iconAsset ?? this.iconAsset,
+      iconRef: iconRef ?? this.iconRef,
+      iconAsset: clearIconAsset ? null : (iconAsset ?? this.iconAsset),
       note: note,
       sortOrder: sortOrder ?? this.sortOrder, isHidden: isHidden ?? this.isHidden,
       isPreset: isPreset, createdAt: createdAt, updatedAt: updatedAt ?? this.updatedAt,
@@ -82,6 +83,10 @@ class Account {
     required this.id, required this.name, required this.type,
     required this.currency, required this.openingBalance, this.note,
     required this.sortOrder, this.isHidden = false,
+    this.creditLimitCents = 0,
+    this.creditDebtCents = 0,
+    this.billDay,
+    this.dueDay,
     required this.createdAt, required this.updatedAt,
     this.deletedAt, this.revision = 1,
     required this.deviceId, this.baseRevision = 0,
@@ -95,6 +100,13 @@ class Account {
   final String? note;
   final int sortOrder;
   final bool isHidden;
+
+  /// STORY-2.2 信用卡：总额度 / 欠款余额（存储值）/ 账单日 / 还款日。
+  final int creditLimitCents;
+  final int creditDebtCents;
+  final int? billDay;
+  final int? dueDay;
+
   final DateTime createdAt;
   final DateTime updatedAt;
   final DateTime? deletedAt;
@@ -103,16 +115,32 @@ class Account {
   final int baseRevision;
 
   bool get isDeleted => deletedAt != null;
+  bool get isCredit => type == AccountType.credit;
+
+  /// 可用额度 = 总额度 − 欠款（派生，只读）。
+  int get creditAvailableCents {
+    final a = creditLimitCents - creditDebtCents;
+    return a > 0 ? a : 0;
+  }
+
+  /// 是否刷爆（AC6 橙标）。
+  bool get isOverLimit => isCredit && creditDebtCents > creditLimitCents;
 
   Account copyWith({
     String? name, int? openingBalance, String? note, int? sortOrder,
-    bool? isHidden, DateTime? updatedAt, DateTime? deletedAt,
+    bool? isHidden, int? creditLimitCents, int? creditDebtCents,
+    int? billDay, int? dueDay,
+    DateTime? updatedAt, DateTime? deletedAt,
     int? revision, int? baseRevision,
   }) {
     return Account(
       id: id, name: name ?? this.name, type: type, currency: currency,
       openingBalance: openingBalance ?? this.openingBalance, note: note ?? this.note,
       sortOrder: sortOrder ?? this.sortOrder, isHidden: isHidden ?? this.isHidden,
+      creditLimitCents: creditLimitCents ?? this.creditLimitCents,
+      creditDebtCents: creditDebtCents ?? this.creditDebtCents,
+      billDay: billDay ?? this.billDay,
+      dueDay: dueDay ?? this.dueDay,
       createdAt: createdAt, updatedAt: updatedAt ?? this.updatedAt,
       deletedAt: deletedAt ?? this.deletedAt, revision: revision ?? this.revision,
       deviceId: deviceId, baseRevision: baseRevision ?? this.baseRevision,

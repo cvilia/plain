@@ -11,6 +11,7 @@ import 'package:plain/app/theme/design_tokens.dart';
 import 'package:plain/core/format/amount_formatter.dart';
 import 'package:plain/core/money/money.dart';
 import 'package:plain/core/refresh/data_invalidation.dart';
+import 'package:plain/data/platform/notification_bridge.dart';
 import 'package:plain/domain/entities/enums.dart';
 import 'package:plain/domain/entities/recurring_rule.dart';
 import 'package:plain/domain/usecases/recurring_usecases.dart';
@@ -33,13 +34,57 @@ class RecurringPage extends ConsumerStatefulWidget {
 class _RecurringPageState extends ConsumerState<RecurringPage> {
 
   Future<void> _runDueNow() async {
+    await NotificationBridge.requestPermission();
     final deps = ref.read(appDependenciesProvider);
     final res = await deps.generateDueRecurring();
     if (!mounted) return;
-    final count = res.successOrNull?.created.length ?? 0;
-    showAppToast(context, count == 0 ? '当前没有到期的周期记账' : '已生成 $count 笔账单');
+    final data = res.successOrNull;
+    final count = data?.created.length ?? 0;
+    final pending = data?.needConfirm.length ?? 0;
+    if (count == 0 && pending == 0) {
+      if (!mounted) return;
+      showAppToast(context, '当前没有到期的周期记账');
+    } else {
+      if (count > 0) {
+        await NotificationBridge.show(
+          id: 9001,
+          title: '周期记账已入账',
+          body: '已自动生成 $count 笔账单',
+        );
+      }
+      if (pending > 0) {
+        await NotificationBridge.show(
+          id: 9002,
+          title: '周期记账待确认',
+          body: '有 $pending 笔到期账单需要你确认入账',
+        );
+      }
+      if (!mounted) return;
+      showAppToast(
+        context,
+        [
+          if (count > 0) '已生成 $count 笔',
+          if (pending > 0) '$pending 笔待确认',
+        ].join('，'),
+      );
+    }
     ref.invalidateData.bumpEntryMutated();
     ref.invalidateData.bumpRecurringMutated();
+    ref.invalidate(_rulesProvider);
+  }
+
+  Future<void> _confirmRule(RecurringRule rule, {bool skip = false}) async {
+    final deps = ref.read(appDependenciesProvider);
+    final res = await deps.confirmRecurringRule(rule, skip: skip);
+    if (!mounted) return;
+    if (res.isSuccess) {
+      ref.invalidateData.bumpEntryMutated();
+      ref.invalidateData.bumpRecurringMutated();
+      ref.invalidate(_rulesProvider);
+      showAppToast(context, skip ? '已跳过本期' : '已确认入账');
+    } else {
+      showAppToast(context, '操作失败: ${res.failureOrNull?.code ?? 'unknown'}');
+    }
   }
 
   Future<void> _undoLastBatch(RecurringRule rule) async {
@@ -88,27 +133,91 @@ class _RecurringPageState extends ConsumerState<RecurringPage> {
         child: async.when(
           loading: () => const Center(child: CircularProgressIndicator()),
           error: (e, _) => Center(child: Text('加载失败: $e')),
-          data: (rules) => rules.isEmpty
-                ? Center(
-                    child: Padding(
-                      padding: const EdgeInsets.all(Spacing.xl),
-                      child: Text(
-                        '还没有周期记账。\n房租、订阅、工资都可以自动入账。',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(color: context.colors.inkTertiary, fontSize: AdaptiveFontSizes.body),
-                      ),
-                    ),
-                  )
-                : ListView.builder(
-                    padding: const EdgeInsets.fromLTRB(Spacing.lg, Spacing.md, Spacing.lg, 100),
-                    itemCount: rules.length,
-                    itemBuilder: (context, i) => _RuleTile(
-                      rule: rules[i], hide: hide,
-                      onUndo: rules[i].lastBatchId == null
-                          ? null
-                          : () => _undoLastBatch(rules[i]),
+          data: (rules) {
+            if (rules.isEmpty) {
+              return Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(Spacing.xl),
+                  child: Text(
+                    '还没有周期记账。\n房租、订阅、工资都可以自动入账。',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: context.colors.inkTertiary,
+                      fontSize: AdaptiveFontSizes.body,
                     ),
                   ),
+                ),
+              );
+            }
+            final pending = rules
+                .where((r) => !r.autoConfirm && !r.isFinished && !r.nextRunAt.isAfter(ref.read(appDependenciesProvider).clock.now()))
+                .toList();
+            return ListView.builder(
+              padding: const EdgeInsets.fromLTRB(Spacing.lg, Spacing.md, Spacing.lg, 100),
+              itemCount: pending.length + rules.length,
+              itemBuilder: (context, i) {
+                if (i < pending.length) {
+                  return _PendingConfirmTile(
+                    rule: pending[i],
+                    hide: hide,
+                    onConfirm: () => _confirmRule(pending[i]),
+                    onSkip: () => _confirmRule(pending[i], skip: true),
+                  );
+                }
+                final rule = rules[i - pending.length];
+                return _RuleTile(
+                  rule: rule,
+                  hide: hide,
+                  onUndo: rule.lastBatchId == null ? null : () => _undoLastBatch(rule),
+                );
+              },
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+class _PendingConfirmTile extends StatelessWidget {
+  const _PendingConfirmTile({
+    required this.rule,
+    required this.hide,
+    required this.onConfirm,
+    required this.onSkip,
+  });
+
+  final RecurringRule rule;
+  final bool hide;
+  final VoidCallback onConfirm;
+  final VoidCallback onSkip;
+
+  @override
+  Widget build(BuildContext context) {
+    final title = rule.name?.isNotEmpty == true ? rule.name! : '周期记账';
+    return Card(
+      margin: const EdgeInsets.only(bottom: Spacing.sm),
+      color: context.colors.primary.withValues(alpha: 0.06),
+      child: Padding(
+        padding: const EdgeInsets.all(Spacing.md),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(title, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+            const SizedBox(height: 4),
+            Text(
+              '${formatAmountYuan(rule.amount.cents, hide: hide)} · 待确认入账',
+              style: TextStyle(fontSize: 13, color: context.colors.inkSecondary),
+            ),
+            const SizedBox(height: Spacing.sm),
+            Row(
+              children: [
+                FilledButton(onPressed: onConfirm, child: const Text('确认入账')),
+                const SizedBox(width: Spacing.sm),
+                TextButton(onPressed: onSkip, child: const Text('跳过本期')),
+              ],
+            ),
+          ],
         ),
       ),
     );

@@ -63,7 +63,17 @@ class _CategoryPickerPageState extends ConsumerState<CategoryPickerPage> {
         data: (categories) {
           var filtered = categories.where((c) => c.kind == widget.kind).toList();
           if (_searchQuery.isNotEmpty) {
-            filtered = filtered.where((c) => c.name.contains(_searchQuery)).toList();
+            final q = _searchQuery.toLowerCase();
+            // Match first- and second-level titles; when a root hits, keep its
+            // children so they can be shown expanded under it.
+            filtered = filtered.where((c) {
+              if (c.name.toLowerCase().contains(q)) return true;
+              if (c.parentId != null) {
+                final parent = categories.where((p) => p.id == c.parentId).firstOrNull;
+                return parent != null && parent.name.toLowerCase().contains(q);
+              }
+              return false;
+            }).toList();
           }
 
           if (filtered.isEmpty) {
@@ -86,6 +96,7 @@ class _CategoryPickerPageState extends ConsumerState<CategoryPickerPage> {
                 return _ExpandableCategoryGroup(
                   root: root,
                   children: rootChildren,
+                  searching: _searchQuery.isNotEmpty,
                   onSelected: (cat) => Navigator.pop(context, cat.id),
                 );
               }),
@@ -230,11 +241,15 @@ class _ExpandableCategoryGroup extends StatefulWidget {
     required this.root,
     required this.children,
     required this.onSelected,
+    this.searching = false,
   });
 
   final domain.Category root;
   final List<domain.Category> children;
   final void Function(domain.Category) onSelected;
+
+  /// When true, children stay open so search hits are visible.
+  final bool searching;
 
   @override
   State<_ExpandableCategoryGroup> createState() => _ExpandableCategoryGroupState();
@@ -246,6 +261,7 @@ class _ExpandableCategoryGroupState extends State<_ExpandableCategoryGroup> {
   @override
   Widget build(BuildContext context) {
     final hasChildren = widget.children.isNotEmpty;
+    final expanded = _expanded || widget.searching;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -255,7 +271,7 @@ class _ExpandableCategoryGroupState extends State<_ExpandableCategoryGroup> {
               ? GestureDetector(
                   onTap: () => setState(() => _expanded = !_expanded),
                   child: AnimatedRotation(
-                    turns: _expanded ? 0.25 : 0,
+                    turns: expanded ? 0.25 : 0,
                     duration: const Duration(milliseconds: 200),
                     child: Icon(Icons.chevron_right, size: 20, color: context.colors.inkTertiary),
                   ),
@@ -281,7 +297,7 @@ class _ExpandableCategoryGroupState extends State<_ExpandableCategoryGroup> {
                   .toList(),
             ),
           ),
-          crossFadeState: _expanded ? CrossFadeState.showSecond : CrossFadeState.showFirst,
+          crossFadeState: expanded ? CrossFadeState.showSecond : CrossFadeState.showFirst,
           duration: const Duration(milliseconds: 200),
         ),
         const SizedBox(height: Spacing.xs),
@@ -303,7 +319,7 @@ class _CategoryTile extends StatelessWidget {
 
     return ListTile(
       contentPadding: const EdgeInsets.symmetric(horizontal: Spacing.sm),
-      leading: CategoryAvatar(iconRef: category.iconRef, color: color, size: 18),
+      leading: CategoryAvatar(iconRef: category.iconRef, iconAsset: category.iconAsset, color: color, size: 18),
       title: Text(
         category.name,
         style: TextStyle(

@@ -37,7 +37,7 @@ class LedgerRepositoryImpl implements LedgerRepository {
       });
       _log?.entrySaved(entryType: entry.type.wire, source: entry.source.wire);
       return ok(entry);
-    } on Exception catch (e) {
+    } on Object catch (e) {
       return err(StorageFailure('db.insert_failed', e.toString(), isRetryable: true));
     }
   }
@@ -58,7 +58,7 @@ class LedgerRepositoryImpl implements LedgerRepository {
         );
       });
       return ok(entry);
-    } on Exception catch (e) {
+    } on Object catch (e) {
       return err(StorageFailure('db.update_failed', e.toString(), isRetryable: true));
     }
   }
@@ -80,7 +80,7 @@ class LedgerRepositoryImpl implements LedgerRepository {
         );
       });
       return ok(null);
-    } on Exception catch (e) {
+    } on Object catch (e) {
       return err(StorageFailure('db.delete_failed', e.toString(), isRetryable: true));
     }
   }
@@ -123,7 +123,7 @@ class LedgerRepositoryImpl implements LedgerRepository {
           ? EntryCursor(occurredAtMs: items.last.occurredAt.millisecondsSinceEpoch, id: items.last.id)
           : null;
       return ok(EntryPage(items: items, nextCursor: nextCursor, hasMore: hasMore));
-    } on Exception catch (e) {
+    } on Object catch (e) {
       return err(StorageFailure('db.query_failed', e.toString(), isRetryable: true));
     }
   }
@@ -145,7 +145,7 @@ class LedgerRepositoryImpl implements LedgerRepository {
         byCat[r['category_id']! as String] = CategoryAgg(expenseCents: exp, incomeCents: inc, txCount: cnt);
       }
       return ok(MonthSummary(expenseCents: expense, incomeCents: income, txCount: count, byCategory: byCat));
-    } on Exception catch (e) {
+    } on Object catch (e) {
       return err(StorageFailure('db.query_failed', e.toString(), isRetryable: true));
     }
   }
@@ -160,7 +160,7 @@ class LedgerRepositoryImpl implements LedgerRepository {
       final rows = _db.raw.select(
         'SELECT * FROM transactions WHERE $where ORDER BY deleted_at DESC, id DESC LIMIT ?', args);
       return ok(rows.map(_fromRow).toList());
-    } on Exception catch (e) {
+    } on Object catch (e) {
       return err(StorageFailure('db.query_failed', e.toString(), isRetryable: true));
     }
   }
@@ -186,7 +186,7 @@ class LedgerRepositoryImpl implements LedgerRepository {
         );
       });
       return ok(restored);
-    } on Exception catch (e) {
+    } on Object catch (e) {
       return err(StorageFailure('db.restore_failed', e.toString(), isRetryable: true));
     }
   }
@@ -223,7 +223,7 @@ class LedgerRepositoryImpl implements LedgerRepository {
         );
       });
       return ok(null);
-    } on Exception catch (e) {
+    } on Object catch (e) {
       return err(StorageFailure('db.hard_delete_failed', e.toString(), isRetryable: true));
     }
   }
@@ -270,7 +270,7 @@ class LedgerRepositoryImpl implements LedgerRepository {
         }
       });
       return ok(count);
-    } on Exception catch (e) {
+    } on Object catch (e) {
       return err(StorageFailure('db.purge_failed', e.toString(), isRetryable: true));
     }
   }
@@ -291,21 +291,94 @@ class LedgerRepositoryImpl implements LedgerRepository {
         result.add('$dayKey|$cents|${note ?? ''}');
       }
       return ok(result);
-    } on Exception catch (e) {
+    } on Object catch (e) {
       return err(StorageFailure('db.query_failed', e.toString(), isRetryable: true));
+    }
+  }
+
+  @override
+  Future<Result<bool>> verifyDailyStats() async {
+    try {
+      final tx = _db.raw.select(
+        'SELECT COUNT(*) AS c FROM transactions '
+        "WHERE deleted_at IS NULL AND type IN ('expense','income') AND source <> 'reconcile'",
+      );
+      final stats = _db.raw.select(
+        'SELECT COALESCE(SUM(tx_count),0) AS c FROM daily_stats',
+      );
+      final a = (tx.first['c'] as int?) ?? 0;
+      final b = (stats.first['c'] as int?) ?? 0;
+      return ok(a == b);
+    } on Object catch (e) {
+      return err(StorageFailure('db.query_failed', e.toString(), isRetryable: true));
+    }
+  }
+
+  @override
+  Future<Result<void>> rebuildDailyStats() async {
+    try {
+      _db.transaction(() {
+        _db.raw.execute('DELETE FROM daily_stats');
+        final rows = _db.raw.select(
+          'SELECT id, book_id, type, amount_cents, category_id, account_id, occurred_at, source '
+          "FROM transactions WHERE deleted_at IS NULL AND type IN ('expense','income') "
+          "AND source <> 'reconcile'",
+        );
+        for (final r in rows) {
+          final entry = LedgerEntry(
+            id: r['id']! as String,
+            bookId: r['book_id']! as String,
+            type: EntryType.fromWire(r['type'] as String?),
+            amount: Money(r['amount_cents']! as int),
+            currency: 'CNY',
+            categoryId: r['category_id'] as String?,
+            accountId: r['account_id'] as String?,
+            toAccountId: null,
+            occurredAt: r.dateTime('occurred_at'),
+            note: null,
+            source: EntrySource.fromWire(r['source'] as String?),
+            batchId: null,
+            createdAt: r.dateTime('occurred_at'),
+            updatedAt: r.dateTime('occurred_at'),
+            deletedAt: null,
+            revision: 1,
+            deviceId: 'rebuild',
+            baseRevision: 0,
+          );
+          _upsertDailyStats(entry, isIncrement: true);
+        }
+        // 08-§8：重建完成后写入校验位，供下次冷启动巡检
+        final nowMs = _clock.now().millisecondsSinceEpoch;
+        final countRow = _db.raw.select(
+            'SELECT COALESCE(SUM(tx_count),0) AS c FROM daily_stats');
+        final checksum = (countRow.first['c'] as int?) ?? 0;
+        _db.raw.execute(
+          'INSERT INTO app_meta (key,value,updated_at) VALUES (?,?,?) '
+          'ON CONFLICT(key) DO UPDATE SET value=?,updated_at=?',
+          ['stats.built_at', '$nowMs', nowMs, '$nowMs', nowMs],
+        );
+        _db.raw.execute(
+          'INSERT INTO app_meta (key,value,updated_at) VALUES (?,?,?) '
+          'ON CONFLICT(key) DO UPDATE SET value=?,updated_at=?',
+          ['stats.checksum', '$checksum', nowMs, '$checksum', nowMs],
+        );
+      });
+      return ok(null);
+    } on Object catch (e) {
+      return err(StorageFailure('db.rebuild_failed', e.toString(), isRetryable: true));
     }
   }
 
   void _insertEntry(LedgerEntry e) {
     _db.raw.execute(
-      'INSERT INTO transactions (id,book_id,type,amount_cents,currency,category_id,account_id,to_account_id,occurred_at,note,source,batch_id,created_at,updated_at,deleted_at,revision,device_id,base_revision) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
-      [e.id, e.bookId, e.type.wire, e.amount.cents, e.currency, e.categoryId, e.accountId, e.toAccountId, e.occurredAt.millisecondsSinceEpoch, e.note, e.source.wire, e.batchId, e.createdAt.millisecondsSinceEpoch, e.updatedAt.millisecondsSinceEpoch, e.deletedAt?.millisecondsSinceEpoch, e.revision, e.deviceId, e.baseRevision]);
+      'INSERT INTO transactions (id,book_id,type,amount_cents,currency,category_id,account_id,to_account_id,occurred_at,note,source,batch_id,split_role,parent_id,reimburse_status,reconciled_at,created_at,updated_at,deleted_at,revision,device_id,base_revision) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
+      [e.id, e.bookId, e.type.wire, e.amount.cents, e.currency, e.categoryId, e.accountId, e.toAccountId, e.occurredAt.millisecondsSinceEpoch, e.note, e.source.wire, e.batchId, e.splitRole.wire, e.parentId, e.reimburseStatus.wire, e.reconciledAt?.millisecondsSinceEpoch, e.createdAt.millisecondsSinceEpoch, e.updatedAt.millisecondsSinceEpoch, e.deletedAt?.millisecondsSinceEpoch, e.revision, e.deviceId, e.baseRevision]);
   }
 
   void _updateEntry(LedgerEntry e) {
     _db.raw.execute(
-      'UPDATE transactions SET type=?,amount_cents=?,category_id=?,account_id=?,to_account_id=?,occurred_at=?,note=?,updated_at=?,deleted_at=?,revision=?,base_revision=? WHERE id=?',
-      [e.type.wire, e.amount.cents, e.categoryId, e.accountId, e.toAccountId, e.occurredAt.millisecondsSinceEpoch, e.note, e.updatedAt.millisecondsSinceEpoch, e.deletedAt?.millisecondsSinceEpoch, e.revision, e.baseRevision, e.id]);
+      'UPDATE transactions SET type=?,amount_cents=?,category_id=?,account_id=?,to_account_id=?,occurred_at=?,note=?,split_role=?,parent_id=?,reimburse_status=?,reconciled_at=?,updated_at=?,deleted_at=?,revision=?,base_revision=? WHERE id=?',
+      [e.type.wire, e.amount.cents, e.categoryId, e.accountId, e.toAccountId, e.occurredAt.millisecondsSinceEpoch, e.note, e.splitRole.wire, e.parentId, e.reimburseStatus.wire, e.reconciledAt?.millisecondsSinceEpoch, e.updatedAt.millisecondsSinceEpoch, e.deletedAt?.millisecondsSinceEpoch, e.revision, e.baseRevision, e.id]);
   }
 
   LedgerEntry? _findById(String id) {
@@ -314,12 +387,14 @@ class LedgerRepositoryImpl implements LedgerRepository {
   }
 
   void _upsertDailyStats(LedgerEntry entry, {required bool isIncrement}) {
-    if (!entry.type.countsInOutflow) return;
+    // STORY-6.2：分类/预算统计只记「子笔 + 普通」；父笔不进 daily_stats（避免双算）。
+    // 收支合计由 Σ 子笔 = 父笔金额，与 PRD AC4 一致。
+    if (!entry.countsInCategoryStats) return;
     final dayKey = _clock.localDayKey(entry.occurredAt);
     final sign = isIncrement ? 1 : -1;
     final exp = entry.type == EntryType.expense ? entry.amount.cents * sign : 0;
     final inc = entry.type == EntryType.income ? entry.amount.cents * sign : 0;
-    final nowMs = DateTime.now().toUtc().millisecondsSinceEpoch;
+    final nowMs = _clock.now().millisecondsSinceEpoch;
     _db.raw.execute(
       'INSERT INTO daily_stats (book_id,day_key,category_id,account_id,expense_cents,income_cents,tx_count,updated_at) VALUES (?,?,?,?,?,?,?,?) '
       'ON CONFLICT(book_id,day_key,category_id,account_id) DO UPDATE SET expense_cents=expense_cents+?,income_cents=income_cents+?,tx_count=tx_count+?,updated_at=?',
@@ -344,6 +419,10 @@ class LedgerRepositoryImpl implements LedgerRepository {
     occurredAt: row.dateTime('occurred_at'),
     note: row['note'] as String?, source: EntrySource.fromWire(row['source'] as String?),
     batchId: row['batch_id'] as String?,
+    splitRole: SplitRole.fromWire(row['split_role'] as String?),
+    parentId: row['parent_id'] as String?,
+    reimburseStatus: ReimburseStatus.fromWire(row['reimburse_status'] as String?),
+    reconciledAt: row.nullableDateTime('reconciled_at'),
     createdAt: row.dateTime('created_at'),
     updatedAt: row.dateTime('updated_at'),
     deletedAt: row.nullableDateTime('deleted_at'),

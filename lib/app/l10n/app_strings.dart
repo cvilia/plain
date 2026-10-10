@@ -2,7 +2,7 @@
 ///
 /// V1.0 ships zh-CN only — `supportedLocales` is deliberately a single
 /// locale so the app never shows a half-translated UI. The `isZh ? :`
-/// branches remain for a future en-US pass (14-代码优化建议.md P1-5).
+/// branches remain for a future en-US pass.
 library;
 
 import 'package:flutter/foundation.dart';

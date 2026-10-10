@@ -114,10 +114,12 @@ class BudgetRepositoryImpl implements BudgetRepository {
     required int fromMs, required int toMs,
   }) async {
     try {
+      // STORY-6.2：预算只计「子笔 + 普通」，父笔不计（避免双算）。
+      const notParent = "AND split_role <> 'parent'";
       if (categoryId == null) {
         final rows = _db.raw.select(
           'SELECT COALESCE(SUM(amount_cents),0) AS s FROM transactions '
-          'WHERE book_id = ? AND type = ? AND deleted_at IS NULL AND occurred_at >= ? AND occurred_at < ?',
+          "WHERE book_id = ? AND type = ? AND source <> 'reconcile' AND deleted_at IS NULL $notParent AND occurred_at >= ? AND occurred_at < ?",
           [bookId, EntryType.expense.wire, fromMs, toMs]);
         return ok((rows.first['s'] as int?) ?? 0);
       }
@@ -130,7 +132,7 @@ class BudgetRepositoryImpl implements BudgetRepository {
       final placeholders = List.filled(ids.length, '?').join(',');
       final rows = _db.raw.select(
         'SELECT COALESCE(SUM(amount_cents),0) AS s FROM transactions '
-        "WHERE book_id = ? AND type = ? AND deleted_at IS NULL AND category_id IN ($placeholders) "
+        "WHERE book_id = ? AND type = ? AND source <> 'reconcile' AND deleted_at IS NULL $notParent AND category_id IN ($placeholders) "
         'AND occurred_at >= ? AND occurred_at < ?',
         [bookId, EntryType.expense.wire, ...ids, fromMs, toMs]);
       return ok((rows.first['s'] as int?) ?? 0);

@@ -17,7 +17,7 @@ const String kPrefThemeMode = 'pref.theme.mode';
 /// so Riverpod listeners rebuild and the previous state stays clean.
 class ThemePrefs {
   const ThemePrefs({
-    this.themeId = ThemeId.qingci,
+    this.themeId = ThemeId.subai,
     this.themeMode = ThemeMode.system,
   });
 

@@ -90,7 +90,7 @@ flutter build apk --flavor prod --release --split-per-abi --target-platform andr
 
 签名：`android/key.properties` + `android/app/upload-keystore.jks`（均已 gitignore）。**密钥与口令务必备份，丢失无法更新应用。**
 
-## 下一步（V1.1 余量）
+## 下一步（V2.0 余量）
 
 1. 回收站 UI（软删除已就绪）
 2. CSV / 竞品导入

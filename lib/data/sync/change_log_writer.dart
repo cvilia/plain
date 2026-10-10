@@ -3,12 +3,14 @@ library;
 
 import 'dart:convert';
 import 'package:crypto/crypto.dart';
+import 'package:plain/core/time/clock.dart';
 import 'package:plain/data/db/database.dart';
 import 'package:plain/domain/entities/enums.dart';
 
 class ChangeLogWriter {
-  ChangeLogWriter(this._db);
+  ChangeLogWriter(this._db, {Clock? clock}) : _clock = clock ?? SystemClock();
   final AppDatabase _db;
+  final Clock _clock;
 
   void write({
     required EntityType entityType, required String entityId, required ChangeOp op,
@@ -18,7 +20,7 @@ class ChangeLogWriter {
   }) {
     final payload = jsonEncode({'before': before, 'after': after});
     final hash = sha256.convert(utf8.encode(payload)).toString();
-    final at = changedAt ?? DateTime.now().toUtc();
+    final at = changedAt ?? _clock.now();
     _db.raw.execute(
       'INSERT INTO change_log (entity_type,entity_id,op,device_id,base_revision,payload,payload_hash,changed_at) VALUES (?,?,?,?,?,?,?,?)',
       [entityType.wire, entityId, op.wire, deviceId, baseRevision, payload, hash, at.millisecondsSinceEpoch],

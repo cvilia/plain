@@ -1,7 +1,7 @@
 name: plain
-description: "SuJi - local-first minimal bookkeeping"
+description: "素记 Plain - local-first minimal bookkeeping"
 publish_to: 'none'
-version: 1.0.1+2
+version: 1.0.2+3
 
 environment:
   sdk: ^3.13.4
@@ -42,11 +42,13 @@ dev_dependencies:
 flutter:
   uses-material-design: true
 
-# sqlite3 hook downloads prebuilt libsqlite3 from GitHub releases.
+# sqlite3 hook downloads prebuilt native lib from GitHub releases.
+# `source: sqlcipher` 选用 SQLCipher 构建（C6 全库加密，04-§10.1 方案 A），
+# 与 sqlite3 同 ABI，@Native 直接绑定，无需 open.overrideFor。
 # Direct GitHub is often unreachable here — route through a mirror.
 # $RELEASE_TAG / $FILENAME are substituted by package:sqlite3.
 hooks:
   user_defines:
     sqlite3:
-      source: sqlite3
+      source: sqlcipher
       url_pattern: "https://ghfast.top/https://github.com/simolus3/sqlite3.dart/releases/download/$RELEASE_TAG/$FILENAME"

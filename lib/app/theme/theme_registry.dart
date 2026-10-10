@@ -6,7 +6,7 @@ library;
 /// renamed). [name] is display-only. Old Chinese storage values are mapped
 /// via [_legacyNameToId] in [ThemeId.fromId].
 enum ThemeId {
-  qingci('qingci', '青瓷', '品牌默认 · 青绿 × 蜜桃'),
+  qingci('qingci', '青瓷', '清爽 · 青绿 × 蜜桃'),
   dianlan('dianlan', '靛蓝', '沉稳 · 深蓝 × 琥珀'),
   zhuqing('zhuqing', '竹青', '素雅 · 草绿 × 藤紫'),
   haiyan('haiyan', '海盐', '深邃 · 青蓝 × 珊瑚'),
@@ -37,7 +37,7 @@ enum ThemeId {
   };
 
   static ThemeId fromId(String? v) {
-    if (v == null || v.isEmpty) return ThemeId.qingci;
+    if (v == null || v.isEmpty) return ThemeId.subai;
     for (final t in values) {
       if (t.id == v || t.name == v) return t;
     }
@@ -47,7 +47,7 @@ enum ThemeId {
         if (t.id == migrated) return t;
       }
     }
-    return ThemeId.qingci;
+    return ThemeId.subai;
   }
 }
 
@@ -113,18 +113,18 @@ const double kASoftAlphaDark = 0.26;
 
 const Map<ToneId, TonePalette> _toneLight = {
   ToneId.cool: TonePalette(
-    bg: 0xFFE9EFEA, appBg: 0xFFF0F4F1, surface: 0xFFFFFFFF, surface2: 0xFFF5F8F5,
-    ink: 0xFF2E3B36, ink2: 0xFF52655E, muted: 0xFF606E69, faint: 0xFF8C9691,
+    bg: 0xFFF1F5F3, appBg: 0xFFF8FAF9, surface: 0xFFFFFFFF, surface2: 0xFFFAFCFB,
+    ink: 0xFF1F2D28, ink2: 0xFF3D524B, muted: 0xFF5A6B65, faint: 0xFF8A9691,
     line: 0xFFE2E8E3, lineSoft: 0xFFECF0EB,
   ),
   ToneId.warm: TonePalette(
-    bg: 0xFFEFEAE0, appBg: 0xFFF6F2E9, surface: 0xFFFFFDF8, surface2: 0xFFF7F3EA,
-    ink: 0xFF332F28, ink2: 0xFF5C554A, muted: 0xFF6E675C, faint: 0xFF989183,
+    bg: 0xFFF6F1E8, appBg: 0xFFFCF8F1, surface: 0xFFFFFEFB, surface2: 0xFFFAF6EF,
+    ink: 0xFF241F18, ink2: 0xFF4A4238, muted: 0xFF6A6257, faint: 0xFF968E80,
     line: 0xFFE6E0D3, lineSoft: 0xFFEFEADF,
   ),
   ToneId.neutral: TonePalette(
-    bg: 0xFFEDEDEB, appBg: 0xFFF4F4F2, surface: 0xFFFFFFFF, surface2: 0xFFF6F6F4,
-    ink: 0xFF2B2B2A, ink2: 0xFF565654, muted: 0xFF6A6A69, faint: 0xFF949491,
+    bg: 0xFFF3F3F1, appBg: 0xFFFAFAF8, surface: 0xFFFFFFFF, surface2: 0xFFFCFCFA,
+    ink: 0xFF1C1C1B, ink2: 0xFF454544, muted: 0xFF656563, faint: 0xFF92928F,
     line: 0xFFE3E3E0, lineSoft: 0xFFEDEDEA,
   ),
 };
@@ -154,139 +154,149 @@ TonePalette toneOf(ToneId tone, bool isDark) =>
 // Values copied field-for-field from 04-技术架构设计.md §16.1. No rounding, no tweaks.
 
 const Map<ThemeId, ThemeSpec> _specs = {
+  // 青瓷：清爽青绿 × 珊瑚（默认）
   ThemeId.qingci: ThemeSpec(
-    id: ThemeId.qingci, name: '青瓷', tag: '品牌默认 · 青绿 × 蜜桃', tone: ToneId.cool,
+    id: ThemeId.qingci, name: '青瓷', tag: '清爽 · 青绿 × 蜜桃', tone: ToneId.cool,
     light: BrandPalette(
-      p: 0xFF47B8A1, pd: 0xFF3A9784, a: 0xFFE77A4B, ad: 0xFFC2663F,
-      hero0: 0xFF28584B, hero1: 0xFF327B74,
-      heroDark0: 0xFF3A4B48, heroDark1: 0xFF4A6461, frame: 0xFF31403D,
+      p: 0xFF14B8A6, pd: 0xFF0D9488, a: 0xFFFF6B6B, ad: 0xFFF43F5E,
+      hero0: 0xFF0F766E, hero1: 0xFF2DD4BF,
+      heroDark0: 0xFF134E4A, heroDark1: 0xFF115E59, frame: 0xFF115E59,
     ),
     dark: BrandPalette(
-      p: 0xFF9FD0C6, pd: 0xFF79B9AC, a: 0xFFE2A78D, ad: 0xFFD38969,
-      hero0: 0xFF2E4C46, hero1: 0xFF3D6B62,
-      heroDark0: 0xFF263633, heroDark1: 0xFF314944, frame: 0xFF2B3B38,
+      p: 0xFF5EEAD4, pd: 0xFF2DD4BF, a: 0xFFFB7185, ad: 0xFFF43F5E,
+      hero0: 0xFF115E59, hero1: 0xFF14B8A6,
+      heroDark0: 0xFF042F2E, heroDark1: 0xFF115E59, frame: 0xFF115E59,
     ),
   ),
+  // 靛蓝：宝蓝 × 明黄
   ThemeId.dianlan: ThemeSpec(
     id: ThemeId.dianlan, name: '靛蓝', tag: '沉稳 · 深蓝 × 琥珀', tone: ToneId.cool,
     light: BrandPalette(
-      p: 0xFF437CC7, pd: 0xFF3766A3, a: 0xFFE2AC40, ad: 0xFFBE9036,
-      hero0: 0xFF3B6EA0, hero1: 0xFF4670C3,
-      heroDark0: 0xFF38414D, heroDark1: 0xFF475167, frame: 0xFF2F3741,
+      p: 0xFF3B82F6, pd: 0xFF2563EB, a: 0xFFF59E0B, ad: 0xFFD97706,
+      hero0: 0xFF1D4ED8, hero1: 0xFF60A5FA,
+      heroDark0: 0xFF1E3A5F, heroDark1: 0xFF1D4ED8, frame: 0xFF1E3A5F,
     ),
     dark: BrandPalette(
-      p: 0xFF9AB4D6, pd: 0xFF7194C1, a: 0xFFE1C58E, ad: 0xFFD2AF6A,
-      hero0: 0xFF2B3B4F, hero1: 0xFF385070,
-      heroDark0: 0xFF242D38, heroDark1: 0xFF2E3B4C, frame: 0xFF2A323C,
+      p: 0xFF93C5FD, pd: 0xFF60A5FA, a: 0xFFFBBF24, ad: 0xFFF59E0B,
+      hero0: 0xFF1E3A8A, hero1: 0xFF3B82F6,
+      heroDark0: 0xFF0B1B3A, heroDark1: 0xFF1E3A8A, frame: 0xFF1E3A8A,
     ),
   ),
+  // 竹青：草绿 × 藤紫
   ThemeId.zhuqing: ThemeSpec(
     id: ThemeId.zhuqing, name: '竹青', tag: '素雅 · 草绿 × 藤紫', tone: ToneId.cool,
     light: BrandPalette(
-      p: 0xFF71AA46, pd: 0xFF5D8B39, a: 0xFFAD7BC6, ad: 0xFF9167A6,
-      hero0: 0xFF425A2B, hero1: 0xFF4D7D36,
-      heroDark0: 0xFF414B3A, heroDark1: 0xFF53634A, frame: 0xFF373F31,
+      p: 0xFF4ADE80, pd: 0xFF22C55E, a: 0xFFA78BFA, ad: 0xFF8B5CF6,
+      hero0: 0xFF15803D, hero1: 0xFF86EFAC,
+      heroDark0: 0xFF14532D, heroDark1: 0xFF166534, frame: 0xFF14532D,
     ),
     dark: BrandPalette(
-      p: 0xFFB4CFA0, pd: 0xFF95B87A, a: 0xFFBFA1CE, ad: 0xFFA782BA,
-      hero0: 0xFF3B4B2F, hero1: 0xFF516A3E,
-      heroDark0: 0xFF2D3626, heroDark1: 0xFF3C4932, frame: 0xFF323A2C,
+      p: 0xFF86EFAC, pd: 0xFF4ADE80, a: 0xFFC4B5FD, ad: 0xFFA78BFA,
+      hero0: 0xFF166534, hero1: 0xFF22C55E,
+      heroDark0: 0xFF052E16, heroDark1: 0xFF166534, frame: 0xFF166534,
     ),
   ),
+  // 海盐：青蓝 × 珊瑚
   ThemeId.haiyan: ThemeSpec(
     id: ThemeId.haiyan, name: '海盐', tag: '深邃 · 青蓝 × 珊瑚', tone: ToneId.cool,
     light: BrandPalette(
-      p: 0xFF3DA3B8, pd: 0xFF328697, a: 0xFFE26C5A, ad: 0xFFBE5B4C,
-      hero0: 0xFF2C676D, hero1: 0xFF347993,
-      heroDark0: 0xFF38494C, heroDark1: 0xFF485E65, frame: 0xFF303E41,
+      p: 0xFF06B6D4, pd: 0xFF0891B2, a: 0xFFFB7185, ad: 0xFFE11D48,
+      hero0: 0xFF0E7490, hero1: 0xFF22D3EE,
+      heroDark0: 0xFF164E63, heroDark1: 0xFF155E75, frame: 0xFF164E63,
     ),
     dark: BrandPalette(
-      p: 0xFF9CCAD3, pd: 0xFF74B1BE, a: 0xFFDF9B91, ad: 0xFFCF7A6D,
-      hero0: 0xFF2C484E, hero1: 0xFF3A666E,
-      heroDark0: 0xFF253437, heroDark1: 0xFF2F464B, frame: 0xFF2A393C,
+      p: 0xFF67E8F9, pd: 0xFF22D3EE, a: 0xFFFDA4AF, ad: 0xFFFB7185,
+      hero0: 0xFF155E75, hero1: 0xFF06B6D4,
+      heroDark0: 0xFF083344, heroDark1: 0xFF155E75, frame: 0xFF155E75,
     ),
   ),
+  // 藕荷：柔紫 × 沙金
   ThemeId.ouhe: ThemeSpec(
     id: ThemeId.ouhe, name: '藕荷', tag: '柔美 · 藕紫 × 沙金', tone: ToneId.cool,
     light: BrandPalette(
-      p: 0xFFA175C7, pd: 0xFF8460A3, a: 0xFFE8A354, ad: 0xFFC38947,
-      hero0: 0xFF6B4795, hero1: 0xFF9254B5,
-      heroDark0: 0xFF433A4B, heroDark1: 0xFF5A4A63, frame: 0xFF39313F,
+      p: 0xFFA78BFA, pd: 0xFF8B5CF6, a: 0xFFFBBF24, ad: 0xFFF59E0B,
+      hero0: 0xFF6D28D9, hero1: 0xFFC4B5FD,
+      heroDark0: 0xFF4C1D95, heroDark1: 0xFF5B21B6, frame: 0xFF4C1D95,
     ),
     dark: BrandPalette(
-      p: 0xFFB9A0CF, pd: 0xFF9B7AB8, a: 0xFFE2BA8D, ad: 0xFFD3A269,
-      hero0: 0xFF3E2F4B, hero1: 0xFF563E6A,
-      heroDark0: 0xFF2E2636, heroDark1: 0xFF3E3249, frame: 0xFF332C3A,
+      p: 0xFFC4B5FD, pd: 0xFFA78BFA, a: 0xFFFDE68A, ad: 0xFFFBBF24,
+      hero0: 0xFF5B21B6, hero1: 0xFF8B5CF6,
+      heroDark0: 0xFF2E1065, heroDark1: 0xFF5B21B6, frame: 0xFF5B21B6,
     ),
   ),
+  // 桃夭：桃粉 × 青碧
   ThemeId.taoyao: ThemeSpec(
     id: ThemeId.taoyao, name: '桃夭', tag: '浪漫 · 桃粉 × 青碧', tone: ToneId.cool,
     light: BrandPalette(
-      p: 0xFFDF6D93, pd: 0xFFB75979, a: 0xFF49A28A, ad: 0xFF3D8874,
-      hero0: 0xFFA93262, hero1: 0xFFCF3A5D,
-      heroDark0: 0xFF4F363E, heroDark1: 0xFF6A444D, frame: 0xFF432D35,
+      p: 0xFFF472B6, pd: 0xFFEC4899, a: 0xFF2DD4BF, ad: 0xFF14B8A6,
+      hero0: 0xFFBE185D, hero1: 0xFFFB7185,
+      heroDark0: 0xFF831843, heroDark1: 0xFF9D174D, frame: 0xFF831843,
     ),
     dark: BrandPalette(
-      p: 0xFFD897AD, pd: 0xFFC46E8B, a: 0xFFA2CDC1, ad: 0xFF84B9AA,
-      hero0: 0xFF532836, hero1: 0xFF763349,
-      heroDark0: 0xFF3A222A, heroDark1: 0xFF4F2C37, frame: 0xFF3E282F,
+      p: 0xFFF9A8D4, pd: 0xFFF472B6, a: 0xFF5EEAD4, ad: 0xFF2DD4BF,
+      hero0: 0xFF9D174D, hero1: 0xFFEC4899,
+      heroDark0: 0xFF500724, heroDark1: 0xFF9D174D, frame: 0xFF9D174D,
     ),
   ),
+  // 绯樱：正红 × 松绿
   ThemeId.feiying: ThemeSpec(
     id: ThemeId.feiying, name: '绯樱', tag: '古朴 · 绯红 × 松绿', tone: ToneId.cool,
     light: BrandPalette(
-      p: 0xFFD04E68, pd: 0xFFAB4055, a: 0xFF509B55, ad: 0xFF438247,
-      hero0: 0xFFA43854, hero1: 0xFFC8414F,
-      heroDark0: 0xFF4E373B, heroDark1: 0xFF684649, frame: 0xFF422E32,
+      p: 0xFFEF4444, pd: 0xFFDC2626, a: 0xFF10B981, ad: 0xFF059669,
+      hero0: 0xFFB91C1C, hero1: 0xFFF87171,
+      heroDark0: 0xFF7F1D1D, heroDark1: 0xFF991B1B, frame: 0xFF7F1D1D,
     ),
     dark: BrandPalette(
-      p: 0xFFD897A4, pd: 0xFFC46E7F, a: 0xFFA6C9A8, ad: 0xFF88B48B,
-      hero0: 0xFF512A31, hero1: 0xFF723642,
-      heroDark0: 0xFF392328, heroDark1: 0xFF4D2D34, frame: 0xFF3D292D,
+      p: 0xFFFCA5A5, pd: 0xFFF87171, a: 0xFF6EE7B7, ad: 0xFF34D399,
+      hero0: 0xFF991B1B, hero1: 0xFFEF4444,
+      heroDark0: 0xFF450A0A, heroDark1: 0xFF991B1B, frame: 0xFF991B1B,
     ),
   ),
+  // 杏黄：暖杏 × 湖蓝
   ThemeId.xinghuang: ThemeSpec(
     id: ThemeId.xinghuang, name: '杏黄', tag: '温暖 · 杏黄 × 湖蓝', tone: ToneId.warm,
     light: BrandPalette(
-      p: 0xFFDDA23C, pd: 0xFFB58531, a: 0xFF458BBA, ad: 0xFF3A759C,
-      hero0: 0xFF624219, hero1: 0xFF8C6E1C,
-      heroDark0: 0xFF504634, heroDark1: 0xFF6B6042, frame: 0xFF443B2C,
+      p: 0xFFF59E0B, pd: 0xFFD97706, a: 0xFF38BDF8, ad: 0xFF0284C7,
+      hero0: 0xFFB45309, hero1: 0xFFFBBF24,
+      heroDark0: 0xFF78350F, heroDark1: 0xFF92400E, frame: 0xFF78350F,
     ),
     dark: BrandPalette(
-      p: 0xFFD8C097, pd: 0xFFC4A46E, a: 0xFF9EBDD1, ad: 0xFF7EA5BE,
-      hero0: 0xFF554326, hero1: 0xFF795E30,
-      heroDark0: 0xFF3B3121, heroDark1: 0xFF50422A, frame: 0xFF3F3627,
+      p: 0xFFFCD34D, pd: 0xFFFBBF24, a: 0xFF7DD3FC, ad: 0xFF38BDF8,
+      hero0: 0xFF92400E, hero1: 0xFFF59E0B,
+      heroDark0: 0xFF451A03, heroDark1: 0xFF92400E, frame: 0xFF92400E,
     ),
   ),
+  // 豆绿：嫩绿 × 藤紫
   ThemeId.doulv: ThemeSpec(
     id: ThemeId.doulv, name: '豆绿', tag: '清新 · 豆绿 × 藤紫', tone: ToneId.warm,
     light: BrandPalette(
-      p: 0xFF86AC4D, pd: 0xFF6E8D3F, a: 0xFFAA7BC1, ad: 0xFF8F67A2,
-      hero0: 0xFF49582D, hero1: 0xFF597939,
-      heroDark0: 0xFF444A3B, heroDark1: 0xFF57624B, frame: 0xFF393E32,
+      p: 0xFF84CC16, pd: 0xFF65A30D, a: 0xFFC084FC, ad: 0xFFA855F7,
+      hero0: 0xFF4D7C0F, hero1: 0xFFBEF264,
+      heroDark0: 0xFF365314, heroDark1: 0xFF3F6212, frame: 0xFF365314,
     ),
     dark: BrandPalette(
-      p: 0xFFBCCDA2, pd: 0xFF9FB57D, a: 0xFFBEA4CC, ad: 0xFFA685B7,
-      hero0: 0xFF404A30, hero1: 0xFF586840,
-      heroDark0: 0xFF2F3527, heroDark1: 0xFF3F4833, frame: 0xFF343A2C,
+      p: 0xFFD9F99D, pd: 0xFFBEF264, a: 0xFFE9D5FF, ad: 0xFFC084FC,
+      hero0: 0xFF3F6212, hero1: 0xFF84CC16,
+      heroDark0: 0xFF1A2E05, heroDark1: 0xFF3F6212, frame: 0xFF3F6212,
     ),
   ),
+  // 素白：炭黑 × 橘红
   ThemeId.subai: ThemeSpec(
-    id: ThemeId.subai, name: '素白', tag: '极简 · 炭黑 × 橘红', tone: ToneId.neutral,
+    id: ThemeId.subai, name: '素白', tag: '默认主题 · 炭黑 × 橘红', tone: ToneId.neutral,
     light: BrandPalette(
-      p: 0xFF454540, pd: 0xFF393934, a: 0xFFE4764E, ad: 0xFFC06342,
-      hero0: 0xFF5A5954, hero1: 0xFF717269,
-      heroDark0: 0xFF434342, heroDark1: 0xFF585856, frame: 0xFF393937,
+      p: 0xFF3F3F46, pd: 0xFF27272A, a: 0xFFFB923C, ad: 0xFFF97316,
+      hero0: 0xFF27272A, hero1: 0xFF71717A,
+      heroDark0: 0xFF18181B, heroDark1: 0xFF27272A, frame: 0xFF27272A,
     ),
     dark: BrandPalette(
-      p: 0xFFBABAB5, pd: 0xFF9C9C96, a: 0xFFE1A48E, ad: 0xFFD2866A,
-      hero0: 0xFF3F3F3C, hero1: 0xFF565652,
-      heroDark0: 0xFF2F2F2D, heroDark1: 0xFF3E3E3C, frame: 0xFF343432,
+      p: 0xFFD4D4D8, pd: 0xFFA1A1AA, a: 0xFFFDBA74, ad: 0xFFFB923C,
+      hero0: 0xFF3F3F46, hero1: 0xFF71717A,
+      heroDark0: 0xFF09090B, heroDark1: 0xFF27272A, frame: 0xFF27272A,
     ),
   ),
 };
 
-ThemeSpec themeSpecOf(ThemeId id) => _specs[id] ?? _specs[ThemeId.qingci]!;
+ThemeSpec themeSpecOf(ThemeId id) => _specs[id] ?? _specs[ThemeId.subai]!;
 
 // ─── Fixed palettes (cross-theme invariant, INV-1) ───────────────────────────
 
@@ -294,37 +304,36 @@ ThemeSpec themeSpecOf(ThemeId id) => _specs[id] ?? _specs[ThemeId.qingci]!;
 /// Fixed 12-color palette for expense category slices (INV-1).
 ///
 /// Keyed by the stable category `iconRef` (not the display name) so user
-/// renames do not break chart colors. See 14-代码优化建议.md P0-9.
+/// renames do not break chart colors. See 12-设计规范系统.md §5.2 (INV-1).
 const Map<String, int> categoryColorMap = {
-  'food': 0xFFE69A6D,
-  'shopping': 0xFFDC8EA6,
-  'daily': 0xFF9B8FD4,
-  'transport': 0xFF75B2C8,
-  'fruit': 0xFF97BC81,
-  'entertainment': 0xFFBFA8E9,
-  'housing': 0xFFC58B72,
-  'medical': 0xFFD97C7C,
-  'study': 0xFF7FA8DC,
-  'social': 0xFFC977A8,
-  'other': 0xFFA3ABA4,
-  'telecom': 0xFF6FAFA3,
+  'food': 0xFFFF6B6B,
+  'shopping': 0xFFF472B6,
+  'daily': 0xFFA78BFA,
+  'transport': 0xFF38BDF8,
+  'fruit': 0xFF4ADE80,
+  'entertainment': 0xFFE879F9,
+  'housing': 0xFFFDBA74,
+  'medical': 0xFFF87171,
+  'study': 0xFF60A5FA,
+  'social': 0xFFC084FC,
+  'other': 0xFF94A3B8,
+  'telecom': 0xFF2DD4BF,
 };
-
 /// Resolve a slice color from a category's iconRef; falls back to null.
 int? categoryColorFor(String iconRef) => categoryColorMap[iconRef];
 
 /// Income / expense semantic colors (fixed, not theme-derived).
 const Map<String, int> _semLight = {
-  'income': 0xFFC74E37, 'incomeSoft': 0xFFF9E4DD, 'incomeLine': 0xFFEDC9BE,
-  'okSoft': 0xFFE6F0DC, 'okBase': 0xFF5F8F53,
+  'income': 0xFFDC2626, 'incomeSoft': 0xFFFFF1F2, 'incomeLine': 0xFFFECDD3,
+  'okSoft': 0xFFECFDF5, 'okBase': 0xFF059669,
   'warnSoft': 0xFFFAEEDA, 'warnInk': 0xFF8A5A1E,
-  'dnBg': 0xFFE4F0E6, 'dnBase': 0xFF4C7A55,
+  'dnBg': 0xFFECFDF5, 'dnBase': 0xFF059669,
 };
 const Map<String, int> _semDark = {
-  'income': 0xFFE8836B, 'incomeSoft': 0xFF442F2A, 'incomeLine': 0xFF5A3A34,
-  'okSoft': 0xFF33452F, 'okBase': 0xFFA5C896,
+  'income': 0xFFFDA4AF, 'incomeSoft': 0xFF4C0519, 'incomeLine': 0xFF881337,
+  'okSoft': 0xFF022C22, 'okBase': 0xFF6EE7B7,
   'warnSoft': 0xFF453A24, 'warnInk': 0xFFE8B96A,
-  'dnBg': 0xFF2F4433, 'dnBase': 0xFF9CC4A4,
+  'dnBg': 0xFF022C22, 'dnBase': 0xFF6EE7B7,
 };
 
 int semColor(String key, bool isDark) =>

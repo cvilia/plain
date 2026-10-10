@@ -91,8 +91,8 @@ class _AmountTextState extends ConsumerState<AmountText> {
   }
 }
 
-/// Currency symbol + amount with hide mode.
-class AmountWithCurrency extends ConsumerWidget {
+/// Currency symbol + amount with hide mode + tap-to-reveal (5s).
+class AmountWithCurrency extends ConsumerStatefulWidget {
   const AmountWithCurrency({
     super.key,
     required this.cents,
@@ -113,26 +113,55 @@ class AmountWithCurrency extends ConsumerWidget {
   final bool isIncome;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<AmountWithCurrency> createState() => _AmountWithCurrencyState();
+}
+
+class _AmountWithCurrencyState extends ConsumerState<AmountWithCurrency> {
+  Timer? _revealTimer;
+  bool _revealed = false;
+
+  @override
+  void dispose() {
+    _revealTimer?.cancel();
+    super.dispose();
+  }
+
+  void _toggleReveal() {
+    final hideAmounts = ref.read(hideAmountsProvider);
+    if (!hideAmounts) return;
+    setState(() => _revealed = true);
+    _revealTimer?.cancel();
+    // G-7 语义 1–3：单点显示、5 秒自动遮回、连点刷新计时
+    _revealTimer = Timer(UiDurations.revealBalance, () {
+      if (mounted) setState(() => _revealed = false);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final hideAmounts = ref.watch(hideAmountsProvider);
-    final text = formatAmountYuan(cents, hide: hideAmounts);
-    final sign = showSign
-        ? (isExpense ? '-' : isIncome ? '+' : '')
+    final isHidden = hideAmounts && !_revealed;
+    final text = formatAmountYuan(widget.cents, hide: isHidden);
+    final sign = widget.showSign
+        ? (widget.isExpense ? '-' : widget.isIncome ? '+' : '')
         : '';
 
-    final displayColor = color ??
-        (isExpense
+    final displayColor = widget.color ??
+        (widget.isExpense
             ? context.colors.expense
-            : isIncome
+            : widget.isIncome
                 ? context.colors.income
                 : context.colors.ink);
 
-    return Text(
-      '$sign$text',
-      style: TextStyle(
-        fontSize: fontSize,
-        fontWeight: fontWeight,
-        color: displayColor,
+    return GestureDetector(
+      onTap: _toggleReveal,
+      child: Text(
+        '$sign$text',
+        style: TextStyle(
+          fontSize: widget.fontSize,
+          fontWeight: widget.fontWeight,
+          color: displayColor,
+        ),
       ),
     );
   }

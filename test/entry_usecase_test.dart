@@ -55,6 +55,31 @@ void main() {
     expect(result.isFailure, true);
   });
 
+  test('transfer same account rejected (AC1)', () async {
+    final result = await createEntry(CreateEntryInput(
+      amountExpression: '10', type: EntryType.transfer,
+      categoryId: '', bookId: 'book-1', deviceId: 'dev-1',
+      accountId: 'acc-a', toAccountId: 'acc-a',
+    ));
+    expect(result.isFailure, true);
+    expect(result.failureOrNull?.code, 'entry.transfer_same_account');
+  });
+
+  test('borrow requires counterparty note', () async {
+    final r = await createEntry(CreateEntryInput(
+      amountExpression: '10', type: EntryType.borrowOut,
+      categoryId: '', bookId: 'book-1', deviceId: 'dev-1',
+      accountId: 'acc-a',
+    ));
+    expect(r.isFailure, true);
+    final ok = await createEntry(CreateEntryInput(
+      amountExpression: '10', type: EntryType.borrowOut,
+      categoryId: '', bookId: 'book-1', deviceId: 'dev-1',
+      accountId: 'acc-a', note: '张三',
+    ));
+    expect(ok.isSuccess, true);
+  });
+
   test('soft delete removes from page', () async {
     final created = await createEntry(CreateEntryInput(
       amountExpression: '25', type: EntryType.expense,

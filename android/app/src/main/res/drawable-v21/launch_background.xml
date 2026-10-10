@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Launch splash: brand logo centered on white (图标方案/备选1, non-circle). -->
+<!-- 启动页：品牌金底 + 居中 launch_image（小猪 + 素记）。 -->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <item android:drawable="@android:color/white" />
+    <item android:drawable="@color/splash_bg" />
     <item>
         <bitmap
-            android:gravity="center"
-            android:src="@mipmap/launch_image" />
+            android:src="@mipmap/launch_image"
+            android:gravity="center" />
     </item>
 </layer-list>

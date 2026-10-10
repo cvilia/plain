@@ -1,11 +1,20 @@
 package com.cvilia.plain
 
+import android.Manifest
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
 import android.appwidget.AppWidgetManager
+import android.content.pm.PackageManager
+import android.os.Build
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import android.provider.OpenableColumns
 import android.view.WindowManager
+import androidx.core.app.ActivityCompat
+import androidx.core.app.NotificationCompat
+import androidx.core.app.NotificationManagerCompat
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
@@ -16,6 +25,7 @@ class MainActivity : FlutterActivity() {
     private val channelName = "app/security"
     private val widgetChannelName = "app/widget"
     private val filePickerChannelName = "app/file_picker"
+    private val notificationChannelName = "app/notification"
     private var securityChannel: MethodChannel? = null
     private var isSecure = true // Default: enable privacy overlay
 
@@ -74,6 +84,47 @@ class MainActivity : FlutterActivity() {
                     else -> result.notImplemented()
                 }
         }
+
+        // Local notifications (recurring due / confirm)
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, notificationChannelName)
+            .setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "show" -> {
+                        val id = (call.argument<Int>("id")) ?: 0
+                        val title = call.argument<String>("title") ?: ""
+                        val body = call.argument<String>("body") ?: ""
+                        val payload = call.argument<String>("payload")
+                        ensureNotificationChannel()
+                        showLocalNotification(id, title, body, payload)
+                        result.success(null)
+                    }
+                    "cancel" -> {
+                        val id = (call.argument<Int>("id")) ?: 0
+                        NotificationManagerCompat.from(this).cancel(id)
+                        result.success(null)
+                    }
+                    "requestPermission" -> {
+                        if (Build.VERSION.SDK_INT >= 33) {
+                            val granted = ActivityCompat.checkSelfPermission(
+                                this, Manifest.permission.POST_NOTIFICATIONS
+                            ) == PackageManager.PERMISSION_GRANTED
+                            if (!granted) {
+                                ActivityCompat.requestPermissions(
+                                    this,
+                                    arrayOf(Manifest.permission.POST_NOTIFICATIONS),
+                                    REQUEST_POST_NOTIFICATIONS
+                                )
+                                result.success(false)
+                                return@setMethodCallHandler
+                            }
+                            result.success(true)
+                        } else {
+                            result.success(true)
+                        }
+                    }
+                    else -> result.notImplemented()
+                }
+            }
 
         // Widget channel: update snapshot
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, widgetChannelName)
@@ -199,6 +250,43 @@ class MainActivity : FlutterActivity() {
         }
     }
 
+    private fun ensureNotificationChannel() {
+        val mgr = getSystemService(NotificationManager::class.java)
+        val channel = NotificationChannel(
+            NOTIF_CHANNEL_ID,
+            "周期记账",
+            NotificationManager.IMPORTANCE_DEFAULT
+        ).apply {
+            description = "周期记账到期提醒与确认"
+        }
+        mgr.createNotificationChannel(channel)
+    }
+
+    private fun showLocalNotification(id: Int, title: String, body: String, payload: String?) {
+        val intent = Intent(this, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            action = "com.cvilia.plain.NOTIFY"
+            payload?.let { putExtra("payload", it) }
+        }
+        val pending = PendingIntent.getActivity(
+            this, id, intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        val notification = NotificationCompat.Builder(this, NOTIF_CHANNEL_ID)
+            .setSmallIcon(android.R.drawable.stat_notify_chat)
+            .setContentTitle(title)
+            .setContentText(body)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(body))
+            .setAutoCancel(true)
+            .setContentIntent(pending)
+            .build()
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) ==
+            PackageManager.PERMISSION_GRANTED || Build.VERSION.SDK_INT < 33
+        ) {
+            NotificationManagerCompat.from(this).notify(id, notification)
+        }
+    }
+
     private fun setSecureFlag(enabled: Boolean) {
         isSecure = enabled
         runOnUiThread {
@@ -215,5 +303,7 @@ class MainActivity : FlutterActivity() {
 
     companion object {
         private const val REQUEST_PICK_FILE = 7101
+        private const val REQUEST_POST_NOTIFICATIONS = 7102
+        private const val NOTIF_CHANNEL_ID = "recurring_due"
     }
 }

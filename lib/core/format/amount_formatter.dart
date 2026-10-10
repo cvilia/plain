@@ -3,6 +3,7 @@
 library;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:plain/core/constants/app_constants.dart';
 
 /// Global hide-amounts toggle.
 class HideAmountsNotifier extends Notifier<bool> {
@@ -31,4 +32,16 @@ String formatAmountYuan(int cents, {bool hide = false}) {
   if (hide) return '¥****';
   final sign = cents < 0 ? '-' : '';
   return '$sign¥${formatAmount(cents)}';
+}
+
+/// 按币种代码格式化（STORY-9.3）。
+String formatAmountCurrency(
+  int cents, {
+  String currencyCode = 'CNY',
+  bool hide = false,
+}) {
+  final sym = CurrencyRules.symbolOf(currencyCode);
+  if (hide) return '$sym****';
+  final sign = cents < 0 ? '-' : '';
+  return '$sign$sym${formatAmount(cents)}';
 }

@@ -115,8 +115,9 @@ class _EntryInputPageState extends ConsumerState<EntryInputPage> {
         final keypadRatio = isCompactHeight ? 0.45 : 0.38;
 
         // Amount display: fixed height, scales with font tier.
+        // 错误提示（如「请选择分类」）贴住键盘，减少与键盘的空隙。
         final fontSize = AdaptiveFontSizes.display(context);
-        final amountHeight = fontSize + 100;
+        final amountHeight = fontSize + 90;
 
         // Reserve room for category area + action chips so short screens never overflow.
         const minBottom = 168; // ~2 category rows + attr bar
@@ -170,18 +171,50 @@ class _EntryInputPageState extends ConsumerState<EntryInputPage> {
   }
 }
 
-class _AmountDisplay extends StatelessWidget {
+class _AmountDisplay extends StatefulWidget {
   const _AmountDisplay({required this.controller, required this.state});
   final EntryInputController controller;
   final EntryInputState state;
 
   @override
+  State<_AmountDisplay> createState() => _AmountDisplayState();
+}
+
+class _AmountDisplayState extends State<_AmountDisplay> with SingleTickerProviderStateMixin {
+  late final AnimationController _shakeCtrl = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 320),
+  );
+  String? _lastError;
+
+  @override
+  void didUpdateWidget(covariant _AmountDisplay oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final err = widget.state.errorMessage;
+    if (err == 'amount_over_limit' && _lastError != 'amount_over_limit') {
+      _shakeCtrl.forward(from: 0);
+    }
+    _lastError = err;
+  }
+
+  @override
+  void dispose() {
+    _shakeCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final state = widget.state;
+    final controller = widget.controller;
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.fromLTRB(Spacing.lg, Spacing.md, Spacing.lg, Spacing.sm),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        mainAxisAlignment: MainAxisAlignment.end,
+        children: [
         // Wrap avoids RenderFlex overflow when the window is narrow
         // (3 chips + gaps exceeded the row width by ~10px).
         Wrap(
@@ -191,10 +224,18 @@ class _AmountDisplay extends StatelessWidget {
             _TypeChip(label: '支出', selected: state.type == EntryType.expense, color: context.colors.expense, onTap: () => controller.onTypeChanged(EntryType.expense)),
             _TypeChip(label: '收入', selected: state.type == EntryType.income, color: context.colors.income, onTap: () => controller.onTypeChanged(EntryType.income)),
             _TypeChip(label: '转账', selected: state.type == EntryType.transfer, color: context.colors.transfer, onTap: () => controller.onTypeChanged(EntryType.transfer)),
+            _TypeChip(label: '借出', selected: state.type == EntryType.borrowOut, color: context.colors.inkSecondary, onTap: () => controller.onTypeChanged(EntryType.borrowOut)),
+            _TypeChip(label: '借入', selected: state.type == EntryType.borrowIn, color: context.colors.inkSecondary, onTap: () => controller.onTypeChanged(EntryType.borrowIn)),
           ],
         ),
         const SizedBox(height: Spacing.sm),
-        Row(
+        AnimatedBuilder(
+          animation: _shakeCtrl,
+          builder: (context, child) {
+            final dx = Curves.elasticIn.transform(_shakeCtrl.value) * 12;
+            return Transform.translate(offset: Offset(dx, 0), child: child);
+          },
+          child: Row(
           mainAxisAlignment: MainAxisAlignment.end,
           crossAxisAlignment: CrossAxisAlignment.baseline,
           textBaseline: TextBaseline.alphabetic,
@@ -222,6 +263,7 @@ class _AmountDisplay extends StatelessWidget {
             ),
           ],
         ),
+        ),
         SizedBox(
           height: 20,
           child: state.errorMessage != null
@@ -238,6 +280,8 @@ class _AmountDisplay extends StatelessWidget {
         'amount_over_limit' => '金额超出上限',
         'amount_zero' => '请输入金额',
         'category_required' => '请选择分类',
+        'expression_invalid' => '无法计算',
+        'transfer_accounts_required' => '请选择转出与转入账户',
         _ => '输入有误',
       };
 }
@@ -273,17 +317,17 @@ class _Keypad extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // 产品口径：键盘只保留数字、小数点、退格/清空与 OK（无四则运算）。
     // Rows stretch to the parent keypad region. Fixed 56px rows overflowed
     // when Form A allocated a shorter height (e.g. desktop window).
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: Spacing.sm),
       child: Column(
         children: [
-          Expanded(child: _keyRow(context, ['7', '8', '9', '\u00f7'])),
-          Expanded(child: _keyRow(context, ['4', '5', '6', '\u00d7'])),
-          Expanded(child: _keyRow(context, ['1', '2', '3', '-'])),
-          Expanded(child: _keyRow(context, ['.', '0', '=', '+'])),
-          Expanded(child: _keyRow(context, ['\u232b', 'C', 'OK'])),
+          Expanded(child: _keyRow(context, ['7', '8', '9', '\u232b'])),
+          Expanded(child: _keyRow(context, ['4', '5', '6', 'C'])),
+          Expanded(child: _keyRow(context, ['1', '2', '3', '.'])),
+          Expanded(child: _keyRow(context, ['0', 'OK'])),
         ],
       ),
     );
@@ -295,12 +339,12 @@ class _Keypad extends StatelessWidget {
       child: Row(children: [
         for (final label in labels)
           Expanded(
+            flex: label == 'OK' ? 2 : 1,
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 3),
-              child: _KeyButton(label: label, onTap: () => _onKey(context, label), isConfirm: label == 'OK', isEquals: label == '='),
+              child: _KeyButton(label: label, onTap: () => _onKey(context, label), isConfirm: label == 'OK'),
             ),
           ),
-        if (labels.length == 3) const Spacer(),
       ]),
     );
   }
@@ -311,12 +355,9 @@ class _Keypad extends StatelessWidget {
         controller.onBackspace();
       case 'C':
         controller.onClearAll();
-      case '=':
-        controller.onEquals();
       case 'OK':
+        // 产品口径：只有 OK 保存；点分类不落库。
         _saveAndToast(context);
-      case '+' || '-' || '\u00d7' || '\u00f7':
-        controller.onOperator(label);
       case '.':
         controller.onDot();
       default:
@@ -329,23 +370,43 @@ class _Keypad extends StatelessWidget {
     if (!ok || !context.mounted) return;
     final msg = controller.currentToast;
     if (msg != null) {
-      showAppToast(context, msg);
-      controller.clearToast();
+      // STORY-1.1：保存 toast 带「撤销」，5 秒窗口
+      final savedId = controller.lastSavedEntryId;
+      if (savedId != null) {
+        showAppToastWithAction(
+          context,
+          msg,
+          actionLabel: '撤销',
+          onAction: () async {
+            final undone = await controller.undoLastSaved();
+            if (undone && context.mounted) {
+              showAppToast(context, '已撤销');
+            }
+          },
+        );
+        controller.clearToast();
+      } else {
+        showAppToast(context, msg);
+        controller.clearToast();
+      }
+    }
+    // STORY-5.1：设置项「保存后停留」（默认开）
+    if (!controller.stayAfterSave && context.mounted) {
+      Navigator.pop(context);
     }
   }
 }
 
 class _KeyButton extends StatelessWidget {
-  const _KeyButton({required this.label, required this.onTap, this.isConfirm = false, this.isEquals = false});
+  const _KeyButton({required this.label, required this.onTap, this.isConfirm = false});
   final String label;
   final VoidCallback onTap;
   final bool isConfirm;
-  final bool isEquals;
 
   @override
   Widget build(BuildContext context) {
-    final bg = isConfirm ? context.colors.primary : isEquals ? context.colors.primary.withValues(alpha: 0.12) : context.colors.surfaceCard;
-    final fg = isConfirm ? context.colors.onPrimary : isEquals ? context.colors.primary : context.colors.ink;
+    final bg = isConfirm ? context.colors.primary : context.colors.surfaceCard;
+    final fg = isConfirm ? context.colors.onPrimary : context.colors.ink;
     return Material(
       color: bg,
       borderRadius: BorderRadius.circular(Radii.sm),
@@ -368,6 +429,20 @@ class _CategoryAndAttrs extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // G-6 / AC12：转账不走分类宫格，换专属双账户表单（必须 OK 确认）。
+    if (state.type == EntryType.transfer) {
+      return Column(children: [
+        Expanded(child: _TransferForm(controller: controller, state: state)),
+        _AttrBar(controller: controller, state: state),
+      ]);
+    }
+    // STORY-1.7：借出/借入走往来对象表单
+    if (state.type == EntryType.borrowOut || state.type == EntryType.borrowIn) {
+      return Column(children: [
+        Expanded(child: _BorrowForm(controller: controller, state: state)),
+        _AttrBar(controller: controller, state: state),
+      ]);
+    }
     return Column(children: [
       Expanded(
         child: categoriesAsync.when(
@@ -378,6 +453,143 @@ class _CategoryAndAttrs extends StatelessWidget {
       ),
       _AttrBar(controller: controller, state: state),
     ]);
+  }
+}
+
+/// 借出/借入：往来对象（备注）+ 约定还款日。
+class _BorrowForm extends StatelessWidget {
+  const _BorrowForm({required this.controller, required this.state});
+  final EntryInputController controller;
+  final EntryInputState state;
+
+  @override
+  Widget build(BuildContext context) {
+    final isOut = state.type == EntryType.borrowOut;
+    return Padding(
+      padding: const EdgeInsets.all(Spacing.md),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Text(
+          isOut ? '借出往来对象' : '借入往来对象',
+          style: TextStyle(fontSize: 12, color: context.colors.inkTertiary),
+        ),
+        const SizedBox(height: Spacing.sm),
+        TextField(
+          decoration: const InputDecoration(
+            labelText: '往来对象（必填）',
+            hintText: '如：张三',
+            border: OutlineInputBorder(),
+          ),
+          onChanged: controller.onNoteChanged,
+        ),
+        const Spacer(),
+        Text(
+          '可继续填写备注与日期；保存需点 OK',
+          textAlign: TextAlign.center,
+          style: TextStyle(fontSize: 11, color: context.colors.inkTertiary),
+        ),
+      ]),
+    );
+  }
+}
+
+/// 转账专属表单：只选转出/转入账户与备注，不选分类。
+class _TransferForm extends ConsumerWidget {
+  const _TransferForm({required this.controller, required this.state});
+  final EntryInputController controller;
+  final EntryInputState state;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return Padding(
+      padding: const EdgeInsets.all(Spacing.md),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Text('转账账户', style: TextStyle(fontSize: 12, color: context.colors.inkTertiary)),
+        const SizedBox(height: Spacing.sm),
+        _AccountRow(
+          icon: Icons.arrow_upward_outlined,
+          title: '转出账户',
+          value: state.selectedAccountId,
+          onTap: () => _pickAccount(context, ref, isSource: true),
+        ),
+        const SizedBox(height: Spacing.sm),
+        Center(child: Icon(Icons.arrow_downward, size: 20, color: context.colors.inkTertiary)),
+        const SizedBox(height: Spacing.sm),
+        _AccountRow(
+          icon: Icons.arrow_downward_outlined,
+          title: '转入账户',
+          value: state.toAccountId,
+          onTap: () => _pickAccount(context, ref, isSource: false),
+        ),
+        const Spacer(),
+        Text(
+          '转账不计入收支统计，无需选择分类（G-2）',
+          textAlign: TextAlign.center,
+          style: TextStyle(fontSize: 11, color: context.colors.inkTertiary),
+        ),
+      ]),
+    );
+  }
+
+  void _pickAccount(BuildContext context, WidgetRef ref, {required bool isSource}) {
+    final db = ref.read(appDependenciesProvider).db;
+    final rows = db.raw.select(
+      'SELECT id, name, type FROM accounts WHERE deleted_at IS NULL ORDER BY sort_order ASC',
+    );
+    showModalBottomSheet<void>(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: ListView(
+          shrinkWrap: true,
+          children: [
+            for (final r in rows)
+              ListTile(
+                title: Text((r['name'] as String?) ?? ''),
+                subtitle: Text((r['type'] as String?) ?? ''),
+                onTap: () {
+                  final id = r['id'] as String?;
+                  if (isSource) {
+                    controller.onAccountSelected(id);
+                  } else {
+                    controller.onToAccountSelected(id);
+                  }
+                  Navigator.pop(ctx);
+                },
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _AccountRow extends StatelessWidget {
+  const _AccountRow({required this.icon, required this.title, required this.value, required this.onTap});
+  final IconData icon;
+  final String title;
+  final String? value;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: context.colors.surfaceCard,
+      borderRadius: BorderRadius.circular(Radii.md),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(Radii.md),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: Spacing.md, vertical: Spacing.md),
+          child: Row(children: [
+            Icon(icon, size: 18, color: context.colors.primary),
+            const SizedBox(width: Spacing.sm),
+            Text(title, style: TextStyle(fontSize: 14, color: context.colors.inkSecondary)),
+            const Spacer(),
+            Text(value == null ? '请选择' : '已选择', style: TextStyle(fontSize: 14, color: context.colors.ink)),
+            Icon(Icons.chevron_right, size: 18, color: context.colors.inkTertiary),
+          ]),
+        ),
+      ),
+    );
   }
 }
 
@@ -399,10 +611,10 @@ class _CategoryGrid extends ConsumerWidget {
     for (final id in recents) {
       final c = byId[id]; // leaves only — parents never enter the grid
       if (c != null && !visible.contains(c)) visible.add(c);
-      if (visible.length >= 7) break;
+      if (visible.length >= 10) break;
     }
     if (visible.isEmpty) {
-      visible.addAll(leaves.take(7));
+      visible.addAll(leaves.take(10));
     }
 
     return Column(
@@ -424,7 +636,7 @@ class _CategoryGrid extends ConsumerWidget {
             padding: const EdgeInsets.all(Spacing.sm),
             physics: const AlwaysScrollableScrollPhysics(),
             gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 4,
+              crossAxisCount: 5,
               mainAxisSpacing: Spacing.xs,
               crossAxisSpacing: Spacing.xs,
               childAspectRatio: 1.05,
@@ -456,7 +668,8 @@ class _CategoryGrid extends ConsumerWidget {
                 selected: selected,
                 color: context.colors.primary,
                 onTap: () {
-                  controller.submitOnCategoryTap(cat.id);
+                  // 产品口径（v1.x 修订）：点分类只预选，**必须点 OK 才保存**。
+                controller.submitOnCategoryTap(cat.id);
                 },
               );
             },
@@ -485,12 +698,32 @@ class _CategoryCell extends StatelessWidget {
           color: selected ? color.withValues(alpha: 0.12) : Colors.transparent,
           borderRadius: BorderRadius.circular(Radii.md),
         ),
-        child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-          Icon(icon, size: 26, color: selected ? color : context.colors.inkSecondary),
-          const SizedBox(height: 4),
-          Text(label, maxLines: 1, overflow: TextOverflow.ellipsis,
-              style: TextStyle(fontSize: 12, fontWeight: selected ? FontWeight.w600 : FontWeight.w400, color: selected ? color : context.colors.inkSecondary)),
-        ]),
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Flexible(
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Icon(icon, size: 26, color: selected ? color : context.colors.inkSecondary),
+              ),
+            ),
+            const SizedBox(height: 2),
+            Flexible(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
+                  color: selected ? color : context.colors.inkSecondary,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -527,17 +760,18 @@ class _AttrBar extends ConsumerWidget {
               )),
             ]),
             const SizedBox(height: Spacing.sm),
-          ] else
+          ] else ...[
             Row(children: [
               _AttrChip(
                 icon: Icons.account_balance_wallet_outlined,
                 label: state.selectedAccountId != null ? '账户' : '默认账户',
                 onTap: () => _showAccountPicker(context, ref, isSource: true),
               ),
-              const SizedBox(width: Spacing.sm),
             ]),
+            const SizedBox(height: Spacing.sm),
+          ],
           Row(children: [
-            _AttrChip(icon: Icons.calendar_today_outlined, label: _dateChipLabel(state.occurredAt), onTap: () => _pickDate(context)),
+            _AttrChip(icon: Icons.calendar_today_outlined, label: _dateChipLabel(state.occurredAt, ref.read(appDependenciesProvider).clock.now()), onTap: () => _pickDate(context, ref)),
             const SizedBox(width: Spacing.sm),
             Expanded(child: _AttrChip(icon: Icons.edit_note_outlined, label: state.note ?? '备注', expanded: true, onTap: () => _showNoteSheet(context))),
           ]),
@@ -548,18 +782,19 @@ class _AttrBar extends ConsumerWidget {
 
 
 
-  String _dateChipLabel(DateTime? at) {
+  String _dateChipLabel(DateTime? at, DateTime now) {
     if (at == null) return '今天';
-    if (isSameLocalDay(at, DateTime.now())) return '今天';
+    if (isSameLocalDay(at, now)) return '今天';
     return shortDateLabel(at);
   }
 
-  Future<void> _pickDate(BuildContext context) async {
+  Future<void> _pickDate(BuildContext context, WidgetRef ref) async {
+    final now = ref.read(appDependenciesProvider).clock.now().toLocal();
     final picked = await showAppDatePicker(
       context: context,
-      initialDate: state.occurredAt?.toLocal() ?? DateTime.now(),
+      initialDate: state.occurredAt?.toLocal() ?? now,
       firstDate: DateTime(2020),
-      lastDate: DateTime.now().add(const Duration(days: 1)),
+      lastDate: now.add(const Duration(days: 1)),
     );
     if (picked != null) controller.onDateSelected(picked.toUtc());
   }

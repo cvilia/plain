@@ -20,7 +20,14 @@ enum EntryType {
       wireEnumFrom(v, values, EntryType.unknown, (e) => e.wire);
 
   bool get countsInOutflow => this == EntryType.expense || this == EntryType.income;
-  bool get enabledInV1 => this == EntryType.expense || this == EntryType.income || this == EntryType.transfer;
+  bool get enabledInV1 =>
+      this == EntryType.expense ||
+      this == EntryType.income ||
+      this == EntryType.transfer ||
+      // V2.0 交易类型化（STORY-1.7）
+      this == EntryType.borrowOut ||
+      this == EntryType.borrowIn ||
+      this == EntryType.repayCredit;
 }
 
 enum EntrySource {
@@ -33,6 +40,35 @@ enum EntrySource {
       wireEnumFrom(v, values, EntrySource.unknown, (e) => e.wire);
 }
 
+/// STORY-6.2 分割交易角色。
+enum SplitRole {
+  normal('normal'),
+  parent('parent'),
+  child('child');
+
+  const SplitRole(this.wire);
+  final String wire;
+  static SplitRole fromWire(String? v) =>
+      wireEnumFrom(v, values, SplitRole.normal, (e) => e.wire);
+}
+
+/// STORY-1.8 报销状态机。
+enum ReimburseStatus {
+  none('none'),
+  pending('pending'),
+  submitted('submitted'),
+  partial('partial'),
+  reimbursed('reimbursed'),
+  abandoned('abandoned');
+
+  const ReimburseStatus(this.wire);
+  final String wire;
+  static ReimburseStatus fromWire(String? v) =>
+      wireEnumFrom(v, values, ReimburseStatus.none, (e) => e.wire);
+
+  bool get inFlow => this != ReimburseStatus.none && this != ReimburseStatus.abandoned;
+}
+
 enum AccountType {
   cash('cash'), debit('debit'), credit('credit'),
   loanOut('loan_out'), loanIn('loan_in'), investment('investment'), unknown('unknown');
@@ -42,7 +78,11 @@ enum AccountType {
   static AccountType fromWire(String? v) =>
       wireEnumFrom(v, values, AccountType.unknown, (e) => e.wire);
 
-  bool get enabledInV1 => this == AccountType.cash || this == AccountType.debit;
+  bool get enabledInV1 =>
+    this == AccountType.cash ||
+    this == AccountType.debit ||
+    this == AccountType.credit ||
+    this == AccountType.investment;
 }
 
 enum CategoryKind {
@@ -65,7 +105,8 @@ enum ChangeOp {
 
 enum EntityType {
   transaction('transaction'), category('category'), account('account'),
-  budget('budget'), recurringRule('recurring_rule'), unknown('unknown');
+  budget('budget'), recurringRule('recurring_rule'), automationRule('rule'),
+  savingsGoal('savings_goal'), unknown('unknown');
 
   const EntityType(this.wire);
   final String wire;

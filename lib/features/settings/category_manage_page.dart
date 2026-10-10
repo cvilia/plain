@@ -5,11 +5,14 @@ import 'package:plain/app/theme/app_colors.dart';
 import 'package:plain/design_system/category_avatar.dart';
 import 'package:flutter/material.dart';
 import 'package:plain/design_system/app_toast.dart';
+import 'package:plain/design_system/confirm_dialog.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:plain/app/bootstrap.dart';
 import 'package:plain/app/theme/design_tokens.dart';
 import 'package:plain/core/refresh/data_invalidation.dart';
+import 'package:plain/data/platform/file_picker_bridge.dart';
 import 'package:plain/design_system/category_icons.dart';
+import 'package:plain/design_system/custom_icon_store.dart';
 import 'package:plain/domain/entities/category.dart' as domain;
 import 'package:plain/domain/entities/enums.dart';
 import 'package:plain/domain/services/category_naming.dart';
@@ -155,6 +158,7 @@ class _CategoryManagePageState extends ConsumerState<CategoryManagePage> {
     final nameCtrl = TextEditingController(text: cat.name);
     final noteCtrl = TextEditingController(text: cat.note ?? '');
     var iconRef = cat.iconRef;
+    var iconAsset = cat.iconAsset;
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -180,7 +184,19 @@ class _CategoryManagePageState extends ConsumerState<CategoryManagePage> {
               const SizedBox(height: Spacing.md),
               _IconPicker(
                 value: iconRef,
-                onChanged: (v) => setSheetState(() => iconRef = v),
+                iconAsset: iconAsset,
+                onChanged: (v) => setSheetState(() {
+                  iconRef = v;
+                  iconAsset = null; // 选内置图标时清掉自定义图
+                }),
+                onPickImage: () async {
+                  final path = await FilePickerBridge.pickFile(mime: 'image/*');
+                  if (path == null) return;
+                  final saved = await saveCustomIcon(path);
+                  if (saved != null) {
+                    setSheetState(() => iconAsset = saved);
+                  }
+                },
               ),
               const SizedBox(height: Spacing.md),
               TextField(
@@ -206,6 +222,8 @@ class _CategoryManagePageState extends ConsumerState<CategoryManagePage> {
                       .copyWith(
                         name: name,
                         iconRef: iconRef,
+                        iconAsset: iconAsset,
+                        clearIconAsset: iconAsset == null,
                         updatedAt: DateTime.now().toUtc(),
                         revision: cat.revision + 1,
                         baseRevision: cat.revision,
@@ -370,6 +388,7 @@ class _CategoryManagePageState extends ConsumerState<CategoryManagePage> {
     final leafNameCtrl = TextEditingController();
     final leafNoteCtrl = TextEditingController();
     var iconRef = 'other';
+    String? iconAsset;
 
     showModalBottomSheet<void>(
       context: context,
@@ -426,7 +445,19 @@ class _CategoryManagePageState extends ConsumerState<CategoryManagePage> {
                 const SizedBox(height: Spacing.md),
                 _IconPicker(
                   value: iconRef,
-                  onChanged: (v) => setSheetState(() => iconRef = v),
+                  iconAsset: iconAsset,
+                  onChanged: (v) => setSheetState(() {
+                    iconRef = v;
+                    iconAsset = null;
+                  }),
+                  onPickImage: () async {
+                    final path = await FilePickerBridge.pickFile(mime: 'image/*');
+                    if (path == null) return;
+                    final saved = await saveCustomIcon(path);
+                    if (saved != null) {
+                      setSheetState(() => iconAsset = saved);
+                    }
+                  },
                 ),
                 const SizedBox(height: Spacing.lg),
                 Text('首个二级条目', style: Theme.of(ctx).textTheme.titleSmall),
@@ -490,6 +521,7 @@ class _CategoryManagePageState extends ConsumerState<CategoryManagePage> {
                       kind: kind,
                       parentId: null,
                       iconRef: iconRef,
+                      iconAsset: iconAsset,
                       id: rootId,
                       now: now,
                     );
@@ -612,6 +644,7 @@ class _CategoryManagePageState extends ConsumerState<CategoryManagePage> {
     required CategoryKind kind,
     required String? parentId,
     String iconRef = 'other',
+    String? iconAsset,
     String? id,
     DateTime? now,
   }) {
@@ -623,6 +656,7 @@ class _CategoryManagePageState extends ConsumerState<CategoryManagePage> {
       name: name,
       kind: kind,
       iconRef: iconRef,
+      iconAsset: iconAsset,
       note: (note == null || note.isEmpty) ? null : note,
       sortOrder: 999,
       createdAt: ts,
@@ -673,10 +707,12 @@ class _CategoryManagePageState extends ConsumerState<CategoryManagePage> {
           onToggleHide: () => _toggleHide(ref, root),
           onRename: () => _showRenameSheet(context, ref, root),
           onMove: null, // first-level groups are not movable
+          onMerge: () => _showMergeSheet(context, ref, root),
           onDelete: () => _showDeleteSheet(context, ref, root),
           onChildToggleHide: (c) => _toggleHide(ref, c),
           onChildRename: (c) => _showRenameSheet(context, ref, c),
           onChildMove: (c) => _showMoveSheet(context, ref, c),
+          onChildMerge: (c) => _showMergeSheet(context, ref, c),
           onChildDelete: (c) => _showDeleteSheet(context, ref, c),
         ),
       ...orphans.map((c) => Padding(
@@ -687,6 +723,7 @@ class _CategoryManagePageState extends ConsumerState<CategoryManagePage> {
               onToggleHide: () => _toggleHide(ref, c),
               onRename: () => _showRenameSheet(context, ref, c),
               onMove: () => _showMoveSheet(context, ref, c),
+              onMerge: () => _showMergeSheet(context, ref, c),
               onDelete: () => _showDeleteSheet(context, ref, c),
             ),
           )),
@@ -762,6 +799,107 @@ class _CategoryManagePageState extends ConsumerState<CategoryManagePage> {
     );
   }
 
+  /// STORY-1.3 AC11：合并到同层级其他分类。
+  void _showMergeSheet(BuildContext context, WidgetRef ref, domain.Category source) {
+    if (source.isPreset) {
+      showAppToast(context, '默认分类不可修改');
+      return;
+    }
+    final categoriesAsync = ref.read(_categoriesProvider);
+    final categories = categoriesAsync.value ?? const <domain.Category>[];
+    // 仅同层级、同 kind
+    final targets = categories
+        .where((c) =>
+            !c.isDeleted &&
+            c.id != source.id &&
+            c.kind == source.kind &&
+            (source.isRoot ? c.isRoot : (!c.isRoot && c.parentId == source.parentId)))
+        .toList()
+      ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
+
+    if (targets.isEmpty) {
+      showAppToast(context, '没有可合并的同级分类');
+      return;
+    }
+
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) => SafeArea(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.sizeOf(ctx).height * 0.7,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(Spacing.lg),
+                child: Text(
+                  '将「${source.name}」合并到：',
+                  style: Theme.of(ctx).textTheme.titleMedium,
+                ),
+              ),
+              Flexible(
+                child: ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: targets.length,
+                  itemBuilder: (_, i) {
+                    final target = targets[i];
+                    return ListTile(
+                      leading: const Icon(Icons.merge_type),
+                      title: Text(target.name),
+                      onTap: () => _confirmMerge(context, ref, source, target),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _confirmMerge(
+    BuildContext context,
+    WidgetRef ref,
+    domain.Category source,
+    domain.Category target,
+  ) async {
+    final deps = ref.read(appDependenciesProvider);
+    final count = await deps.categoryRepository.countLiveEntries(
+      categoryId: source.id,
+      includeDescendants: source.isRoot,
+    );
+    final n = count.successOrNull ?? 0;
+    if (!context.mounted) return;
+
+    final ok = await showConfirmDialog(
+      context,
+      title: '合并分类',
+      message: '将「${source.name}」合并到「${target.name}」。\n'
+          '涉及账单约 $n 笔将改归目标分类${source.isRoot ? '，下级同名分类会并入目标同名项' : ''}。\n'
+          '合并后不可撤销，确定继续？',
+      confirmLabel: '合并',
+      destructive: true,
+    );
+    if (ok != true || !context.mounted) return;
+
+    final result = await deps.categoryRepository.mergeCategories(
+      sourceId: source.id,
+      targetId: target.id,
+    );
+    result.when(
+      success: (r) {
+        ref.invalidateData.bumpCategoriesMutated();
+        ref.invalidateData.bumpEntryMutated();
+        showAppToast(context, '已合并，${r.movedEntries} 笔账单改归「${target.name}」');
+      },
+      failure: (f) => showAppToast(context, '合并失败: ${f.code}'),
+    );
+  }
+
   void _confirmMove(
     BuildContext context,
     WidgetRef ref,
@@ -829,6 +967,8 @@ class _CategoryGroup extends StatefulWidget {
     required this.onChildDelete,
     required this.onDelete,
     this.onMove,
+    this.onMerge,
+    this.onChildMerge,
   });
 
   final domain.Category root;
@@ -842,6 +982,8 @@ class _CategoryGroup extends StatefulWidget {
   final void Function(domain.Category) onChildDelete;
   final VoidCallback onDelete;
   final VoidCallback? onMove;
+  final VoidCallback? onMerge;
+  final void Function(domain.Category)? onChildMerge;
 
   @override
   State<_CategoryGroup> createState() => _CategoryGroupState();
@@ -864,6 +1006,7 @@ class _CategoryGroupState extends State<_CategoryGroup> {
           onToggleHide: widget.onToggleHide,
           onRename: widget.onRename,
           onMove: widget.onMove,
+          onMerge: widget.onMerge,
           onDelete: widget.onDelete,
           trailingExpand: hasChildren
               ? GestureDetector(
@@ -893,6 +1036,7 @@ class _CategoryGroupState extends State<_CategoryGroup> {
                     onToggleHide: () => widget.onChildToggleHide(c),
                     onRename: () => widget.onChildRename(c),
                     onMove: () => widget.onChildMove(c),
+                    onMerge: widget.onChildMerge == null ? null : () => widget.onChildMerge!(c),
                     onDelete: () => widget.onChildDelete(c),
                   ),
               ],
@@ -910,6 +1054,7 @@ class _CategoryTile extends StatelessWidget {
     required this.onRename,
     this.onMove,
     this.onDelete,
+    this.onMerge,
     this.parentName,
     this.isGroup = false,
     this.trailingExpand,
@@ -924,6 +1069,9 @@ class _CategoryTile extends StatelessWidget {
 
   /// Delete custom category (bills go to default 其他).
   final VoidCallback? onDelete;
+
+  /// Merge into another same-level category (STORY-1.3 AC11).
+  final VoidCallback? onMerge;
 
   /// Parent title for second-level categories (shown in search context).
   final String? parentName;
@@ -980,7 +1128,7 @@ class _CategoryTile extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: Spacing.sm),
       child: ListTile(
         contentPadding: const EdgeInsets.symmetric(horizontal: Spacing.lg, vertical: Spacing.xs),
-        leading: CategoryAvatar(iconRef: category.iconRef, color: color, size: 18),
+        leading: CategoryAvatar(iconRef: category.iconRef, iconAsset: category.iconAsset, color: color, size: 18),
         title: Text(
           category.name,
           style: TextStyle(
@@ -1016,6 +1164,8 @@ class _CategoryTile extends StatelessWidget {
                     onRename();
                   case 'move':
                     onMove?.call();
+                  case 'merge':
+                    onMerge?.call();
                   case 'delete':
                     onDelete?.call();
                 }
@@ -1034,6 +1184,11 @@ class _CategoryTile extends StatelessWidget {
                       value: 'move',
                       child: Text('移动到…', style: labelStyle),
                     ),
+                  if (onMerge != null)
+                    PopupMenuItem(
+                      value: 'merge',
+                      child: Text('合并到…', style: labelStyle),
+                    ),
                   if (onDelete != null)
                     PopupMenuItem(
                       value: 'delete',
@@ -1050,41 +1205,64 @@ class _CategoryTile extends StatelessWidget {
 }
 
 class _IconPicker extends StatelessWidget {
-  const _IconPicker({required this.value, required this.onChanged});
+  const _IconPicker({
+    required this.value,
+    required this.onChanged,
+    this.iconAsset,
+    this.onPickImage,
+  });
   final String value;
   final ValueChanged<String> onChanged;
-
-  static const _refs = [
-    'food', 'shopping', 'daily', 'transport', 'fruit',
-    'entertainment', 'telecom', 'housing', 'medical', 'study',
-    'social', 'salary', 'bonus', 'other',
-  ];
+  final String? iconAsset;
+  final Future<void> Function()? onPickImage;
 
   @override
   Widget build(BuildContext context) {
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        for (final r in _refs)
-          InkWell(
-            borderRadius: BorderRadius.circular(10),
-            onTap: () => onChanged(r),
-            child: Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: r == value
-                    ? context.colors.primary.withValues(alpha: 0.15)
-                    : context.colors.surfaceMuted,
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(
-                  color: r == value ? context.colors.primary : context.colors.divider,
-                ),
-              ),
-              child: Icon(iconForCategory(r), size: 20, color: context.colors.primary),
+        if (onPickImage != null)
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              onPressed: () => onPickImage!(),
+              icon: const Icon(Icons.add_photo_alternate_outlined, size: 18),
+              label: Text(iconAsset == null ? '上传自定义图标' : '更换自定义图标'),
             ),
           ),
+        SizedBox(
+          height: 180,
+          child: GridView.builder(
+            padding: const EdgeInsets.symmetric(vertical: Spacing.sm),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 7,
+              mainAxisSpacing: 8,
+              crossAxisSpacing: 8,
+              childAspectRatio: 1,
+            ),
+            itemCount: kAllCategoryIconRefs.length,
+            itemBuilder: (context, i) {
+              final r = kAllCategoryIconRefs[i];
+              final selected = r == value && iconAsset == null;
+              return InkWell(
+                borderRadius: BorderRadius.circular(10),
+                onTap: () => onChanged(r),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: selected
+                        ? context.colors.primary.withValues(alpha: 0.15)
+                        : context.colors.surfaceMuted,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: selected ? context.colors.primary : context.colors.divider,
+                    ),
+                  ),
+                  child: Icon(iconForCategory(r), size: 20, color: context.colors.primary),
+                ),
+              );
+            },
+          ),
+        ),
       ],
     );
   }

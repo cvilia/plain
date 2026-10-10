@@ -42,10 +42,10 @@ class AccountRepositoryImpl implements AccountRepository {
       final rows = _db.raw.select(
         'SELECT * FROM accounts WHERE deleted_at IS NULL ORDER BY sort_order ASC',
       );
-      // One grouped query instead of 2N+1.
+      // One grouped query instead of 2N+1. STORY-6.2：子笔不计余额。
       final sums = _db.raw.select(
         'SELECT account_id, to_account_id, type, SUM(amount_cents) AS s '
-        'FROM transactions WHERE deleted_at IS NULL '
+        "FROM transactions WHERE deleted_at IS NULL AND split_role <> 'child' "
         'GROUP BY account_id, to_account_id, type',
       );
       final expenseBy = <String, int>{};
@@ -142,16 +142,13 @@ class AccountRepositoryImpl implements AccountRepository {
 
   @override
   Future<Result<void>> softDelete(String id) async {
-    // Check for transaction references (PRD STORY-2.1 AC2)
-    final refCount = _db.raw.select(
-      'SELECT COUNT(*) AS c FROM transactions '
-      'WHERE (account_id = ? OR to_account_id = ?) AND deleted_at IS NULL',
-      [id, id],
-    );
-    if ((refCount.first['c'] as int) > 0) {
+    // STORY-2.1 AC2/AC6：有引用（账单/转入/周期/预算）不可删，应迁移或隐藏
+    final refs = await countReferences(id);
+    final counts = refs.successOrNull;
+    if (counts != null && !counts.isEmpty) {
       return err<void>(const ConflictFailure(
-        'account.has_transactions',
-        'Account has transactions. Migrate or hide instead.',
+        'account.has_references',
+        'Account has transactions/rules. Migrate or hide instead.',
       ));
     }
 
@@ -188,6 +185,86 @@ class AccountRepositoryImpl implements AccountRepository {
   }
 
   @override
+  Future<Result<AccountRefCounts>> countReferences(String accountId) async {
+    try {
+      int count(String sql, List<Object?> args) {
+        final rows = _db.raw.select(sql, args);
+        return (rows.first['c'] as int?) ?? 0;
+      }
+
+      final tx = count(
+        'SELECT COUNT(*) AS c FROM transactions '
+        'WHERE account_id = ? AND deleted_at IS NULL',
+        [accountId],
+      );
+      final transferIn = count(
+        'SELECT COUNT(*) AS c FROM transactions '
+        'WHERE to_account_id = ? AND deleted_at IS NULL',
+        [accountId],
+      );
+      final recurring = count(
+        'SELECT COUNT(*) AS c FROM recurring_rules '
+        'WHERE (account_id = ? OR to_account_id = ?) AND deleted_at IS NULL',
+        [accountId, accountId],
+      );
+      // budgets 表当前无 account_id 维度（只按 book/category），故恒为 0。
+      const budgets = 0;
+      return ok(AccountRefCounts(
+        transactions: tx,
+        transferIn: transferIn,
+        recurringRules: recurring,
+        budgets: budgets,
+      ));
+    } on Object catch (e) {
+      return err(StorageFailure('db.query_failed', e.toString(), isRetryable: true));
+    }
+  }
+
+  @override
+  Future<Result<int>> migrateTransactions({required String fromId, required String toId}) async {
+    if (fromId == toId) {
+      return err(const ValidationFailure('account.migrate_same', 'same'));
+    }
+    try {
+      var moved = 0;
+      _db.transaction(() {
+        final before = _db.raw.select(
+          'SELECT COUNT(*) AS c FROM transactions '
+          'WHERE (account_id = ? OR to_account_id = ?) AND deleted_at IS NULL',
+          [fromId, fromId],
+        );
+        final countBefore = (before.first['c'] as int?) ?? 0;
+        _db.raw.execute(
+          'UPDATE transactions SET account_id = ? WHERE account_id = ?',
+          [toId, fromId],
+        );
+        _db.raw.execute(
+          'UPDATE transactions SET to_account_id = ? WHERE to_account_id = ?',
+          [toId, fromId],
+        );
+        _db.raw.execute(
+          'UPDATE recurring_rules SET account_id = ? WHERE account_id = ? AND deleted_at IS NULL',
+          [toId, fromId],
+        );
+        _db.raw.execute(
+          'UPDATE recurring_rules SET to_account_id = ? WHERE to_account_id = ? AND deleted_at IS NULL',
+          [toId, fromId],
+        );
+        final after = _db.raw.select(
+          'SELECT COUNT(*) AS c FROM transactions '
+          'WHERE (account_id = ? OR to_account_id = ?) AND deleted_at IS NULL',
+          [fromId, fromId],
+        );
+        final countAfter = (after.first['c'] as int?) ?? 0;
+        moved = countBefore - countAfter;
+      });
+      return ok(moved);
+    } on Object catch (e) {
+      return err(StorageFailure('db.migrate_failed', e.toString(), isRetryable: true));
+    }
+  }
+
+  @override
   Future<Result<AccountBalance>> balanceOf(String accountId) async {
     try {
       final acct = await getById(accountId);
@@ -196,20 +273,22 @@ class AccountRepositoryImpl implements AccountRepository {
 
       final opening = acct.successOrNull!.openingBalance;
 
-      // Sum expenses (negative) and income (positive) for this account
+      // Sum expenses (negative) and income (positive) for this account.
+      // STORY-6.2：子笔不计余额（仅父笔/普通）。
+      const notChild = "AND split_role <> 'child'";
       final expenseRow = _db.raw.select(
         'SELECT COALESCE(SUM(amount_cents), 0) AS s FROM transactions '
-        'WHERE account_id = ? AND type = ? AND deleted_at IS NULL',
+        'WHERE account_id = ? AND type = ? AND deleted_at IS NULL $notChild',
         [accountId, EntryType.expense.wire],
       );
       final incomeRow = _db.raw.select(
         'SELECT COALESCE(SUM(amount_cents), 0) AS s FROM transactions '
-        'WHERE account_id = ? AND type = ? AND deleted_at IS NULL',
+        'WHERE account_id = ? AND type = ? AND deleted_at IS NULL $notChild',
         [accountId, EntryType.income.wire],
       );
       final countRow = _db.raw.select(
         'SELECT COUNT(*) AS c FROM transactions '
-        'WHERE (account_id = ? OR to_account_id = ?) AND deleted_at IS NULL',
+        'WHERE (account_id = ? OR to_account_id = ?) AND deleted_at IS NULL $notChild',
         [accountId, accountId],
       );
 
@@ -220,12 +299,12 @@ class AccountRepositoryImpl implements AccountRepository {
       // Transfers: subtract outgoing, add incoming
       final transferOut = _db.raw.select(
         'SELECT COALESCE(SUM(amount_cents), 0) AS s FROM transactions '
-        'WHERE account_id = ? AND type = ? AND deleted_at IS NULL',
+        'WHERE account_id = ? AND type = ? AND deleted_at IS NULL $notChild',
         [accountId, EntryType.transfer.wire],
       );
       final transferIn = _db.raw.select(
         'SELECT COALESCE(SUM(amount_cents), 0) AS s FROM transactions '
-        'WHERE to_account_id = ? AND type = ? AND deleted_at IS NULL',
+        'WHERE to_account_id = ? AND type = ? AND deleted_at IS NULL $notChild',
         [accountId, EntryType.transfer.wire],
       );
 
@@ -266,7 +345,7 @@ class AccountRepositoryImpl implements AccountRepository {
 
       // Create adjustment entry (PRD STORY-2.1 AC3).
       // Prefer CreateEntryUseCase at call sites — this is a lower-level fallback
-      // and must keep change_log + daily_stats + unique id intact.
+      // and must keep change_log + unique id intact. **不写 daily_stats**（G-2/C11）。
       final now = _clock.now();
       final isExpense = diff < 0;
       final adjType = isExpense ? EntryType.expense : EntryType.income;
@@ -303,22 +382,8 @@ class AccountRepositoryImpl implements AccountRepository {
               0,
             ],
           );
-          // Keep daily_stats in sync (used by reports / budget strip).
-          final dayKey = _clock.localDayKey(now);
-          final exp = isExpense ? adjAmount : 0;
-          final inc = isExpense ? 0 : adjAmount;
-          _db.raw.execute(
-            'INSERT INTO daily_stats (book_id,day_key,category_id,account_id,'
-            'expense_cents,income_cents,tx_count,updated_at) VALUES (?,?,?,?,?,?,?,?) '
-            'ON CONFLICT(book_id,day_key,category_id,account_id) DO UPDATE SET '
-            'expense_cents=expense_cents+?,income_cents=income_cents+?,'
-            'tx_count=tx_count+?,updated_at=?',
-            [
-              bookId, dayKey, otherCategoryId, accountId, exp, inc, 1,
-              now.millisecondsSinceEpoch,
-              exp, inc, 1, now.millisecondsSinceEpoch,
-            ],
-          );
+          // G-2 / C11：对账调整不写 daily_stats——它只修余额，
+          // 进统计会污染消费与分类口径。分类计数/报表/预算一律排除 source=reconcile。
           _changeLog.write(
             entityType: EntityType.transaction,
             entityId: adjId,
@@ -343,11 +408,13 @@ class AccountRepositoryImpl implements AccountRepository {
     _db.raw.execute(
       'INSERT INTO accounts '
       '(id,name,type,currency,opening_balance_cents,note,sort_order,is_hidden,'
+      'credit_limit_cents,credit_debt_cents,bill_day,due_day,'
       'created_at,updated_at,revision,device_id,base_revision) '
-      'VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)',
+      'VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
       [
         a.id, a.name, a.type.wire, a.currency, a.openingBalance,
         a.note, a.sortOrder, a.isHidden ? 1 : 0,
+        a.creditLimitCents, a.creditDebtCents, a.billDay, a.dueDay,
         a.createdAt.millisecondsSinceEpoch, a.updatedAt.millisecondsSinceEpoch,
         a.revision, a.deviceId, a.baseRevision,
       ],
@@ -357,11 +424,13 @@ class AccountRepositoryImpl implements AccountRepository {
   void _update(Account a) {
     _db.raw.execute(
       'UPDATE accounts SET name=?,type=?,currency=?,opening_balance_cents=?,'
-      'note=?,sort_order=?,is_hidden=?,updated_at=?,deleted_at=?,revision=?,'
+      'note=?,sort_order=?,is_hidden=?,credit_limit_cents=?,credit_debt_cents=?,'
+      'bill_day=?,due_day=?,updated_at=?,deleted_at=?,revision=?,'
       'base_revision=? WHERE id=?',
       [
         a.name, a.type.wire, a.currency, a.openingBalance, a.note, a.sortOrder,
         a.isHidden ? 1 : 0,
+        a.creditLimitCents, a.creditDebtCents, a.billDay, a.dueDay,
         a.updatedAt.millisecondsSinceEpoch,
         a.deletedAt?.millisecondsSinceEpoch,
         a.revision, a.baseRevision, a.id,
@@ -378,6 +447,10 @@ class AccountRepositoryImpl implements AccountRepository {
         note: row['note'] as String?,
         sortOrder: row['sort_order']! as int,
         isHidden: row.boolOr('is_hidden'),
+        creditLimitCents: row.intOr('credit_limit_cents', 0),
+        creditDebtCents: row.intOr('credit_debt_cents', 0),
+        billDay: row['bill_day'] as int?,
+        dueDay: row['due_day'] as int?,
         createdAt: row.dateTime('created_at'),
         updatedAt: row.dateTime('updated_at'),
         deletedAt: row.nullableDateTime('deleted_at'),
@@ -390,5 +463,8 @@ class AccountRepositoryImpl implements AccountRepository {
         'id': a.id, 'name': a.name, 'type': a.type.wire,
         'opening_balance_cents': a.openingBalance,
         'sort_order': a.sortOrder, 'is_hidden': a.isHidden,
+        'credit_limit_cents': a.creditLimitCents,
+        'credit_debt_cents': a.creditDebtCents,
+        'bill_day': a.billDay, 'due_day': a.dueDay,
       };
 }

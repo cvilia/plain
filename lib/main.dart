@@ -11,10 +11,13 @@ import 'package:plain/app/bootstrap.dart';
 import 'package:plain/app/first_launch.dart';
 import 'package:plain/app/l10n/app_strings.dart';
 import 'package:plain/app/router/app_router.dart';
+import 'package:plain/app/settings/display_prefs.dart';
 import 'package:plain/app/theme/theme_prefs.dart';
 import 'package:plain/app/theme/theme_resolver.dart';
 import 'package:plain/core/id/uuid_v7.dart';
 import 'package:plain/data/db/database.dart';
+import 'package:plain/data/platform/platform_bridge.dart';
+import 'package:plain/data/seed/default_account.dart';
 import 'package:plain/data/seed/preset_categories.dart';
 import 'package:plain/features/security/app_lock_prefs.dart';
 import 'package:plain/features/security/app_lock_screen.dart';
@@ -25,6 +28,7 @@ Future<void> main() async {
 
   // Theme prefs must be known before first frame (§5.2). Failure → defaults.
   await preloadThemePrefs();
+  await preloadDisplayPrefs();
   final appLock = await AppLockPrefs.load();
   final onboardPending = await isOnboardingPending();
 
@@ -39,6 +43,8 @@ Future<void> main() async {
 
     // Seed preset categories (idempotent).
     await seedPresetCategories(db, deps.clock);
+    // Seed default cash account (idempotent) so 资产页 is never empty on first run.
+    await seedDefaultAccount(db, deps.clock);
   } catch (e, stack) {
     // If DB init fails, still show the app with an in-memory DB
     debugPrint('Startup init failed: $e');
@@ -58,6 +64,9 @@ Future<void> main() async {
       child: PlainApp(showOnboarding: onboardPending, appLockInitiallyEnabled: appLock.isConfigured),
     ),
   );
+  // 08-§8 巡检 + 06-C3 change_log GC 不阻塞首帧，空闲后再跑。
+  unawaited(runDailyStatsIntegrityCheck(deps));
+  unawaited(runChangeLogGc(deps));
 }
 
 class PlainApp extends ConsumerStatefulWidget {
@@ -99,8 +108,16 @@ class _PlainAppState extends ConsumerState<PlainApp> with WidgetsBindingObserver
     final lock = ref.read(appLockControllerProvider.notifier);
     switch (state) {
       case AppLifecycleState.paused:
+        // STORY-4.2 AC2/AC5：切后台立即打码（任务切换器预览）+ 禁截屏
+        final lockEnabled = ref.read(appLockEnabledProvider);
+        if (lockEnabled) {
+          PlatformBridge.setPrivacyOverlay(true);
+          PlatformBridge.setSecureFlag(true);
+        }
         lock.onAppPaused();
       case AppLifecycleState.resumed:
+        PlatformBridge.setPrivacyOverlay(false);
+        PlatformBridge.setSecureFlag(false);
         lock.onAppResumed();
       default:
         break;
@@ -156,7 +173,13 @@ class _PlainAppState extends ConsumerState<PlainApp> with WidgetsBindingObserver
             child: AppLockScreen(),
           );
         }
-        return child ?? const SizedBox.shrink();
+        final display = ref.watch(displayPrefsProvider);
+        final scaled = MediaQuery(
+          data: MediaQuery.of(context)
+              .copyWith(textScaler: TextScaler.linear(display.fontScale)),
+          child: child ?? const SizedBox.shrink(),
+        );
+        return scaled;
       },
     );
   }

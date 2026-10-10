@@ -2,11 +2,13 @@
 library;
 
 import 'package:plain/core/result/result.dart';
+import 'package:plain/domain/entities/automation_rule.dart';
 import 'package:plain/domain/entities/budget.dart';
 import 'package:plain/domain/entities/category.dart';
 import 'package:plain/domain/entities/enums.dart';
 import 'package:plain/domain/entities/ledger_entry.dart';
 import 'package:plain/domain/entities/recurring_rule.dart';
+import 'package:plain/domain/entities/savings_goal.dart';
 
 class EntryCursor {
   const EntryCursor({required this.occurredAtMs, required this.id});
@@ -49,6 +51,11 @@ abstract interface class LedgerRepository {
   Future<Result<int>> purgeExpired({required DateTime before});
   /// Return fingerprints of live entries in [fromMs, toMs] for import dedup.
   Future<Result<Set<String>>> fingerprintsInRange({required int fromMs, required int toMs});
+  /// 08-§8 巡检：比对 transactions 行数与 daily_stats.tx_count 合计。
+  /// 返回 true 表示一致；false 表示需要重建。
+  Future<Result<bool>> verifyDailyStats();
+  /// 08-§8 重建：单事务清空 daily_stats 后由 transactions 全量重算。
+  Future<Result<void>> rebuildDailyStats();
 }
 
 class MonthSummary {
@@ -96,6 +103,25 @@ abstract interface class CategoryRepository {
     required String fallbackCategoryId,
     bool includeDescendants = false,
   });
+
+  /// STORY-1.3 AC11–13：同层级合并。
+  /// 一级合并时，其下二级整体迁到目标一级；同名二级并入目标同名项。
+  Future<Result<CategoryMergeResult>> mergeCategories({
+    required String sourceId,
+    required String targetId,
+  });
+}
+
+class CategoryMergeResult {
+  const CategoryMergeResult({
+    required this.movedEntries,
+    required this.movedChildren,
+    required this.mergedSameNameChildren,
+  });
+  final int movedEntries;
+  final int movedChildren;
+  final int mergedSameNameChildren;
+  int get totalAffected => movedEntries + movedChildren + mergedSameNameChildren;
 }
 
 class AccountWithBalance {
@@ -117,6 +143,49 @@ abstract interface class AccountRepository {
   Future<Result<void>> softDelete(String id);
   Future<Result<AccountBalance>> balanceOf(String accountId);
   Future<Result<void>> reconcile({required String accountId, required int actualBalanceCents, required String deviceId, required String bookId, required String otherCategoryId});
+  /// STORY-2.1 AC6：删除前的引用统计（账单/转入/周期/预算）。
+  Future<Result<AccountRefCounts>> countReferences(String accountId);
+  /// 把 [fromId] 上的账单引用迁到 [toId]（含转出/转入两侧）。
+  Future<Result<int>> migrateTransactions({required String fromId, required String toId});
+}
+
+/// 账户被引用的四类来源（STORY-2.1 AC6）。
+class AccountRefCounts {
+  const AccountRefCounts({
+    required this.transactions,
+    required this.transferIn,
+    required this.recurringRules,
+    required this.budgets,
+  });
+  final int transactions;
+  final int transferIn;
+  final int recurringRules;
+  final int budgets;
+  int get total => transactions + transferIn + recurringRules + budgets;
+  bool get isEmpty => total == 0;
+}
+
+/// STORY-6.1 自动化规则。
+abstract interface class AutomationRuleRepository {
+  Future<Result<List<AutomationRule>>> listEnabled({String? bookId, RuleStage? stage});
+  Future<Result<List<AutomationRule>>> listAll({String? bookId});
+  Future<Result<AutomationRule>> getById(String id);
+  Future<Result<AutomationRule>> create(AutomationRule rule);
+  Future<Result<AutomationRule>> update(AutomationRule rule);
+  Future<Result<void>> softDelete(String id);
+  /// 命中条数（变更预览用）。
+  Future<Result<int>> countMatches({required String bookId, required List<RuleCondition> conditions});
+}
+
+/// STORY-7.1 储蓄目标。
+abstract interface class SavingsGoalRepository {
+  Future<Result<List<SavingsGoal>>> listByBook(String bookId);
+  Future<Result<SavingsGoal>> getById(String id);
+  Future<Result<SavingsGoal>> create(SavingsGoal goal);
+  Future<Result<SavingsGoal>> update(SavingsGoal goal);
+  Future<Result<void>> softDelete(String id);
+  /// 存入金额（累加 saved_cents）。
+  Future<Result<SavingsGoal>> deposit({required String goalId, required int amountCents});
 }
 
 abstract interface class BudgetRepository {

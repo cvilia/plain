@@ -5,10 +5,13 @@ library;
 import 'package:plain/core/money/money.dart';
 
 class EvalResult {
-  const EvalResult({required this.money, required this.expression, required this.wasIncomplete});
+  const EvalResult({required this.money, required this.expression, required this.wasIncomplete, this.error});
   final Money money;
   final String expression;
   final bool wasIncomplete;
+
+  /// 非空表示求值失败（如除零）；此时 [money] 无业务意义。
+  final String? error;
 }
 
 class ExpressionEvaluator {
@@ -31,10 +34,13 @@ class ExpressionEvaluator {
     if (end == 0) {
       return EvalResult(money: Money.zero, expression: input, wasIncomplete: true);
     }
+    final err = _ErrBox();
+    final money = _evalTokens(tokens.sublist(0, end), err);
     return EvalResult(
-      money: _evalTokens(tokens.sublist(0, end)),
+      money: money,
       expression: input,
       wasIncomplete: wasIncomplete,
+      error: err.value,
     );
   }
 
@@ -67,7 +73,7 @@ class ExpressionEvaluator {
   bool _isOperator(String t) => t == '+' || t == '-' || t == '*' || t == '/';
   bool _isDigit(String c) => c.codeUnitAt(0) >= 0x30 && c.codeUnitAt(0) <= 0x39;
 
-  Money _evalTokens(List<String> tokens) {
+  Money _evalTokens(List<String> tokens, _ErrBox err) {
     final output = <String>[];
     final ops = <String>[];
     var prevWasValue = false;
@@ -111,6 +117,11 @@ class ExpressionEvaluator {
           case '*':
             stack.add(_mulCents(a, b));
           case '/':
+            if (b == 0) {
+              // AC8：除零不得静默算成 0
+              err.value = 'divide_by_zero';
+              return Money.zero;
+            }
             stack.add(_divCents(a, b));
         }
       }
@@ -137,8 +148,11 @@ class ExpressionEvaluator {
   }
 
   int _divCents(int a, int b) {
-    if (b == 0) return 0;
     final scaled = a * 100;
     return scaled >= 0 ? (scaled + (b.abs() ~/ 2)) ~/ b : -((-scaled + (b.abs() ~/ 2)) ~/ b);
   }
+}
+
+class _ErrBox {
+  String? value;
 }

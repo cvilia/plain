@@ -11,10 +11,16 @@ import 'package:plain/data/db/database.dart';
 import 'package:plain/data/sync/webdav_client.dart';
 
 class WebDavSyncResult {
-  const WebDavSyncResult({required this.success, this.message, this.fileSize});
+  const WebDavSyncResult({
+    required this.success,
+    this.message,
+    this.fileSize,
+    this.syncedAt,
+  });
   final bool success;
   final String? message;
   final int? fileSize;
+  final DateTime? syncedAt;
 }
 
 class WebDavSyncService {
@@ -38,7 +44,9 @@ class WebDavSyncService {
 
       final docsDir = await getApplicationDocumentsDirectory();
       final tmpPath = p.join(docsDir.path, 'sync_upload_${DateTime.now().millisecondsSinceEpoch}.db');
-      _db.raw.execute("VACUUM INTO '$tmpPath'");
+      // VACUUM INTO requires a literal path — escape quotes (same as backup_page).
+      final escaped = tmpPath.replaceAll("'", "''");
+      _db.raw.execute("VACUUM INTO '$escaped'");
 
       final file = File(tmpPath);
       if (!await file.exists()) {
@@ -52,7 +60,12 @@ class WebDavSyncService {
       if (!uploaded) return const WebDavSyncResult(success: false, message: '上传失败');
 
       _log?.info('webdav.upload', fields: {'size': size});
-      return WebDavSyncResult(success: true, message: '上传成功', fileSize: size);
+      return WebDavSyncResult(
+    success: true,
+    message: '上传成功',
+    fileSize: size,
+    syncedAt: DateTime.now().toUtc(),
+  );
     } on Exception catch (e) {
       return WebDavSyncResult(success: false, message: '上传异常: $e');
     }
@@ -99,7 +112,12 @@ class WebDavSyncService {
       await tmpFile.copy(dbPath);
       await tmpFile.delete();
 
-      return WebDavSyncResult(success: true, message: '下载成功，请重启应用', fileSize: bytes.length);
+      return WebDavSyncResult(
+    success: true,
+    message: '下载成功，请重启应用',
+    fileSize: bytes.length,
+    syncedAt: DateTime.now().toUtc(),
+  );
     } on Exception catch (e) {
       return WebDavSyncResult(success: false, message: '下载异常: $e');
     }

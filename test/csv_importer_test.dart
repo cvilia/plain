@@ -99,14 +99,25 @@ void main() {
   });
 
   group('fingerprint and label', () {
-    test('fingerprint uses date|amount|label', () {
+    test('fingerprint uses date|amount|label|currency', () {
       final fp = buildFingerprint(date: DateTime(2024, 1, 15), amountCents: 2500, label: '午餐');
-      expect(fp, '2024-01-15|2500|午餐');
+      expect(fp, '2024-01-15|2500|午餐|CNY');
     });
 
     test('fingerprint uses abs amount', () {
       final fp = buildFingerprint(date: DateTime(2024, 1, 15), amountCents: -2500, label: '午餐');
-      expect(fp, '2024-01-15|2500|午餐');
+      expect(fp, '2024-01-15|2500|午餐|CNY');
+    });
+
+    test('fingerprint can include source for same-source dedup', () {
+      final fp = buildFingerprint(
+        date: DateTime(2024, 1, 15),
+        amountCents: 2500,
+        label: '午餐',
+        source: 'alipay',
+        includeSource: true,
+      );
+      expect(fp, '2024-01-15|2500|午餐|CNY|alipay');
     });
 
     test('composeLabel combines merchant and note', () {
@@ -181,11 +192,20 @@ void main() {
         make('2024-01-15', 2500, '午餐'),
         make('2024-01-16', 3000, '打车'),
       ];
-      final existing = {'2024-01-15|2500|午餐'};
+      final existing = {
+        buildFingerprint(
+          date: DateTime.parse('2024-01-15'),
+          amountCents: 2500,
+          label: '午餐',
+        ),
+      };
       final result = dedupEntries(entries, existing);
       expect(result.unique.length, 1);
       expect(result.dedupedCount, 1);
-      expect(result.unique.first.fingerprint, '2024-01-16|3000|打车');
+      expect(
+        result.unique.first.fingerprint,
+        buildFingerprint(date: DateTime.parse('2024-01-16'), amountCents: 3000, label: '打车'),
+      );
     });
   });
 }

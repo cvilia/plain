@@ -7,9 +7,11 @@ import 'package:plain/core/money/expression_evaluator.dart';
 import 'package:plain/core/money/money.dart';
 import 'package:plain/core/result/result.dart';
 import 'package:plain/core/time/clock.dart';
+import 'package:plain/domain/entities/automation_rule.dart';
 import 'package:plain/domain/entities/enums.dart';
 import 'package:plain/domain/entities/ledger_entry.dart';
 import 'package:plain/domain/repositories/repositories.dart';
+import 'package:plain/domain/services/rule_applier.dart';
 
 class CreateEntryInput {
   const CreateEntryInput({
@@ -34,12 +36,16 @@ class CreateEntryUseCase {
   CreateEntryUseCase({
     required LedgerRepository repository, required Clock clock, required UuidV7 idGen,
     ExpressionEvaluator evaluator = const ExpressionEvaluator(),
+    this.ruleRepository,
   })  : _repository = repository, _clock = clock, _idGen = idGen, _evaluator = evaluator;
 
   final LedgerRepository _repository;
   final Clock _clock;
   final UuidV7 _idGen;
   final ExpressionEvaluator _evaluator;
+
+  /// STORY-6.1：可选规则仓储；非空时在写入前套用 post 阶段规则。
+  final AutomationRuleRepository? ruleRepository;
 
   Future<Result<LedgerEntry>> call(CreateEntryInput input) async {
     final eval = _evaluator.eval(input.amountExpression);
@@ -51,15 +57,38 @@ class CreateEntryUseCase {
     if (input.type == EntryType.transfer && input.toAccountId == null) {
       return err<LedgerEntry>(const ValidationFailure('entry.transfer_missing_target', 'missing'));
     }
+    // STORY-1.7 AC1：转出与转入不可相同
+    if (input.type == EntryType.transfer &&
+        input.accountId != null &&
+        input.accountId == input.toAccountId) {
+      return err<LedgerEntry>(
+          const ValidationFailure('entry.transfer_same_account', 'same'));
+    }
+    // STORY-1.7：借出/借入需往来对象（暂用备注承载）
+    if ((input.type == EntryType.borrowOut || input.type == EntryType.borrowIn) &&
+        (input.note == null || input.note!.trim().isEmpty)) {
+      return err<LedgerEntry>(
+          const ValidationFailure('entry.borrow_counterparty_required', 'note'));
+    }
     final now = _clock.now();
     final occurred = input.occurredAt?.toUtc() ?? now;
-    final entry = LedgerEntry(
+    var entry = LedgerEntry(
       id: _idGen.generate(at: occurred), bookId: input.bookId, type: input.type,
       amount: Money(eval.money.cents.abs()), currency: MoneyRules.defaultCurrency,
       categoryId: input.categoryId, accountId: input.accountId, toAccountId: input.toAccountId,
       occurredAt: occurred, note: input.note, source: input.source,
       createdAt: now, updatedAt: now, revision: 1, deviceId: input.deviceId, baseRevision: 0,
     );
+
+    // STORY-6.1：套用自动化规则（post，手动记账作用域）
+    if (ruleRepository != null) {
+      entry = await applyAutomationRules(
+        ruleRepository: ruleRepository!,
+        entry: entry,
+        scope: RuleScope.manual,
+      );
+    }
+
     return _repository.create(entry);
   }
 }

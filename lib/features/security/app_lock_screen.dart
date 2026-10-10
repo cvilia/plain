@@ -131,9 +131,15 @@ class _AppLockScreenState extends ConsumerState<AppLockScreen> {
 
       if (didAuth && mounted) {
         lock.unlock();
+      } else if (!didAuth && mounted) {
+        // STORY-4.2 AC3：生物识别失败计入失败次数，3 次后强制回退 PIN
+        lock.recordFailure();
       }
     } on Exception {
       // Fall through to PIN.
+      if (mounted) {
+        ref.read(appLockControllerProvider.notifier).recordFailure();
+      }
     } finally {
       if (mounted) setState(() => _checking = false);
     }
@@ -284,9 +290,11 @@ class _AppLockSetupDialogState extends State<_AppLockSetupDialog> {
   Widget build(BuildContext context) {
     return AlertDialog(
       title: const Text('设置应用锁'),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
+      // Scrollable so the dialog never overflows on short windows / large text.
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
           const Text('设置数字密码后才会开启应用锁。请牢记 PIN，忘记后只能清除应用数据。'),
           const SizedBox(height: Spacing.lg),
           TextField(
@@ -314,7 +322,8 @@ class _AppLockSetupDialogState extends State<_AppLockSetupDialog> {
           ),
           if (_error != null)
             Text(_error!, style: TextStyle(color: context.colors.expense, fontSize: 12)),
-        ],
+          ],
+        ),
       ),
       actions: [
         TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('取消')),

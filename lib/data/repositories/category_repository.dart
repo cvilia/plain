@@ -263,6 +263,139 @@ class CategoryRepositoryImpl implements CategoryRepository {
     );
   }
 
+  @override
+  Future<Result<CategoryMergeResult>> mergeCategories({
+    required String sourceId,
+    required String targetId,
+  }) async {
+    if (sourceId == targetId) {
+      return err(const ValidationFailure('category.merge_same', 'same'));
+    }
+    var movedEntries = 0;
+    var movedChildren = 0;
+    var mergedSameName = 0;
+
+    final result = runWrite<CategoryMergeResult>(
+      _db,
+      failCode: 'db.merge_failed',
+      result: const CategoryMergeResult(movedEntries: 0, movedChildren: 0, mergedSameNameChildren: 0),
+      body: () {
+        final srcRow = _db.raw.select('SELECT * FROM categories WHERE id = ? AND deleted_at IS NULL', [sourceId]);
+        final dstRow = _db.raw.select('SELECT * FROM categories WHERE id = ? AND deleted_at IS NULL', [targetId]);
+        if (srcRow.isEmpty || dstRow.isEmpty) {
+          throw StateError('category.merge_not_found');
+        }
+        final src = _fromRow(srcRow.first);
+        final dst = _fromRow(dstRow.first);
+        // 仅同层级合并
+        if ((src.parentId == null) != (dst.parentId == null)) {
+          throw StateError('category.merge_level_mismatch');
+        }
+
+        int moveEntries(String fromId, String toId) {
+          final affected = _db.raw.select(
+            'SELECT id, category_id, device_id, revision FROM transactions '
+            'WHERE category_id = ? AND deleted_at IS NULL',
+            [fromId],
+          );
+          if (affected.isEmpty) return 0;
+          _db.raw.execute(
+            'UPDATE transactions SET category_id = ? WHERE category_id = ? AND deleted_at IS NULL',
+            [toId, fromId],
+          );
+          for (final row in affected) {
+            _changeLog.write(
+              entityType: EntityType.transaction,
+              entityId: row['id']! as String,
+              op: ChangeOp.update,
+              deviceId: row['device_id']! as String,
+              baseRevision: (row['revision'] as int?) ?? 1,
+              before: {'category_id': row['category_id']},
+              after: {'category_id': toId},
+            );
+          }
+          return affected.length;
+        }
+
+        void softDeleteCategory(Category cat) {
+          final now = _clock.now();
+          final deleted = cat.copyWith(
+            deletedAt: now, updatedAt: now,
+            revision: cat.revision + 1, baseRevision: cat.revision,
+          );
+          _update(deleted);
+          _changeLog.write(
+            entityType: EntityType.category, entityId: cat.id, op: ChangeOp.delete,
+            deviceId: cat.deviceId, baseRevision: cat.revision,
+            before: _payload(cat), after: const {},
+          );
+        }
+
+        if (src.parentId == null) {
+          // 一级合并：二级整体迁移；同名二级并入目标同名项
+          final kids = _db.raw.select(
+            'SELECT * FROM categories WHERE parent_id = ? AND deleted_at IS NULL',
+            [sourceId],
+          );
+          final dstKids = _db.raw.select(
+            'SELECT * FROM categories WHERE parent_id = ? AND deleted_at IS NULL',
+            [targetId],
+          );
+          final dstByName = <String, Category>{
+            for (final r in dstKids) (_fromRow(r).name): _fromRow(r),
+          };
+          for (final r in kids) {
+            final child = _fromRow(r);
+            final same = dstByName[child.name];
+            if (same != null) {
+              movedEntries += moveEntries(child.id, same.id);
+              softDeleteCategory(child);
+              mergedSameName++;
+            } else {
+              // 挂到目标一级下
+              final now = _clock.now();
+              final reparented = child.copyWith(
+                // parent change is applied via raw update (copyWith has no parentId)
+                updatedAt: now,
+                revision: child.revision + 1,
+                baseRevision: child.revision,
+              );
+              _db.raw.execute(
+                'UPDATE categories SET parent_id = ?, updated_at = ?, revision = ?, base_revision = ? WHERE id = ?',
+                [targetId, now.millisecondsSinceEpoch, reparented.revision, child.revision, child.id],
+              );
+              _changeLog.write(
+                entityType: EntityType.category,
+                entityId: child.id,
+                op: ChangeOp.update,
+                deviceId: child.deviceId,
+                baseRevision: child.revision,
+                before: _payload(child),
+                after: {..._payload(child), 'parent_id': targetId},
+              );
+              movedChildren++;
+            }
+          }
+          movedEntries += moveEntries(sourceId, targetId);
+          softDeleteCategory(src);
+        } else {
+          // 二级合并：账单并入目标，源软删
+          movedEntries += moveEntries(sourceId, targetId);
+          softDeleteCategory(src);
+        }
+      },
+    );
+
+    return result.when(
+      success: (_) => ok(CategoryMergeResult(
+        movedEntries: movedEntries,
+        movedChildren: movedChildren,
+        mergedSameNameChildren: mergedSameName,
+      )),
+      failure: (f) => err(f),
+    );
+  }
+
   void _insert(Category c) {
     _db.raw.execute(
       'INSERT INTO categories (id,parent_id,name,kind,icon_ref,icon_asset,note,sort_order,is_hidden,is_preset,created_at,updated_at,deleted_at,revision,device_id,base_revision) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',

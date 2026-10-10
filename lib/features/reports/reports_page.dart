@@ -4,16 +4,20 @@ library;
 import 'package:plain/app/theme/app_colors.dart';
 import 'package:plain/domain/entities/category.dart';
 import 'package:plain/design_system/app_empty_state.dart';
-import 'package:flutter/material.dart';
 import 'package:plain/design_system/app_toast.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:plain/app/bootstrap.dart';
 import 'package:plain/app/breakpoints.dart';
+import 'package:plain/app/router/app_router.dart';
+import 'package:plain/app/settings/ledger_settings.dart';
 import 'package:plain/app/theme/design_tokens.dart';
 import 'package:plain/app/theme/theme_registry.dart';
 import 'package:plain/core/format/amount_formatter.dart';
 import 'package:plain/core/refresh/data_invalidation.dart';
 import 'package:plain/design_system/donut_chart.dart';
+import 'package:plain/features/ledger/controllers/flow_list_controller.dart';
 
 class MonthlyReport {
   const MonthlyReport({
@@ -24,6 +28,7 @@ class MonthlyReport {
     required this.txCount,
     required this.categoryBreakdown,
     this.dailyExpense = const {},
+    this.dailyIncome = const {},
   });
 
   final int year;
@@ -36,20 +41,33 @@ class MonthlyReport {
   /// day-of-month (1–31) → expense cents. Used by 日支出走势.
   final Map<int, int> dailyExpense;
 
+  /// day-of-month (1–31) → income cents.
+  final Map<int, int> dailyIncome;
+
   int get balanceCents => incomeCents - expenseCents;
 }
 
 class CategorySlice {
-  const CategorySlice({required this.name, required this.expenseCents, required this.color});
+  const CategorySlice({
+    required this.name,
+    required this.expenseCents,
+    required this.color,
+    this.categoryId,
+    this.children = const [],
+  });
   final String name;
   final int expenseCents;
   final Color color;
+  final String? categoryId;
+
+  /// 二级分类（STORY-3.1 AC2 下钻）。
+  final List<CategorySlice> children;
 }
 
 class SelectedMonthNotifier extends Notifier<DateTime> {
   @override
   DateTime build() {
-    final now = DateTime.now();
+    final now = ref.read(appDependenciesProvider).clock.now().toLocal();
     return DateTime(now.year, now.month);
   }
 
@@ -74,10 +92,13 @@ final _reportProvider = FutureProvider<MonthlyReport>((ref) async {
   ref.watch(categoriesVersionProvider);
   final month = ref.watch(_selectedMonthProvider);
   final deps = ref.watch(appDependenciesProvider);
+  final calendar = ref.watch(calendarProvider);
+  final monthStartDay = ref.watch(monthStartDayProvider);
 
-  final dayFrom = '${month.year}-${month.month.toString().padLeft(2, '0')}-01';
-  final lastDay = DateTime(month.year, month.month + 1, 0).day;
-  final dayTo = '${month.year}-${month.month.toString().padLeft(2, '0')}-${lastDay.toString().padLeft(2, '0')}';
+  // G-1：按记账月边界取期，不按自然月硬切
+  final period = calendar.periodFor(month.year, month.month, day: monthStartDay);
+  final dayFrom = period.dayFrom;
+  final dayTo = period.dayTo;
 
   final summaryRes = await deps.ledgerRepository.monthSummary(
     bookId: deps.bookId, dayFrom: dayFrom, dayTo: dayTo,
@@ -93,6 +114,7 @@ final _reportProvider = FutureProvider<MonthlyReport>((ref) async {
 
   final catRes = await deps.categoryRepository.listAll();
   final cats = catRes.successOrNull ?? const <Category>[];
+  final catById = {for (final c in cats) c.id: c};
   final catNameMap = {for (final c in cats) c.id: c.name};
   final catIconMap = {for (final c in cats) c.id: c.iconRef};
 
@@ -103,39 +125,72 @@ final _reportProvider = FutureProvider<MonthlyReport>((ref) async {
     Color(0xFF97BC81), Color(0xFFBFA8E9),
   ];
 
-  final breakdown = <CategorySlice>[];
-  var colorIdx = 0;
-  final sorted = summary.byCategory.entries.toList()
-    ..sort((a, b) => b.value.expenseCents.compareTo(a.value.expenseCents));
-  for (final e in sorted) {
+  Color colorOf(String catId, int idx) {
+    final iconRef = catIconMap[catId] ?? 'other';
+    final palette = categoryColorMap[iconRef];
+    return palette != null ? Color(palette) : fallbackColors[idx % fallbackColors.length];
+  }
+
+  // 归并到一级分类，二级作为 children（STORY-3.1 AC2 下钻）
+  final rootAgg = <String, int>{}; // rootId -> expense
+  final childAgg = <String, Map<String, int>>{}; // rootId -> {childId: expense}
+  for (final e in summary.byCategory.entries) {
     final exp = e.value.expenseCents;
     if (exp <= 0) continue;
     final catId = e.key;
-    final catName = catNameMap[catId] ?? '其他';
-    final iconRef = catIconMap[catId] ?? 'other';
-    final palette = categoryColorMap[iconRef];
+    final cat = catById[catId];
+    final rootId = (cat != null && cat.parentId != null) ? cat.parentId! : catId;
+    rootAgg[rootId] = (rootAgg[rootId] ?? 0) + exp;
+    if (cat != null && cat.parentId != null) {
+      (childAgg[rootId] ??= {})[catId] = exp;
+    }
+  }
+
+  final breakdown = <CategorySlice>[];
+  var colorIdx = 0;
+  final sortedRoots = rootAgg.entries.toList()
+    ..sort((a, b) => b.value.compareTo(a.value));
+  for (final e in sortedRoots) {
+    final rootId = e.key;
+    final kids = childAgg[rootId];
+    final children = <CategorySlice>[];
+    if (kids != null) {
+      final sortedKids = kids.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
+      for (final k in sortedKids) {
+        children.add(CategorySlice(
+          name: catNameMap[k.key] ?? '其他',
+          expenseCents: k.value,
+          color: colorOf(k.key, colorIdx),
+          categoryId: k.key,
+        ));
+      }
+    }
     breakdown.add(CategorySlice(
-      name: catName,
-      expenseCents: exp,
-      color: palette != null
-          ? Color(palette)
-          : fallbackColors[colorIdx % fallbackColors.length],
+      name: catNameMap[rootId] ?? '其他',
+      expenseCents: e.value,
+      color: colorOf(rootId, colorIdx),
+      categoryId: rootId,
+      children: children,
     ));
     colorIdx++;
   }
 
-  // Daily expense for 日支出走势
+  // Daily expense/income for 日趋势
   final db = deps.db;
   final dayRows = db.raw.select(
-    'SELECT day_key, SUM(expense_cents) AS exp FROM daily_stats '
+    'SELECT day_key, SUM(expense_cents) AS exp, SUM(income_cents) AS inc FROM daily_stats '
     'WHERE book_id = ? AND day_key >= ? AND day_key <= ? GROUP BY day_key',
     [deps.bookId, dayFrom, dayTo],
   );
   final dailyExpense = <int, int>{};
+  final dailyIncome = <int, int>{};
   for (final r in dayRows) {
     final key = r['day_key']! as String;
     final d = int.tryParse(key.substring(8, 10)) ?? 0;
-    if (d > 0) dailyExpense[d] = ((r['exp'] as int?) ?? 0);
+    if (d > 0) {
+      dailyExpense[d] = ((r['exp'] as int?) ?? 0);
+      dailyIncome[d] = ((r['inc'] as int?) ?? 0);
+    }
   }
 
   return MonthlyReport(
@@ -146,28 +201,29 @@ final _reportProvider = FutureProvider<MonthlyReport>((ref) async {
     txCount: summary.txCount,
     categoryBreakdown: breakdown,
     dailyExpense: dailyExpense,
+    dailyIncome: dailyIncome,
   );
 });
 final _prevReportProvider = FutureProvider<MonthlyReport>((ref) async {
   ref.watch(ledgerVersionProvider);
   final month = ref.watch(_selectedMonthProvider);
-  final prevMonth = month.month == 1 ? DateTime(month.year - 1, 12) : DateTime(month.year, month.month - 1);
+  final calendar = ref.watch(calendarProvider);
+  final monthStartDay = ref.watch(monthStartDayProvider);
   final deps = ref.watch(appDependenciesProvider);
   final db = deps.db;
 
-  final dayFrom = '${prevMonth.year}-${prevMonth.month.toString().padLeft(2, '0')}-01';
-  final nextMonth = prevMonth.month == 12 ? DateTime(prevMonth.year + 1, 1) : DateTime(prevMonth.year, prevMonth.month + 1);
-  final dayTo = '${nextMonth.year}-${nextMonth.month.toString().padLeft(2, '0')}-01';
+  final cur = calendar.periodFor(month.year, month.month, day: monthStartDay);
+  final prev = calendar.previousPeriod(cur);
 
   final rows = db.raw.select(
     'SELECT COALESCE(SUM(expense_cents), 0) AS exp, COALESCE(SUM(income_cents), 0) AS inc '
-    'FROM daily_stats WHERE book_id = ? AND day_key >= ? AND day_key < ?',
-    [deps.bookId, dayFrom, dayTo],
+    'FROM daily_stats WHERE book_id = ? AND day_key >= ? AND day_key <= ?',
+    [deps.bookId, prev.dayFrom, prev.dayTo],
   );
 
   return MonthlyReport(
-    year: prevMonth.year,
-    month: prevMonth.month,
+    year: prev.year,
+    month: prev.month,
     expenseCents: (rows.first['exp'] as int?) ?? 0,
     incomeCents: (rows.first['inc'] as int?) ?? 0,
     txCount: 0,
@@ -175,12 +231,28 @@ final _prevReportProvider = FutureProvider<MonthlyReport>((ref) async {
   );
 });
 
-class ReportsPage extends ConsumerWidget {
+class ReportsPage extends ConsumerStatefulWidget {
   const ReportsPage({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<ReportsPage> createState() => _ReportsPageState();
+}
+
+class _ReportsPageState extends ConsumerState<ReportsPage> {
+  @override
+  void initState() {
+    super.initState();
+    // 报表下钻会带上流水分类筛选；再次进入报表时清除，
+    // 保证返回首页是完整流水。
+    Future.microtask(() {
+      ref.read(flowCategoryFilterProvider.notifier).clear();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final selectedMonth = ref.watch(_selectedMonthProvider);
+    final monthStartDay = ref.watch(monthStartDayProvider);
     final reportAsync = ref.watch(_reportProvider);
     final prevAsync = ref.watch(_prevReportProvider);
 
@@ -189,11 +261,19 @@ class ReportsPage extends ConsumerWidget {
         title: const Text('报表'),
         actions: [
           IconButton(icon: const Icon(Icons.chevron_left), onPressed: () => ref.read(_selectedMonthProvider.notifier).changeMonth(-1)),
-          Center(
-            child: Text(
-              '${selectedMonth.year}-${selectedMonth.month.toString().padLeft(2, '0')}',
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-            ),
+          Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                '${selectedMonth.year}-${selectedMonth.month.toString().padLeft(2, '0')}',
+                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+              ),
+              if (monthStartDay != 1)
+                Text(
+                  '记账月起始：$monthStartDay 日',
+                  style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w400),
+                ),
+            ],
           ),
           IconButton(icon: const Icon(Icons.chevron_right), onPressed: () => ref.read(_selectedMonthProvider.notifier).changeMonth(1)),
         ],
@@ -201,10 +281,16 @@ class ReportsPage extends ConsumerWidget {
       body: reportAsync.when(
         data: (report) {
           if (report.txCount == 0) {
-            return const ContentWidthConstraint(
+            // AC3：空态给记账入口
+            return ContentWidthConstraint(
               child: AppEmptyState(
                 icon: Icons.pie_chart_outline,
                 title: '本月还没有记录',
+                action: FilledButton.icon(
+                  onPressed: () => context.go(Routes.home),
+                  icon: const Icon(Icons.add),
+                  label: const Text('记一笔'),
+                ),
               ),
             );
           }
@@ -217,29 +303,47 @@ class ReportsPage extends ConsumerWidget {
   }
 }
 
-class _ReportContent extends StatefulWidget {
+class _ReportContent extends ConsumerStatefulWidget {
   const _ReportContent({required this.report, required this.prevAsync});
   final MonthlyReport report;
   final AsyncValue<MonthlyReport> prevAsync;
 
   @override
-  State<_ReportContent> createState() => _ReportContentState();
+  ConsumerState<_ReportContent> createState() => _ReportContentState();
 }
 
-class _ReportContentState extends State<_ReportContent> {
+class _ReportContentState extends ConsumerState<_ReportContent> {
   DonutSegment? _drillSegment;
 
   @override
   Widget build(BuildContext context) {
     final report = widget.report;
     final segments = report.categoryBreakdown
-        .map((s) => DonutSegment(name: s.name, value: s.expenseCents, color: s.color))
+        .map((s) => DonutSegment(
+              name: s.name,
+              value: s.expenseCents,
+              color: s.color,
+              children: [
+                for (final c in s.children)
+                  DonutSegment(name: c.name, value: c.expenseCents, color: c.color),
+              ],
+            ))
         .toList();
 
-    // 高保真 SP-3-01：支出分类 → 日支出走势 → 月对比
+    void openCategory(String? categoryId, String name) {
+      // STORY-3.1 AC2：下钻到该分类的流水列表
+      ref.read(flowCategoryFilterProvider.notifier).set(categoryId);
+      ref.read(flowListControllerProvider.notifier).loadInitial();
+      context.go(Routes.home);
+      showAppToast(context, '已筛选「$name」');
+    }
+
+    // 高保真 SP-3-01：结余卡 → 支出分类 → 日趋势 → 月对比
     return ListView(
       padding: const EdgeInsets.all(Spacing.lg),
       children: [
+        _BalanceCard(report: report),
+        const SizedBox(height: Spacing.lg),
         if (segments.isNotEmpty) ...[
           _sectionTitle(context, '支出分类'),
           Card(
@@ -248,21 +352,44 @@ class _ReportContentState extends State<_ReportContent> {
               child: DonutChart(
                 segments: segments,
                 drillSegment: _drillSegment,
-                onSegmentTap: (seg) => setState(() => _drillSegment = seg),
+                onSegmentTap: (seg) {
+                  if (seg.children.isEmpty) {
+                    final slice = report.categoryBreakdown
+                        .where((s) => s.name == seg.name)
+                        .toList();
+                    openCategory(slice.isEmpty ? null : slice.first.categoryId, seg.name);
+                  } else {
+                    setState(() => _drillSegment = seg);
+                  }
+                },
                 onDrillBack: () => setState(() => _drillSegment = null),
                 onSubcategoryTap: (sub) {
-                  showAppToast(context, '查看 ${sub.name} 的账单');
+                  final parent = _drillSegment;
+                  final rootSlice = report.categoryBreakdown
+                      .where((s) => s.name == (parent?.name ?? ''))
+                      .toList();
+                  String? catId;
+                  if (rootSlice.isNotEmpty) {
+                    final hit = rootSlice.first.children.where((c) => c.name == sub.name);
+                    if (hit.isNotEmpty) catId = hit.first.categoryId;
+                  }
+                  openCategory(catId, sub.name);
                 },
               ),
             ),
           ),
           const SizedBox(height: Spacing.lg),
         ],
-        _sectionTitle(context, '日支出走势'),
+        _sectionTitle(context, '日收支走势'),
         Card(
           child: Padding(
             padding: const EdgeInsets.all(Spacing.lg),
-            child: _DailyBars(dailyExpense: report.dailyExpense, month: report.month, year: report.year),
+            child: _DailyBars(
+              dailyExpense: report.dailyExpense,
+              dailyIncome: report.dailyIncome,
+              month: report.month,
+              year: report.year,
+            ),
           ),
         ),
         const SizedBox(height: Spacing.lg),
@@ -282,10 +409,47 @@ class _ReportContentState extends State<_ReportContent> {
       );
 }
 
-/// 日支出柱状图（高保真 .bars）
+/// 结余数字卡（STORY-3.1 页面结构 ①）
+class _BalanceCard extends StatelessWidget {
+  const _BalanceCard({required this.report});
+  final MonthlyReport report;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(Spacing.lg),
+        child: Row(children: [
+          Expanded(child: _stat(context, '收入', report.incomeCents, context.colors.income)),
+          Expanded(child: _stat(context, '支出', report.expenseCents, context.colors.expense)),
+          Expanded(child: _stat(context, '结余', report.balanceCents, context.colors.ink)),
+        ]),
+      ),
+    );
+  }
+
+  Widget _stat(BuildContext context, String label, int cents, Color color) {
+    return Column(children: [
+      Text(label, style: TextStyle(fontSize: 12, color: context.colors.inkTertiary)),
+      const SizedBox(height: 4),
+      Text(
+        formatAmountYuan(cents),
+        style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: color),
+      ),
+    ]);
+  }
+}
+
+/// 日收支柱状图（STORY-3.1：支出 + 收入双系列）
 class _DailyBars extends ConsumerWidget {
-  const _DailyBars({required this.dailyExpense, required this.month, required this.year});
+  const _DailyBars({
+    required this.dailyExpense,
+    required this.dailyIncome,
+    required this.month,
+    required this.year,
+  });
   final Map<int, int> dailyExpense;
+  final Map<int, int> dailyIncome;
   final int month;
   final int year;
 
@@ -294,7 +458,9 @@ class _DailyBars extends ConsumerWidget {
     final hideAmounts = ref.watch(hideAmountsProvider);
     final daysInMonth = DateTime(year, month + 1, 0).day;
     final maxExp = dailyExpense.values.fold<int>(0, (m, v) => v > m ? v : m);
-    final now = DateTime.now();
+    final maxInc = dailyIncome.values.fold<int>(0, (m, v) => v > m ? v : m);
+    final maxV = maxExp > maxInc ? maxExp : maxInc;
+    final now = ref.read(appDependenciesProvider).clock.now().toLocal();
     final isCurrentMonth = now.year == year && now.month == month;
     final today = now.day;
 
@@ -318,17 +484,36 @@ class _DailyBars extends ConsumerWidget {
               for (var d = 1; d <= daysInMonth; d++)
                 Expanded(
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 1.5),
+                    padding: const EdgeInsets.symmetric(horizontal: 1),
                     child: Tooltip(
-                      message: '$month月$d日 ¥${formatAmount(dailyExpense[d] ?? 0, hide: hideAmounts)}',
-                      child: Container(
-                        height: ((dailyExpense[d] ?? 0) / (maxExp == 0 ? 1 : maxExp) * 92).clamp(3.0, 92.0),
-                        decoration: BoxDecoration(
-                          color: (isCurrentMonth && d == today)
-                              ? context.colors.primary
-                              : context.colors.barFill,
-                          borderRadius: BorderRadius.circular(4),
-                        ),
+                      message: '$month月$d日 支出 ¥${formatAmount(dailyExpense[d] ?? 0, hide: hideAmounts)} · 收入 ¥${formatAmount(dailyIncome[d] ?? 0, hide: hideAmounts)}',
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Expanded(
+                            child: Container(
+                              height: ((dailyExpense[d] ?? 0) / (maxV == 0 ? 1 : maxV) * 92).clamp(2.0, 92.0),
+                              decoration: BoxDecoration(
+                                color: (isCurrentMonth && d == today)
+                                    ? context.colors.primary
+                                    : context.colors.barFill,
+                                borderRadius: BorderRadius.circular(2),
+                              ),
+                            ),
+                          ),
+                          if (dailyIncome[d] != null && dailyIncome[d]! > 0) ...[
+                            const SizedBox(width: 1),
+                            Expanded(
+                              child: Container(
+                                height: ((dailyIncome[d] ?? 0) / (maxV == 0 ? 1 : maxV) * 92).clamp(2.0, 92.0),
+                                decoration: BoxDecoration(
+                                  color: context.colors.income.withValues(alpha: 0.55),
+                                  borderRadius: BorderRadius.circular(2),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
                       ),
                     ),
                   ),
@@ -336,8 +521,22 @@ class _DailyBars extends ConsumerWidget {
             ],
           ),
         ),
+        const SizedBox(height: 8),
+        Row(children: [
+          _legendDot(context, context.colors.barFill, '支出'),
+          const SizedBox(width: Spacing.md),
+          _legendDot(context, context.colors.income.withValues(alpha: 0.55), '收入'),
+        ]),
       ],
     );
+  }
+
+  Widget _legendDot(BuildContext context, Color color, String label) {
+    return Row(children: [
+      Container(width: 8, height: 8, decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(2))),
+      const SizedBox(width: 4),
+      Text(label, style: TextStyle(fontSize: 11, color: context.colors.inkTertiary)),
+    ]);
   }
 }
 
@@ -363,6 +562,7 @@ class _ComparisonCard extends StatelessWidget {
               children: [
                 Expanded(child: _ChangeItem(label: '支出', current: current.expenseCents, previous: previous.expenseCents, change: expChange, isExpense: true)),
                 Expanded(child: _ChangeItem(label: '收入', current: current.incomeCents, previous: previous.incomeCents, change: incChange, isExpense: false)),
+                Expanded(child: _ChangeItem(label: '结余', current: current.balanceCents, previous: previous.balanceCents, change: null, isExpense: false)),
               ],
             ),
           ],

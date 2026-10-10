@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 手绘小猪品牌标（VectorDrawable，非位图）：启动页用，背景透明。 -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="120dp"
+    android:height="120dp"
+    android:viewportWidth="120"
+    android:viewportHeight="120">
+
+  <!-- 圆角方块 -->
+  <path
+      android:pathData="M24,10 L96,10 Q110,10 110,24 L110,96 Q110,110 96,110 L24,110 Q10,110 10,96 L10,24 Q10,10 24,10 Z"
+      android:fillColor="#DDA23C"/>
+
+  <!-- 耳 -->
+  <path
+      android:pathData="M38,42 Q30,22 52,34 L48,44 Z"
+      android:fillColor="#FFFFFF"/>
+  <path
+      android:pathData="M82,42 Q90,22 68,34 L72,44 Z"
+      android:fillColor="#FFFFFF"/>
+
+  <!-- 头 -->
+  <path
+      android:pathData="M60,40 a22,22 0 1 0 0.1,0 Z"
+      android:fillColor="#FFFFFF"/>
+
+  <!-- 鼻 -->
+  <path
+      android:pathData="M48,58 L72,58 Q76,58 76,62 L76,68 Q76,72 72,72 L48,72 Q44,72 44,68 L44,62 Q44,58 48,58 Z"
+      android:fillColor="#F0D8B0"/>
+  <path android:pathData="M52,64 a2,3 0 1 0 0.1,0 Z" android:fillColor="#FFFFFF"/>
+  <path android:pathData="M68,64 a2,3 0 1 0 0.1,0 Z" android:fillColor="#FFFFFF"/>
+
+  <!-- 眼 -->
+  <path android:pathData="M50,46 a2.5,2.5 0 1 0 0.1,0 Z" android:fillColor="#DDA23C"/>
+  <path android:pathData="M70,46 a2.5,2.5 0 1 0 0.1,0 Z" android:fillColor="#DDA23C"/>
+
+  <!-- 卷尾 -->
+  <path
+      android:pathData="M82,62 Q96,58 92,50 Q89,46 90,52"
+      android:strokeColor="#FFFFFF"
+      android:strokeWidth="3"
+      android:strokeLineCap="round"
+      android:fillColor="#00000000"/>
+
+  <!-- 脚 -->
+  <path android:pathData="M42,78 L56,78 Q58,78 58,80 L58,86 Q58,88 56,88 L42,88 Q40,88 40,86 L40,80 Q40,78 42,78 Z" android:fillColor="#FFFFFF"/>
+  <path android:pathData="M64,78 L78,78 Q80,78 80,80 L80,86 Q80,88 78,88 L64,88 Q62,88 62,86 L62,80 Q62,78 64,78 Z" android:fillColor="#FFFFFF"/>
+</vector>
