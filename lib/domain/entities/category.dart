@@ -9,6 +9,7 @@ class Category {
     required this.kind, required this.iconRef, this.iconAsset,
     this.note,
     required this.sortOrder, this.isHidden = false, this.isPreset = false,
+    this.isRigid = false,
     required this.createdAt, required this.updatedAt,
     this.deletedAt, this.revision = 1,
     required this.deviceId, this.baseRevision = 0,
@@ -26,6 +27,10 @@ class Category {
   final int sortOrder;
   final bool isHidden;
   final bool isPreset;
+
+  /// STORY-3.3：刚性支出标记。仅一级分类可标，二级继承。
+  /// 仅用于安全可花的「刚性支出预留」计算。
+  final bool isRigid;
   final DateTime createdAt;
   final DateTime updatedAt;
   final DateTime? deletedAt;
@@ -41,7 +46,7 @@ class Category {
   Category withNote(String? note) => Category(
         id: id, parentId: parentId, name: name, kind: kind,
         iconRef: iconRef, iconAsset: iconAsset, note: note,
-        sortOrder: sortOrder, isHidden: isHidden, isPreset: isPreset,
+        sortOrder: sortOrder, isHidden: isHidden, isPreset: isPreset, isRigid: isRigid,
         createdAt: createdAt, updatedAt: updatedAt, deletedAt: deletedAt,
         revision: revision, deviceId: deviceId, baseRevision: baseRevision,
       );
@@ -50,14 +55,14 @@ class Category {
   Category withParent(String? parentId) => Category(
         id: id, parentId: parentId, name: name, kind: kind,
         iconRef: iconRef, iconAsset: iconAsset, note: note,
-        sortOrder: sortOrder, isHidden: isHidden, isPreset: isPreset,
+        sortOrder: sortOrder, isHidden: isHidden, isPreset: isPreset, isRigid: isRigid,
         createdAt: createdAt, updatedAt: updatedAt, deletedAt: deletedAt,
         revision: revision, deviceId: deviceId, baseRevision: baseRevision,
       );
 
   Category copyWith({
     String? name, String? iconRef, String? iconAsset, int? sortOrder,
-    bool? isHidden, DateTime? updatedAt, DateTime? deletedAt,
+    bool? isHidden, bool? isRigid, DateTime? updatedAt, DateTime? deletedAt,
     int? revision, int? baseRevision, bool clearIconAsset = false,
   }) {
     return Category(
@@ -66,7 +71,8 @@ class Category {
       iconAsset: clearIconAsset ? null : (iconAsset ?? this.iconAsset),
       note: note,
       sortOrder: sortOrder ?? this.sortOrder, isHidden: isHidden ?? this.isHidden,
-      isPreset: isPreset, createdAt: createdAt, updatedAt: updatedAt ?? this.updatedAt,
+      isPreset: isPreset, isRigid: isRigid ?? this.isRigid,
+      createdAt: createdAt, updatedAt: updatedAt ?? this.updatedAt,
       deletedAt: deletedAt ?? this.deletedAt, revision: revision ?? this.revision,
       deviceId: deviceId, baseRevision: baseRevision ?? this.baseRevision,
     );

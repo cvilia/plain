@@ -59,6 +59,22 @@ android {
     }
 
     buildTypes {
+        // debug / profile 也走自建 jks，保证 Android Studio Run / Profile 与正式包同签名。
+        // key.properties 缺失时回落默认调试签名，不影响无签名环境构建。
+        getByName("debug") {
+            signingConfig = if (keystoreProperties.getProperty("storeFile") != null) {
+                signingConfigs.getByName("release")
+            } else {
+                signingConfigs.getByName("debug")
+            }
+        }
+        getByName("profile") {
+            signingConfig = if (keystoreProperties.getProperty("storeFile") != null) {
+                signingConfigs.getByName("release")
+            } else {
+                signingConfigs.getByName("debug")
+            }
+        }
         release {
             signingConfig = signingConfigs.getByName("release")
             // APK slimming: R8 + resource shrink (main lever vs ~19MB).

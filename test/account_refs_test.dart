@@ -80,4 +80,38 @@ void main() {
     final del = await accountRepo.softDelete('acc-b');
     expect(del.isSuccess, true);
   });
+
+  test('detachFromAccount clears account_id then softDelete succeeds', () async {
+    await createEntry(CreateEntryInput(
+      amountExpression: '10', type: EntryType.expense,
+      categoryId: 'cat-food', accountId: 'acc-a',
+      bookId: 'book-1', deviceId: 'dev-1',
+    ));
+    await createEntry(CreateEntryInput(
+      amountExpression: '5', type: EntryType.transfer,
+      categoryId: '', accountId: 'acc-a', toAccountId: 'acc-b',
+      bookId: 'book-1', deviceId: 'dev-1',
+    ));
+
+    // 有引用时不能直接删
+    final del1 = await accountRepo.softDelete('acc-a');
+    expect(del1.isFailure, isTrue);
+
+    // 改为不指定账户后可以删
+    final detached = await accountRepo.detachFromAccount('acc-a');
+    expect(detached.isSuccess, isTrue);
+    expect(detached.successOrNull, 2); // expense + transfer
+
+    final refs = await accountRepo.countReferences('acc-a');
+    expect(refs.successOrNull!.isEmpty, isTrue);
+
+    final del2 = await accountRepo.softDelete('acc-a');
+    expect(del2.isSuccess, isTrue);
+  });
+
+  test('detachFromAccount returns 0 when no references', () async {
+    final detached = await accountRepo.detachFromAccount('acc-b');
+    expect(detached.isSuccess, isTrue);
+    expect(detached.successOrNull, 0);
+  });
 }

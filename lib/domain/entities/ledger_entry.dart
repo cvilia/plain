@@ -8,6 +8,7 @@ class LedgerEntry {
   const LedgerEntry({
     required this.id, required this.bookId, required this.type,
     required this.amount, required this.currency,
+    this.originalAmountCents, this.exchangeRate,
     this.categoryId, this.accountId, this.toAccountId,
     required this.occurredAt, this.note, required this.source,
     this.batchId,
@@ -25,6 +26,12 @@ class LedgerEntry {
   final EntryType type;
   final Money amount;
   final String currency;
+
+  /// STORY-9.3：原币金额（cents）。null = 与 amount 相同（本位币记账）。
+  final int? originalAmountCents;
+
+  /// STORY-9.3：锁定汇率。null = 不适用（本位币记账）。
+  final double? exchangeRate;
   final String? categoryId;
   final String? accountId;
   final String? toAccountId;
@@ -90,15 +97,18 @@ class LedgerEntry {
     SplitRole? splitRole, String? parentId,
     ReimburseStatus? reimburseStatus,
     DateTime? reconciledAt,
+    int? originalAmountCents, double? exchangeRate,
     DateTime? updatedAt, DateTime? deletedAt, int? revision, int? baseRevision,
     bool clearNote = false, bool clearCategoryId = false, bool clearDeletedAt = false,
-    bool clearParentId = false,
+    bool clearParentId = false, bool clearAccount = false,
   }) {
     return LedgerEntry(
       id: id, bookId: bookId, type: type ?? this.type,
       amount: amount ?? this.amount, currency: currency,
+      originalAmountCents: originalAmountCents ?? this.originalAmountCents,
+      exchangeRate: exchangeRate ?? this.exchangeRate,
       categoryId: clearCategoryId ? null : (categoryId ?? this.categoryId),
-      accountId: accountId ?? this.accountId,
+      accountId: clearAccount ? null : (accountId ?? this.accountId),
       toAccountId: toAccountId ?? this.toAccountId,
       occurredAt: occurredAt ?? this.occurredAt,
       note: clearNote ? null : (note ?? this.note),

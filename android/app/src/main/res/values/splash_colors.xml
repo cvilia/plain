@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 启动页底色：白色。 -->
+<!-- 启动页底色：白色（仅浅色）。 -->
 <resources>
     <color name="splash_bg">#FFFFFF</color>
 </resources>

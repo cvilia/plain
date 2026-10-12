@@ -19,14 +19,16 @@ import 'package:plain/domain/usecases/split_usecases.dart';
 
 
 class _DetailData {
-  const _DetailData({required this.entry, required this.category});
+  const _DetailData({required this.entry, required this.category, this.accountName});
   final LedgerEntry entry;
   final domain.Category? category;
+  final String? accountName;
 }
 
 final _detailProvider = FutureProvider.family<_DetailData, String>((ref, entryId) async {
   ref.watch(ledgerVersionProvider);
   ref.watch(categoriesVersionProvider);
+  ref.watch(accountsVersionProvider);
   final deps = ref.watch(appDependenciesProvider);
   final entryResult = await deps.ledgerRepository.getById(entryId);
   final entry = entryResult.successOrNull;
@@ -38,7 +40,13 @@ final _detailProvider = FutureProvider.family<_DetailData, String>((ref, entryId
     final catResult = await deps.categoryRepository.getById(entry.categoryId!);
     cat = catResult.successOrNull;
   }
-  return _DetailData(entry: entry, category: cat);
+  // 归属账户
+  String? accountName;
+  if (entry.accountId != null) {
+    final accResult = await deps.accountRepository.getById(entry.accountId!);
+    accountName = accResult.successOrNull?.name;
+  }
+  return _DetailData(entry: entry, category: cat, accountName: accountName);
 });
 
 class EntryDetailPage extends ConsumerStatefulWidget {
@@ -106,7 +114,10 @@ class _EntryDetailPageState extends ConsumerState<EntryDetailPage> {
           ),
           const SizedBox(height: Spacing.xl),
           _DetailRow(icon: Icons.category_outlined, label: '分类', value: async.value?.category?.name ?? '未分类'),
-          _DetailRow(icon: Icons.calendar_today_outlined, label: '日期', value: formatDateTime(entry.occurredAt)),
+          _DetailRow(icon: Icons.account_balance_wallet_outlined, label: '归属账户', value: async.value?.accountName ?? '未指定账户'),
+          // 报销状态：可点击切换（none ↔ pending）
+          _ReimburseToggleRow(entry: entry),
+          _DetailRow(icon: Icons.calendar_today_outlined, label: '日期', value: formatDate(entry.occurredAt)),
           if (entry.note != null && entry.note!.isNotEmpty)
             _DetailRow(icon: Icons.edit_note_outlined, label: '备注', value: entry.note!),
           _DetailRow(icon: Icons.source_outlined, label: '来源', value: _sourceLabel(entry.source)),
@@ -292,6 +303,65 @@ class _EntryDetailPageState extends ConsumerState<EntryDetailPage> {
 
 }
 
+class _ReimburseToggleRow extends ConsumerWidget {
+  const _ReimburseToggleRow({required this.entry});
+  final LedgerEntry entry;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final label = switch (entry.reimburseStatus) {
+      ReimburseStatus.none => '不报销',
+      ReimburseStatus.pending => '待报销',
+      ReimburseStatus.submitted => '已提交',
+      ReimburseStatus.partial => '部分回款',
+      ReimburseStatus.reimbursed => '已回款',
+      ReimburseStatus.abandoned => '已放弃',
+    };
+    final isOn = entry.reimburseStatus == ReimburseStatus.pending;
+    return InkWell(
+      onTap: () async {
+        final deps = ref.read(appDependenciesProvider);
+        final next = isOn ? ReimburseStatus.none : ReimburseStatus.pending;
+        final updated = entry.copyWith(
+          reimburseStatus: next,
+          updatedAt: deps.clock.now(),
+          revision: entry.revision + 1,
+          baseRevision: entry.revision,
+        );
+        await deps.ledgerRepository.update(updated);
+        ref.invalidateData.bumpEntryMutated();
+      },
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: Spacing.md),
+        child: Row(
+          children: [
+            Icon(Icons.receipt_long_outlined, size: 20, color: context.colors.inkTertiary),
+            const SizedBox(width: Spacing.md),
+            SizedBox(width: 64, child: Text('报销', style: TextStyle(fontSize: 14, color: context.colors.inkSecondary))),
+            const SizedBox(width: Spacing.md),
+            Expanded(child: Text(label, style: TextStyle(fontSize: 14, color: isOn ? context.colors.accent : context.colors.ink))),
+            Switch(
+              value: isOn,
+              onChanged: (_) {
+                final deps = ref.read(appDependenciesProvider);
+                final next = isOn ? ReimburseStatus.none : ReimburseStatus.pending;
+                final updated = entry.copyWith(
+                  reimburseStatus: next,
+                  updatedAt: deps.clock.now(),
+                  revision: entry.revision + 1,
+                  baseRevision: entry.revision,
+                );
+                deps.ledgerRepository.update(updated);
+                ref.invalidateData.bumpEntryMutated();
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _DetailRow extends StatelessWidget {
   const _DetailRow({required this.icon, required this.label, required this.value});
 
@@ -304,17 +374,21 @@ class _DetailRow extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: Spacing.md),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Icon(icon, size: 20, color: context.colors.inkTertiary),
           const SizedBox(width: Spacing.md),
-          Text(label, style: TextStyle(fontSize: 14, color: context.colors.inkSecondary)),
-          const Spacer(),
-          Flexible(
+          SizedBox(
+            width: 64,
+            child: Text(label, style: TextStyle(fontSize: 14, color: context.colors.inkSecondary)),
+          ),
+          const SizedBox(width: Spacing.md),
+          Expanded(
             child: Text(
               value,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
-              textAlign: TextAlign.right,
+              textAlign: TextAlign.left,
               style: TextStyle(fontSize: 14, color: context.colors.ink),
             ),
           ),

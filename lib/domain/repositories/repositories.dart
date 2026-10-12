@@ -24,7 +24,7 @@ class EntryPage {
 }
 
 class EntryFilter {
-  const EntryFilter({this.categoryId, this.accountId, this.type, this.fromMs, this.toMs, this.keyword, this.bookId});
+  const EntryFilter({this.categoryId, this.accountId, this.type, this.fromMs, this.toMs, this.keyword, this.bookId, this.minAmountCents, this.maxAmountCents});
   final String? categoryId;
   final String? accountId;
   final String? type;
@@ -32,6 +32,8 @@ class EntryFilter {
   final int? toMs;
   final String? keyword;
   final String? bookId;
+  final int? minAmountCents;
+  final int? maxAmountCents;
 }
 
 abstract interface class LedgerRepository {
@@ -147,6 +149,8 @@ abstract interface class AccountRepository {
   Future<Result<AccountRefCounts>> countReferences(String accountId);
   /// 把 [fromId] 上的账单引用迁到 [toId]（含转出/转入两侧）。
   Future<Result<int>> migrateTransactions({required String fromId, required String toId});
+  /// 把该账户的账单/周期规则改为「不指定账户」（account_id = null），返回影响行数。
+  Future<Result<int>> detachFromAccount(String accountId);
 }
 
 /// 账户被引用的四类来源（STORY-2.1 AC6）。

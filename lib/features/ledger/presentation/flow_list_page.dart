@@ -3,6 +3,7 @@
 library;
 
 import 'package:plain/app/theme/app_colors.dart';
+import 'package:plain/features/ledger/presentation/home_shell.dart';
 import 'package:plain/core/time/date_format.dart';
 import 'package:plain/design_system/category_avatar.dart';
 import 'package:plain/design_system/app_empty_state.dart';
@@ -17,9 +18,20 @@ import 'package:plain/app/theme/tokens.dart';
 import 'package:plain/core/format/amount_formatter.dart';
 import 'package:plain/core/refresh/data_invalidation.dart';
 import 'package:plain/domain/entities/category.dart' as domain;
+import 'package:plain/features/ledger/presentation/safe_to_spend_card.dart';
+import 'package:plain/features/ledger/presentation/advanced_filter_page.dart';
+import 'package:plain/app/settings/home_layout_prefs.dart';
 import 'package:plain/domain/entities/enums.dart';
 import 'package:plain/domain/entities/ledger_entry.dart';
 import 'package:plain/features/ledger/controllers/flow_list_controller.dart';
+
+/// 首页卡片布局（order + hidden）（STORY-5.3）。
+final _homeLayoutProvider = FutureProvider<(List<String>, Set<String>)>((ref) async {
+  ref.watch(homeLayoutVersionProvider);
+  final order = await loadHomeCardOrder();
+  final hidden = await loadHomeCardHidden();
+  return (order, hidden);
+});
 
 class FlowListPage extends ConsumerWidget {
   const FlowListPage({super.key});
@@ -38,6 +50,20 @@ class FlowListPage extends ConsumerWidget {
     });
 
     return Scaffold(
+      appBar: AppBar(
+        title: const Text('流水'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.tune, size: 22),
+            tooltip: '高级筛选',
+            onPressed: () => Navigator.push<void>(
+              context,
+              MaterialPageRoute(builder: (_) => const AdvancedFilterPage()),
+            ),
+          ),
+          const EntryAppBarAction(),
+        ],
+      ),
       body: SafeArea(
         child: Column(
           children: [
@@ -95,13 +121,13 @@ class _EmptyState extends StatelessWidget {
   }
 }
 
-class _FlowList extends StatelessWidget {
+class _FlowList extends ConsumerWidget {
   const _FlowList({required this.state, required this.controller});
   final FlowListState state;
   final FlowListController controller;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final groups = state.groups;
     // Keep the balance card clear of the status bar / notch.
     // 顶部安全区由外层 SafeArea 统一处理，这里只留间距
@@ -109,8 +135,29 @@ class _FlowList extends StatelessWidget {
 
     // 拍平成单一列表：日标题 + 账单各自为 ListView 顶层子项。
     // 嵌套 Column 里的 Dismissible 在删一条后会失效（手势丢失）。
+    // 首页卡片按布局偏好排序 + 显示/隐藏（STORY-5.3）。
+    final layout = ref.watch(_homeLayoutProvider).maybeWhen(
+      data: (v) => v,
+      orElse: () => (const <String>[], const <String>{}),
+    );
+    final (cardOrder, hiddenCards) = layout;
+    // 按用户排序决定 balance/safeToSpend 的顺序
+    final showBalance = !hiddenCards.contains('monthly_balance');
+    final showSafe = !hiddenCards.contains('safe_to_spend');
+    final balanceIdx = cardOrder.indexOf('monthly_balance');
+    final safeIdx = cardOrder.indexOf('safe_to_spend');
+    final headerRows = <_FlowRow>[
+      if (showBalance) const _FlowRow.balance(),
+      if (showSafe) const _FlowRow.safeToSpend(),
+    ];
+    // 按 order 中的相对位置排序
+    headerRows.sort((a, b) {
+      final ia = a.kind == _FlowRowKind.balance ? (balanceIdx < 0 ? 0 : balanceIdx) : (safeIdx < 0 ? 1 : safeIdx);
+      final ib = b.kind == _FlowRowKind.balance ? (balanceIdx < 0 ? 0 : balanceIdx) : (safeIdx < 0 ? 1 : safeIdx);
+      return ia.compareTo(ib);
+    });
     final rows = <_FlowRow>[
-      const _FlowRow.balance(),
+      ...headerRows,
       for (final g in groups) ...[
         _FlowRow.dayHeader(g),
         for (final e in g.entries) _FlowRow.entry(e),
@@ -126,6 +173,8 @@ class _FlowList extends StatelessWidget {
         switch (row.kind) {
           case _FlowRowKind.balance:
             return _BalanceCard(state: state);
+          case _FlowRowKind.safeToSpend:
+            return const SafeToSpendCard();
           case _FlowRowKind.dayHeader:
             return _DayHeader(group: row.group!, key: ValueKey('day-${row.group!.dayKey}'));
           case _FlowRowKind.entry:
@@ -145,10 +194,11 @@ class _FlowList extends StatelessWidget {
   }
 }
 
-enum _FlowRowKind { balance, dayHeader, entry, more }
+enum _FlowRowKind { balance, safeToSpend, dayHeader, entry, more }
 
 class _FlowRow {
   const _FlowRow.balance() : kind = _FlowRowKind.balance, group = null, entry = null;
+  const _FlowRow.safeToSpend() : kind = _FlowRowKind.safeToSpend, group = null, entry = null;
   const _FlowRow.dayHeader(DayGroup this.group) : kind = _FlowRowKind.dayHeader, entry = null;
   const _FlowRow.entry(LedgerEntry this.entry) : kind = _FlowRowKind.entry, group = null;
   const _FlowRow.more() : kind = _FlowRowKind.more, group = null, entry = null;
@@ -394,3 +444,4 @@ class _EntryTileState extends ConsumerState<_EntryTile> {
     return hm;
   }
 }
+

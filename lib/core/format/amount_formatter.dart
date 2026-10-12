@@ -45,3 +45,19 @@ String formatAmountCurrency(
   final sign = cents < 0 ? '-' : '';
   return '$sign$sym${formatAmount(cents)}';
 }
+
+/// 双币显示（STORY-9.3）：原币 + 折算本位币。
+/// [originalCents] 原币金额，[convertedCents] 折算后本位币金额。
+/// 返回如 `$12.50 ≈ ¥89.00`，同币种时只显示一个。
+String formatDualCurrency({
+  required int originalCents,
+  required int convertedCents,
+  required String fromCurrency,
+  String toCurrency = 'CNY',
+  bool hide = false,
+}) {
+  final from = formatAmountCurrency(originalCents, currencyCode: fromCurrency, hide: hide);
+  if (fromCurrency == toCurrency) return from;
+  final to = formatAmountCurrency(convertedCents, currencyCode: toCurrency, hide: hide);
+  return '$from ≈ $to';
+}

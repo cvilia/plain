@@ -13,6 +13,14 @@ String formatDateTime(DateTime at) {
   return '${local.year}-$mm-$dd $hh:$mi';
 }
 
+/// `2026-01-15` in local time (date only, no time).
+String formatDate(DateTime at) {
+  final local = at.toLocal();
+  final mm = local.month.toString().padLeft(2, '0');
+  final dd = local.day.toString().padLeft(2, '0');
+  return '${local.year}-$mm-$dd';
+}
+
 /// `1/15` short label for the entry-input date chip.
 String shortDateLabel(DateTime at) {
   final local = at.toLocal();

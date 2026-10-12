@@ -11,6 +11,7 @@ import 'package:plain/app/theme/design_tokens.dart';
 import 'package:plain/core/format/amount_formatter.dart';
 import 'package:plain/core/money/money.dart';
 import 'package:plain/core/refresh/data_invalidation.dart';
+import 'package:plain/design_system/app_empty_state.dart';
 import 'package:plain/data/platform/notification_bridge.dart';
 import 'package:plain/domain/entities/enums.dart';
 import 'package:plain/domain/entities/recurring_rule.dart';
@@ -115,19 +116,16 @@ class _RecurringPageState extends ConsumerState<RecurringPage> {
         title: const Text('周期记账'),
         actions: [
           IconButton(
+            tooltip: '新建规则',
+            onPressed: _create,
+            icon: const Icon(Icons.add),
+          ),
+          IconButton(
             tooltip: '立即执行到期规则',
             onPressed: _runDueNow,
             icon: const Icon(Icons.play_arrow),
           ),
         ],
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        heroTag: 'fab_recurring_add',
-        onPressed: _create,
-        backgroundColor: context.colors.primary,
-        foregroundColor: context.colors.onPrimary,
-        icon: const Icon(Icons.add),
-        label: const Text('新建规则'),
       ),
       body: ContentWidthConstraint(
         child: async.when(
@@ -136,15 +134,14 @@ class _RecurringPageState extends ConsumerState<RecurringPage> {
           data: (rules) {
             if (rules.isEmpty) {
               return Center(
-                child: Padding(
-                  padding: const EdgeInsets.all(Spacing.xl),
-                  child: Text(
-                    '还没有周期记账。\n房租、订阅、工资都可以自动入账。',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: context.colors.inkTertiary,
-                      fontSize: AdaptiveFontSizes.body,
-                    ),
+                child: AppEmptyState(
+                  icon: Icons.event_repeat_outlined,
+                  title: '还没有周期记账',
+                  subtitle: '房租、订阅、工资都可以自动入账',
+                  action: FilledButton.icon(
+                    onPressed: _create,
+                    icon: const Icon(Icons.add),
+                    label: const Text('新建周期记账'),
                   ),
                 ),
               );

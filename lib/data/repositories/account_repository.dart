@@ -265,6 +265,41 @@ class AccountRepositoryImpl implements AccountRepository {
   }
 
   @override
+  Future<Result<int>> detachFromAccount(String accountId) async {
+    try {
+      var affected = 0;
+      _db.transaction(() {
+        final before = _db.raw.select(
+          'SELECT COUNT(*) AS c FROM transactions '
+          'WHERE (account_id = ? OR to_account_id = ?) AND deleted_at IS NULL',
+          [accountId, accountId],
+        );
+        affected = (before.first['c'] as int?) ?? 0;
+        // 把引用该账户的账单和周期规则改为「不指定账户」
+        _db.raw.execute(
+          'UPDATE transactions SET account_id = NULL WHERE account_id = ?',
+          [accountId],
+        );
+        _db.raw.execute(
+          'UPDATE transactions SET to_account_id = NULL WHERE to_account_id = ?',
+          [accountId],
+        );
+        _db.raw.execute(
+          'UPDATE recurring_rules SET account_id = NULL WHERE account_id = ? AND deleted_at IS NULL',
+          [accountId],
+        );
+        _db.raw.execute(
+          'UPDATE recurring_rules SET to_account_id = NULL WHERE to_account_id = ? AND deleted_at IS NULL',
+          [accountId],
+        );
+      });
+      return ok(affected);
+    } on Object catch (e) {
+      return err(StorageFailure('db.detach_failed', e.toString(), isRetryable: true));
+    }
+  }
+
+  @override
   Future<Result<AccountBalance>> balanceOf(String accountId) async {
     try {
       final acct = await getById(accountId);

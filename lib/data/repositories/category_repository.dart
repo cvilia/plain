@@ -398,14 +398,14 @@ class CategoryRepositoryImpl implements CategoryRepository {
 
   void _insert(Category c) {
     _db.raw.execute(
-      'INSERT INTO categories (id,parent_id,name,kind,icon_ref,icon_asset,note,sort_order,is_hidden,is_preset,created_at,updated_at,deleted_at,revision,device_id,base_revision) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
-      [c.id, c.parentId, c.name, c.kind.wire, c.iconRef, c.iconAsset, c.note, c.sortOrder, c.isHidden ? 1 : 0, c.isPreset ? 1 : 0, c.createdAt.millisecondsSinceEpoch, c.updatedAt.millisecondsSinceEpoch, c.deletedAt?.millisecondsSinceEpoch, c.revision, c.deviceId, c.baseRevision]);
+      'INSERT INTO categories (id,parent_id,name,kind,icon_ref,icon_asset,note,sort_order,is_hidden,is_preset,is_rigid,created_at,updated_at,deleted_at,revision,device_id,base_revision) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
+      [c.id, c.parentId, c.name, c.kind.wire, c.iconRef, c.iconAsset, c.note, c.sortOrder, c.isHidden ? 1 : 0, c.isPreset ? 1 : 0, c.isRigid ? 1 : 0, c.createdAt.millisecondsSinceEpoch, c.updatedAt.millisecondsSinceEpoch, c.deletedAt?.millisecondsSinceEpoch, c.revision, c.deviceId, c.baseRevision]);
   }
 
   void _update(Category c) {
     _db.raw.execute(
-      'UPDATE categories SET name=?,icon_ref=?,icon_asset=?,note=?,sort_order=?,is_hidden=?,updated_at=?,deleted_at=?,revision=?,base_revision=? WHERE id=?',
-      [c.name, c.iconRef, c.iconAsset, c.note, c.sortOrder, c.isHidden ? 1 : 0, c.updatedAt.millisecondsSinceEpoch, c.deletedAt?.millisecondsSinceEpoch, c.revision, c.baseRevision, c.id]);
+      'UPDATE categories SET name=?,icon_ref=?,icon_asset=?,note=?,sort_order=?,is_hidden=?,is_rigid=?,updated_at=?,deleted_at=?,revision=?,base_revision=? WHERE id=?',
+      [c.name, c.iconRef, c.iconAsset, c.note, c.sortOrder, c.isHidden ? 1 : 0, c.isRigid ? 1 : 0, c.updatedAt.millisecondsSinceEpoch, c.deletedAt?.millisecondsSinceEpoch, c.revision, c.baseRevision, c.id]);
   }
 
   Category _fromRow(Map<String, Object?> row) => Category(
@@ -415,6 +415,7 @@ class CategoryRepositoryImpl implements CategoryRepository {
     note: row['note'] as String?,
     sortOrder: row['sort_order']! as int, isHidden: row.boolOr('is_hidden'),
     isPreset: row.boolOr('is_preset'),
+    isRigid: row.boolOr('is_rigid'),
     createdAt: row.dateTime('created_at'),
     updatedAt: row.dateTime('updated_at'),
     deletedAt: row.nullableDateTime('deleted_at'),
@@ -424,6 +425,6 @@ class CategoryRepositoryImpl implements CategoryRepository {
   Map<String, Object?> _payload(Category c) => {
     'id': c.id, 'parent_id': c.parentId, 'name': c.name, 'kind': c.kind.wire,
     'icon_ref': c.iconRef, 'note': c.note, 'sort_order': c.sortOrder,
-    'is_hidden': c.isHidden, 'is_preset': c.isPreset,
+    'is_hidden': c.isHidden, 'is_preset': c.isPreset, 'is_rigid': c.isRigid,
   };
 }

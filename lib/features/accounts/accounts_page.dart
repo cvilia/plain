@@ -7,17 +7,21 @@ import 'package:plain/design_system/amount_text.dart';
 import 'package:plain/design_system/app_empty_state.dart';
 import 'package:plain/design_system/app_toast.dart';
 import 'package:plain/features/accounts/credit_reconcile_page.dart';
+import 'package:plain/features/accounts/reconcile_mode_page.dart';
+import 'package:plain/features/ledger/presentation/home_shell.dart';
 import 'package:plain/design_system/confirm_dialog.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:plain/app/bootstrap.dart';
 import 'package:plain/app/breakpoints.dart';
 import 'package:plain/app/theme/design_tokens.dart';
+import 'package:plain/core/constants/app_constants.dart';
 import 'package:plain/core/format/amount_formatter.dart';
 import 'package:plain/core/money/money.dart';
 import 'package:plain/core/refresh/data_invalidation.dart';
 import 'package:plain/domain/entities/category.dart';
 import 'package:plain/domain/entities/enums.dart';
+import 'package:plain/domain/entities/ledger_entry.dart';
 import 'package:plain/domain/repositories/repositories.dart';
 import 'package:plain/domain/usecases/entry_usecases.dart';
 
@@ -28,7 +32,20 @@ final _accountsProvider = FutureProvider<List<_AccountWithBalance>>((ref) async 
   final deps = ref.watch(appDependenciesProvider);
   final res = await deps.accountRepository.listWithBalances();
   final list = res.successOrNull ?? const <AccountWithBalance>[];
-  return list.map(_AccountWithBalance.from).toList();
+  // STORY-2.3：待对账角标 — 未勾选笔数
+  final pendingMap = <String, int>{};
+  for (final aw in list) {
+    final page = await deps.ledgerRepository.listPage(
+      filter: EntryFilter(accountId: aw.account.id),
+      limit: 500,
+    );
+    final items = page.successOrNull?.items ?? const <LedgerEntry>[];
+    pendingMap[aw.account.id] = items.where((e) => !e.isReconciled).length;
+  }
+  return [
+    for (final aw in list)
+      _AccountWithBalance.from(aw, pendingReconcile: pendingMap[aw.account.id] ?? 0),
+  ];
 });
 
 /// Flat view-model the list UI already expects.
@@ -36,9 +53,11 @@ class _AccountWithBalance {
   const _AccountWithBalance({
     required this.account,
     required this.balance,
+    this.pendingReconcile = 0,
   });
   final Account account;
   final int balance;
+  final int pendingReconcile;
 
   String get id => account.id;
   String get name => account.name;
@@ -49,9 +68,11 @@ class _AccountWithBalance {
   bool get isOverLimit => account.isOverLimit;
   int get creditAvailableCents => account.creditAvailableCents;
 
-  factory _AccountWithBalance.from(AccountWithBalance src) => _AccountWithBalance(
+  factory _AccountWithBalance.from(AccountWithBalance src, {int pendingReconcile = 0}) =>
+      _AccountWithBalance(
         account: src.account,
         balance: src.balanceCents,
+        pendingReconcile: pendingReconcile,
       );
 }
 
@@ -63,15 +84,25 @@ class AccountsPage extends ConsumerWidget {
     final accountsAsync = ref.watch(_accountsProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('资产')),
+      appBar: AppBar(
+        title: const Text('资产'),
+        actions: [
+          AddAppBarAction(tooltip: '添加账户', onPressed: () => _showAddSheet(context, ref)),
+        ],
+      ),
       body: accountsAsync.when(
         data: (accounts) {
           if (accounts.isEmpty) {
-            return const ContentWidthConstraint(
+            return ContentWidthConstraint(
               child: AppEmptyState(
                 icon: Icons.account_balance_wallet_outlined,
                 title: '还没有账户',
                 subtitle: '添加现金或银行卡',
+                action: FilledButton.icon(
+                  onPressed: () => _showAddSheet(context, ref),
+                  icon: const Icon(Icons.add),
+                  label: const Text('添加账户'),
+                ),
               ),
             );
           }
@@ -119,13 +150,6 @@ class AccountsPage extends ConsumerWidget {
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(child: Text('加载失败: $e')),
       ),
-      floatingActionButton: FloatingActionButton(
-        heroTag: 'fab_accounts_add',
-        onPressed: () => _showAddSheet(context, ref),
-        backgroundColor: context.colors.primary,
-        foregroundColor: context.colors.onPrimary,
-        child: const Icon(Icons.add),
-      ),
     );
   }
 
@@ -133,9 +157,11 @@ class AccountsPage extends ConsumerWidget {
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      builder: (ctx) => _AddAccountSheet(onSaved: () {
-        ref.invalidateData.bumpAccountsMutated();
-      }),
+      builder: (ctx) => SafeArea(
+        child: _AddAccountSheet(onSaved: () {
+          ref.invalidateData.bumpAccountsMutated();
+        }),
+      ),
     );
   }
 
@@ -189,7 +215,7 @@ class AccountsPage extends ConsumerWidget {
                 // UUID / revision are all written (raw INSERT used to skip them).
                 final deps = ref.read(appDependenciesProvider);
                 final isExpense = diff < 0;
-                await deps.createEntry(CreateEntryInput(
+                final result = await deps.createEntry(CreateEntryInput(
                   amountExpression: formatAmount(diff.abs()),
                   type: isExpense ? EntryType.expense : EntryType.income,
                   categoryId: isExpense ? 'preset_other' : 'preset_income_other',
@@ -199,6 +225,11 @@ class AccountsPage extends ConsumerWidget {
                   bookId: deps.bookId,
                   deviceId: deps.deviceId,
                 ));
+                if (result.isFailure) {
+                  if (ctx.mounted) Navigator.pop(ctx);
+                  if (context.mounted) showAppToast(context, '对账失败：${result.failureOrNull?.code ?? '未知错误'}');
+                  return;
+                }
               }
 
               if (ctx.mounted) Navigator.pop(ctx);
@@ -243,7 +274,23 @@ class _AccountTile extends ConsumerWidget {
           iconRef: iconRef,
           color: context.colors.primary,
         ),
-        title: Text(account.name, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500)),
+        title: Row(
+          children: [
+            Expanded(child: Text(account.name, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500))),
+            if (account.pendingReconcile > 0)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: context.colors.accent.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  '待对账 ${account.pendingReconcile} 笔',
+                  style: TextStyle(fontSize: 10, color: context.colors.accent, fontWeight: FontWeight.w500),
+                ),
+              ),
+          ],
+        ),
         subtitle: Text(typeLabel, style: TextStyle(fontSize: 12, color: context.colors.inkTertiary)),
         trailing: Row(
           mainAxisSize: MainAxisSize.min,
@@ -278,6 +325,8 @@ class _AccountTile extends ConsumerWidget {
                 switch (v) {
                   case 'reconcile':
                     onReconcile();
+                  case 'reconcile_mode':
+                    _openReconcileMode(context);
                   case 'edit':
                     _editAccount(context, ref);
                   case 'hide':
@@ -288,6 +337,7 @@ class _AccountTile extends ConsumerWidget {
               },
               itemBuilder: (_) => [
                 const PopupMenuItem(value: 'reconcile', child: Text('对账')),
+                const PopupMenuItem(value: 'reconcile_mode', child: Text('逐笔对账')),
                 const PopupMenuItem(value: 'edit', child: Text('编辑')),
                 PopupMenuItem(value: 'hide', child: Text(account.isHidden ? '取消隐藏' : '隐藏')),
                 const PopupMenuItem(value: 'delete', child: Text('删除')),
@@ -303,12 +353,23 @@ class _AccountTile extends ConsumerWidget {
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      builder: (_) => _AddAccountSheet(
-        editing: account.account,
-        onSaved: onRefresh,
+      builder: (_) => SafeArea(
+        child: _AddAccountSheet(
+          editing: account.account,
+          onSaved: onRefresh,
+        ),
       ),
     );
     if (context.mounted) onRefresh();
+  }
+
+  void _openReconcileMode(BuildContext context) {
+    Navigator.push<void>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ReconcileModePage(accountId: account.id, accountName: account.name),
+      ),
+    ).then((_) => onRefresh());
   }
 
   Future<void> _toggleHide(BuildContext context, WidgetRef ref) async {
@@ -332,18 +393,19 @@ class _AccountTile extends ConsumerWidget {
     if (counts == null || !context.mounted) return;
 
     if (!counts.isEmpty) {
-      // 有引用：迁移或改为隐藏（STORY-2.1 AC6）
+      // 有引用：迁移 / 改为不指定账户 / 隐藏（STORY-2.1 AC6）
       final choice = await showDialog<String>(
         context: context,
         builder: (ctx) => AlertDialog(
           title: const Text('账户仍有引用'),
           content: Text(
-            '账单 ${counts.transactions + counts.transferIn} 笔 · 周期规则 ${counts.recurringRules} 条\n'
-            '可迁移到其他账户，或改为隐藏保留数据。',
+            '账单 ${counts.transactions + counts.transferIn} 笔 · 周期规则 ${counts.recurringRules} 条\n\n'
+            '可选择迁移、改为不指定账户，或隐藏保留数据。',
           ),
           actions: [
             TextButton(onPressed: () => Navigator.pop(ctx, 'hide'), child: const Text('改为隐藏')),
             TextButton(onPressed: () => Navigator.pop(ctx, 'cancel'), child: const Text('取消')),
+            TextButton(onPressed: () => Navigator.pop(ctx, 'detach'), child: const Text('改为不指定账户')),
             FilledButton(onPressed: () => Navigator.pop(ctx, 'migrate'), child: const Text('迁移后删除')),
           ],
         ),
@@ -353,16 +415,27 @@ class _AccountTile extends ConsumerWidget {
         await _toggleHide(context, ref);
         return;
       }
+      if (choice == 'detach') {
+        if (!context.mounted) return;
+        await _detachAndDelete(context, ref);
+        return;
+      }
       if (choice != 'migrate' || !context.mounted) return;
       final toId = await _pickTargetAccount(context, ref);
       if (toId == null || !context.mounted) return;
       final moved = await deps.accountRepository.migrateTransactions(fromId: account.id, toId: toId);
-      if (!moved.isSuccess || !context.mounted) return;
+      if (!moved.isSuccess) {
+        if (context.mounted) showAppToast(context, '迁移失败：${moved.failureOrNull?.code ?? '未知错误'}');
+        return;
+      }
+      if (!context.mounted) return;
       ref.invalidateData.bumpEntryMutated();
       ref.invalidateData.bumpRecurringMutated();
       final del = await deps.accountRepository.softDelete(account.id);
       if (del.isSuccess && context.mounted) {
         showAppToast(context, '已迁移并删除账户');
+      } else if (context.mounted) {
+        showAppToast(context, '删除失败：${del.failureOrNull?.code ?? '未知错误'}');
       }
       ref.invalidateData.bumpAccountsMutated();
       onRefresh();
@@ -385,6 +458,36 @@ class _AccountTile extends ConsumerWidget {
     } else if (context.mounted) {
       showAppToast(context, '删除失败，请先迁移或隐藏');
     }
+    onRefresh();
+  }
+
+  /// STORY-2.1：把引用账单改为不指定账户，然后删除账户。
+  Future<void> _detachAndDelete(BuildContext context, WidgetRef ref) async {
+    final confirmed = await showConfirmDialog(
+      context,
+      title: '改为不指定账户',
+      message: '该账户的 ${'账单与规则'}将改为「不指定账户」，然后删除「${account.name}」。此操作不可恢复。',
+      confirmLabel: '确认',
+      destructive: true,
+    );
+    if (confirmed != true || !context.mounted) return;
+
+    final deps = ref.read(appDependenciesProvider);
+    final detached = await deps.accountRepository.detachFromAccount(account.id);
+    if (!detached.isSuccess) {
+      if (context.mounted) showAppToast(context, '处理失败：${detached.failureOrNull?.code ?? '未知错误'}');
+      return;
+    }
+    if (!context.mounted) return;
+    ref.invalidateData.bumpEntryMutated();
+    ref.invalidateData.bumpRecurringMutated();
+    final del = await deps.accountRepository.softDelete(account.id);
+    if (del.isSuccess && context.mounted) {
+      showAppToast(context, '已改为不指定账户并删除');
+    } else if (context.mounted) {
+      showAppToast(context, '删除失败：${del.failureOrNull?.code ?? '未知错误'}');
+    }
+    ref.invalidateData.bumpAccountsMutated();
     onRefresh();
   }
 
@@ -428,6 +531,7 @@ class _AddAccountSheetState extends ConsumerState<_AddAccountSheet> {
   final _billDayCtrl = TextEditingController();
   final _dueDayCtrl = TextEditingController();
   AccountType _type = AccountType.cash;
+  String _currency = 'CNY';
   bool _saving = false;
 
   bool get _isEditing => widget.editing != null;
@@ -441,6 +545,7 @@ class _AddAccountSheetState extends ConsumerState<_AddAccountSheet> {
       _openingCtrl.text = (e.openingBalance / 100).toStringAsFixed(2);
       _noteCtrl.text = e.note ?? '';
       _type = e.type;
+      _currency = e.currency;
       _limitCtrl.text = (e.creditLimitCents / 100).toStringAsFixed(2);
       _billDayCtrl.text = e.billDay?.toString() ?? '';
       _dueDayCtrl.text = e.dueDay?.toString() ?? '';
@@ -462,13 +567,14 @@ class _AddAccountSheetState extends ConsumerState<_AddAccountSheet> {
   Widget build(BuildContext context) {
     return Padding(
       padding: EdgeInsets.only(left: Spacing.lg, right: Spacing.lg, top: Spacing.lg, bottom: MediaQuery.of(context).viewInsets.bottom + Spacing.lg),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text(_isEditing ? '编辑账户' : '添加账户', style: Theme.of(context).textTheme.titleMedium),
-          const SizedBox(height: Spacing.lg),
-          Wrap(
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(_isEditing ? '编辑账户' : '添加账户', style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: Spacing.lg),
+            Wrap(
             spacing: Spacing.sm,
             runSpacing: Spacing.sm,
             children: [
@@ -480,6 +586,16 @@ class _AddAccountSheetState extends ConsumerState<_AddAccountSheet> {
           ),
           const SizedBox(height: Spacing.lg),
           TextField(controller: _nameCtrl, maxLength: 20, decoration: const InputDecoration(labelText: '名称', hintText: '如：现金', border: OutlineInputBorder())),
+          const SizedBox(height: Spacing.md),
+          DropdownButtonFormField<String>(
+            initialValue: _currency,
+            decoration: const InputDecoration(labelText: '币种', border: OutlineInputBorder()),
+            items: [
+              for (final code in CurrencyRules.symbols.keys)
+                DropdownMenuItem(value: code, child: Text('${CurrencyRules.symbolOf(code)}  $code')),
+            ],
+            onChanged: (v) => setState(() => _currency = v ?? 'CNY'),
+          ),
           const SizedBox(height: Spacing.md),
           TextField(controller: _openingCtrl, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(labelText: '期初余额', hintText: '0.00', border: OutlineInputBorder(), prefixText: '¥')),
           if (_type == AccountType.credit) ...[
@@ -516,6 +632,7 @@ class _AddAccountSheetState extends ConsumerState<_AddAccountSheet> {
             child: _saving ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2)) : Text(_isEditing ? '保存修改' : '保存'),
           ),
         ],
+        ),
       ),
     );
   }
@@ -559,7 +676,7 @@ class _AddAccountSheetState extends ConsumerState<_AddAccountSheet> {
         id: e.id,
         name: name,
         type: _type,
-        currency: e.currency,
+        currency: _currency,
         openingBalance: openingCents,
         note: note.isEmpty ? null : note,
         sortOrder: e.sortOrder,
@@ -580,7 +697,7 @@ class _AddAccountSheetState extends ConsumerState<_AddAccountSheet> {
         id: deps.idGen.generate(),
         name: name,
         type: _type,
-        currency: 'CNY',
+        currency: _currency,
         openingBalance: openingCents,
         note: note.isEmpty ? null : note,
         sortOrder: 0,

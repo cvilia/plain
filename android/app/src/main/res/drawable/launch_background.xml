@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 启动页：品牌金底 + 居中 launch_image（小猪 + 素记）。 -->
+<!-- 启动窗口背景：120dp logo 居中（按密度缩放）。 -->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
     <item android:drawable="@color/splash_bg" />
     <item>

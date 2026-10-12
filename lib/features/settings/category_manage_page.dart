@@ -2,9 +2,11 @@
 library;
 
 import 'package:plain/app/theme/app_colors.dart';
+import 'package:plain/features/ledger/presentation/home_shell.dart';
 import 'package:plain/design_system/category_avatar.dart';
 import 'package:flutter/material.dart';
 import 'package:plain/design_system/app_toast.dart';
+import 'package:plain/design_system/bubble_overlay.dart';
 import 'package:plain/design_system/confirm_dialog.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:plain/app/bootstrap.dart';
@@ -64,7 +66,10 @@ class _CategoryManagePageState extends ConsumerState<CategoryManagePage> {
     final categoriesAsync = ref.watch(_categoriesProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('分类管理')),
+      appBar: AppBar(
+        title: const Text('分类管理'),
+        actions: [AddAppBarAction(tooltip: '添加分类', onPressed: () => _showAddSheet(context, ref))],
+      ),
       body: Column(
         children: [
           Padding(
@@ -127,13 +132,6 @@ class _CategoryManagePageState extends ConsumerState<CategoryManagePage> {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
-        heroTag: 'fab_category_add',
-        onPressed: () => _showAddSheet(context, ref),
-        backgroundColor: context.colors.primary,
-        foregroundColor: context.colors.onPrimary,
-        child: const Icon(Icons.add),
-      ),
     );
   }
 
@@ -159,22 +157,25 @@ class _CategoryManagePageState extends ConsumerState<CategoryManagePage> {
     final noteCtrl = TextEditingController(text: cat.note ?? '');
     var iconRef = cat.iconRef;
     var iconAsset = cat.iconAsset;
+    var isRigid = cat.isRigid;
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setSheetState) => Padding(
-          padding: EdgeInsets.only(
-            left: Spacing.lg,
-            right: Spacing.lg,
-            top: Spacing.lg,
-            bottom: MediaQuery.of(ctx).viewInsets.bottom + Spacing.lg,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text('编辑分类信息', style: Theme.of(ctx).textTheme.titleMedium),
+      builder: (ctx) => SafeArea(
+        child: StatefulBuilder(
+          builder: (ctx, setSheetState) => Padding(
+            padding: EdgeInsets.only(
+              left: Spacing.lg,
+              right: Spacing.lg,
+              top: Spacing.lg,
+              bottom: MediaQuery.of(ctx).viewInsets.bottom + Spacing.lg,
+            ),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text('编辑分类信息', style: Theme.of(ctx).textTheme.titleMedium),
               const SizedBox(height: Spacing.lg),
               TextField(
                 controller: nameCtrl,
@@ -210,6 +211,16 @@ class _CategoryManagePageState extends ConsumerState<CategoryManagePage> {
                   border: OutlineInputBorder(),
                 ),
               ),
+              if (cat.isRoot) ...[
+                const SizedBox(height: Spacing.sm),
+                SwitchListTile(
+                  title: const Text('标记为刚性支出', style: TextStyle(fontSize: 14)),
+                  subtitle: Text('房租、水电等固定必要支出，用于安全可花计算', style: TextStyle(fontSize: 11, color: Theme.of(ctx).textTheme.bodySmall?.color?.withValues(alpha: 0.6))),
+                  value: isRigid,
+                  onChanged: (v) => setSheetState(() => isRigid = v),
+                  contentPadding: EdgeInsets.zero,
+                ),
+              ],
               const SizedBox(height: Spacing.lg),
               FilledButton(
                 onPressed: () {
@@ -223,6 +234,7 @@ class _CategoryManagePageState extends ConsumerState<CategoryManagePage> {
                         name: name,
                         iconRef: iconRef,
                         iconAsset: iconAsset,
+                        isRigid: isRigid,
                         clearIconAsset: iconAsset == null,
                         updatedAt: DateTime.now().toUtc(),
                         revision: cat.revision + 1,
@@ -235,7 +247,9 @@ class _CategoryManagePageState extends ConsumerState<CategoryManagePage> {
                 child: const Text('保存'),
               ),
             ],
+            ),
           ),
+        ),
         ),
       ),
     );
@@ -1085,60 +1099,65 @@ class _CategoryTile extends StatelessWidget {
   /// Optional row tap (expand/collapse for groups).
   final VoidCallback? onTap;
 
-  Widget? _subtitle(BuildContext context) {
-    final note = category.note;
-    final children = <Widget>[];
-    if (parentName != null && parentName!.isNotEmpty) {
-      children.add(Text(
-        '在「$parentName」下',
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: TextStyle(fontSize: 12, color: context.colors.inkTertiary),
-      ));
-    }
-    if (note != null && note.isNotEmpty) {
-      children.add(Text(
-        note,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: TextStyle(fontSize: 12, color: context.colors.inkTertiary),
-      ));
-    }
-    if (category.isPreset) {
-      children.add(Text('预置', style: TextStyle(fontSize: 11, color: context.colors.inkTertiary)));
-    }
-    if (children.isEmpty) return null;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        for (var i = 0; i < children.length; i++) ...[
-          if (i > 0) const SizedBox(height: 2),
-          children[i],
-        ],
-      ],
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final isExpense = category.kind == CategoryKind.expense;
     final color = isExpense ? context.colors.expense : context.colors.income;
+    final note = category.note;
 
-    return Card(
-      margin: const EdgeInsets.only(bottom: Spacing.sm),
-      child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: Spacing.lg, vertical: Spacing.xs),
+    return BubbleOnLongPress(
+      bubbleText: note,
+      child: Card(
+        margin: EdgeInsets.only(bottom: isGroup ? Spacing.sm : Spacing.xs),
+        // 一级条目有子条目时不显示水波效果
+        child: Theme(
+          data: isGroup && onTap != null
+              ? Theme.of(context).copyWith(
+                  splashColor: Colors.transparent,
+                  highlightColor: Colors.transparent,
+                  hoverColor: Colors.transparent,
+                )
+              : Theme.of(context),
+          child: ListTile(
+          dense: !isGroup,
+          contentPadding: EdgeInsets.symmetric(horizontal: Spacing.lg, vertical: isGroup ? Spacing.xs : 0),
         leading: CategoryAvatar(iconRef: category.iconRef, iconAsset: category.iconAsset, color: color, size: 18),
-        title: Text(
-          category.name,
-          style: TextStyle(
-            fontSize: 15,
-            fontWeight: isGroup ? FontWeight.w600 : FontWeight.w500,
-            color: category.isHidden ? context.colors.inkTertiary : context.colors.ink,
-            decoration: category.isHidden ? TextDecoration.lineThrough : null,
-          ),
+        title: Row(
+          children: [
+            Flexible(
+              child: Text(
+                category.name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: isGroup ? 15 : 14,
+                  fontWeight: isGroup ? FontWeight.w600 : FontWeight.w500,
+                  color: category.isHidden ? context.colors.inkTertiary : context.colors.ink,
+                  decoration: category.isHidden ? TextDecoration.lineThrough : null,
+                ),
+              ),
+            ),
+            if (category.isPreset) ...[
+              const SizedBox(width: 6),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                decoration: BoxDecoration(
+                  color: context.colors.surfaceMuted,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text('预置', style: TextStyle(fontSize: 10, color: context.colors.inkTertiary)),
+              ),
+            ],
+          ],
         ),
-        subtitle: _subtitle(context),
+        subtitle: (note != null && note.isNotEmpty)
+            ? Text(
+                note,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(fontSize: 12, color: context.colors.inkTertiary),
+              )
+            : null,
         onTap: onTap,
         trailing: Row(
           mainAxisSize: MainAxisSize.min,
@@ -1199,6 +1218,8 @@ class _CategoryTile extends StatelessWidget {
             ),
           ],
         ),
+        ),
+      ),
       ),
     );
   }
@@ -1267,3 +1288,4 @@ class _IconPicker extends StatelessWidget {
     );
   }
 }
+

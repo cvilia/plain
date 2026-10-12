@@ -38,6 +38,9 @@ enum DataScope {
 
   /// Theme / appearance prefs only. Local-only, never cloud-synced (INV-3).
   theme,
+
+  /// Home card layout (order + hidden set). Local-only.
+  homeLayout,
 }
 
 /// Monotonic per-scope versions. Bump on write; watch on the read side.
@@ -49,6 +52,7 @@ class DataInvalidation extends Notifier<Map<DataScope, int>> {
     DataScope.budget: 0,
     DataScope.recurring: 0,
     DataScope.theme: 0,
+    DataScope.homeLayout: 0,
   };
 
   @override
@@ -102,6 +106,9 @@ class DataInvalidation extends Notifier<Map<DataScope, int>> {
 
   /// Theme / appearance change (id or mode).
   void bumpTheme() => bump(DataScope.theme);
+
+  /// Home card layout change (order / hidden / preset).
+  void bumpHomeLayout() => bump(DataScope.homeLayout);
 }
 
 final dataInvalidationProvider =
@@ -140,6 +147,11 @@ final recurringVersionProvider = Provider<int>(
 /// for any non-widget listeners.
 final themeVersionProvider = Provider<int>(
   (ref) => ref.watch(dataInvalidationProvider)[DataScope.theme] ?? 0,
+);
+
+/// Watch in home page card layout.
+final homeLayoutVersionProvider = Provider<int>(
+  (ref) => ref.watch(dataInvalidationProvider)[DataScope.homeLayout] ?? 0,
 );
 
 /// One-shot bump helpers on the notifier handle.

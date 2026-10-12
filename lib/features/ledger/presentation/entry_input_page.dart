@@ -15,6 +15,9 @@ import 'package:plain/design_system/app_date_picker.dart';
 import 'package:plain/design_system/category_icons.dart';
 import 'package:plain/domain/entities/category.dart' as domain;
 import 'package:plain/domain/entities/enums.dart';
+import 'package:plain/domain/services/ai_recognition_service.dart';
+import 'package:plain/design_system/emotion_feedback_card.dart';
+import 'package:plain/design_system/sound_service.dart';
 import 'package:plain/features/ledger/controllers/entry_input_controller.dart';
 import 'package:plain/features/ledger/controllers/recent_categories.dart';
 import 'package:plain/features/ledger/presentation/category_picker_page.dart';
@@ -61,11 +64,25 @@ class _EntryInputPageState extends ConsumerState<EntryInputPage> {
     final categoriesAsync = ref.watch(_categoriesProvider);
     final isEdit = widget.editEntryId != null;
 
+    // STORY-5.4：监听情绪反馈并展示卡片
+    ref.listen(entryInputControllerProvider.select((s) => s.emotionFeedback), (prev, next) {
+      if (next == null || next == prev) return;
+      showEmotionFeedback(context, next, () {
+        ref.read(entryInputControllerProvider.notifier).clearEmotion();
+      });
+    });
+
     return Scaffold(
       appBar: AppBar(
         title: Text(isEdit ? '编辑账单' : '记一笔'),
         leading: IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(context)),
         actions: [
+          if (!isEdit)
+            IconButton(
+              icon: const Icon(Icons.document_scanner_outlined),
+              tooltip: '识别小票',
+              onPressed: () => _showOcrSheet(context, controller),
+            ),
           if (isEdit)
             TextButton(
               onPressed: () async {
@@ -94,6 +111,96 @@ class _EntryInputPageState extends ConsumerState<EntryInputPage> {
                 ? _buildFormB(controller, state, categoriesAsync)
                 : _buildFormA(controller, state, categoriesAsync);
           },
+        ),
+      ),
+    );
+  }
+
+  /// STORY-9.4：AI 识别记账 — 文本识别 + 额度管理。
+  void _showOcrSheet(BuildContext context, EntryInputController controller) {
+    final ctrl = TextEditingController();
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) => Padding(
+        padding: EdgeInsets.only(
+          left: Spacing.lg, right: Spacing.lg, top: Spacing.lg,
+          bottom: MediaQuery.of(ctx).viewInsets.bottom + Spacing.lg,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text('AI 识别记账', style: Theme.of(ctx).textTheme.titleMedium),
+            const SizedBox(height: Spacing.sm),
+            // 额度显示
+            FutureBuilder<QuotaStatus>(
+              future: AiRecognitionService.getQuota(
+                now: DateTime.now(),
+                monthStartDay: ref.read(appDependenciesProvider).calendar.monthStartDay,
+              ),
+              builder: (ctx2, snap) {
+                final q = snap.data;
+                if (q == null) return const SizedBox.shrink();
+                return Text(
+                  '本月额度 ${q.displayLabel}',
+                  style: TextStyle(fontSize: 11, color: q.isExhausted ? context.colors.expense : context.colors.inkTertiary),
+                );
+              },
+            ),
+            const SizedBox(height: Spacing.sm),
+            Text('粘贴文字、截图或语音识别结果，自动预填金额和商户。', style: TextStyle(fontSize: 12, color: context.colors.inkTertiary)),
+            const SizedBox(height: Spacing.lg),
+            TextField(
+              controller: ctrl,
+              maxLines: 4,
+              decoration: const InputDecoration(
+                hintText: '例如：星巴克 ¥128.50 2026-01-15',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: Spacing.lg),
+            FilledButton(
+              onPressed: () async {
+                final text = ctrl.text.trim();
+                if (text.isEmpty) return;
+                // 检查额度
+                final deps = ref.read(appDependenciesProvider);
+                final now = DateTime.now();
+                final quota = await AiRecognitionService.getQuota(
+                  now: now,
+                  monthStartDay: deps.calendar.monthStartDay,
+                );
+                if (quota.isExhausted) {
+                  if (ctx.mounted) Navigator.pop(ctx);
+                  if (mounted) showAppToast(this.context, '本月额度已用完，下月 ${deps.calendar.monthStartDay} 日恢复');
+                  return;
+                }
+                final draft = AiRecognitionService.parseInput(AiInputType.text, text);
+                // 成功识别才消耗额度（AC2）
+                if (!draft.isEmpty) {
+                  await AiRecognitionService.consumeQuota(
+                    now: now,
+                    monthStartDay: deps.calendar.monthStartDay,
+                  );
+                }
+                if (!ctx.mounted) return;
+                Navigator.pop(ctx);
+                if (draft.isEmpty) {
+                  showAppToast(context, '未能识别，请手动录入');
+                  return;
+                }
+                controller.applyOcrPrefill(
+                  amountCents: draft.amountCents,
+                  merchant: draft.merchant,
+                  occurredAt: draft.occurredAt,
+                  categoryHint: draft.categoryHint,
+                );
+                showAppToast(context, '已预填，请确认或修正');
+              },
+              child: const Text('识别并预填'),
+            ),
+          ],
         ),
       ),
     );
@@ -368,6 +475,8 @@ class _Keypad extends StatelessWidget {
   Future<void> _saveAndToast(BuildContext context) async {
     final ok = await controller.saveExplicit();
     if (!ok || !context.mounted) return;
+    // 音效开关打开时播放 coin 声
+    playEntrySavedSound(context);
     final msg = controller.currentToast;
     if (msg != null) {
       // STORY-1.1：保存 toast 带「撤销」，5 秒窗口
@@ -767,6 +876,14 @@ class _AttrBar extends ConsumerWidget {
                 label: state.selectedAccountId != null ? '账户' : '默认账户',
                 onTap: () => _showAccountPicker(context, ref, isSource: true),
               ),
+              const SizedBox(width: Spacing.sm),
+              // STORY-1.8：需报销标记
+              _AttrChip(
+                icon: Icons.receipt_long_outlined,
+                label: '需报销',
+                active: state.reimburseStatus == ReimburseStatus.pending,
+                onTap: controller.toggleReimburse,
+              ),
             ]),
             const SizedBox(height: Spacing.sm),
           ],
@@ -880,16 +997,19 @@ class _AttrBar extends ConsumerWidget {
 }
 
 class _AttrChip extends StatelessWidget {
-  const _AttrChip({required this.icon, required this.label, required this.onTap, this.expanded = false});
+  const _AttrChip({required this.icon, required this.label, required this.onTap, this.expanded = false, this.active = false});
   final IconData icon;
   final String label;
   final VoidCallback onTap;
   final bool expanded;
+  final bool active;
 
   @override
   Widget build(BuildContext context) {
+    final bg = active ? context.colors.accent.withValues(alpha: 0.15) : context.colors.surfaceMuted;
+    final fg = active ? context.colors.accent : context.colors.inkSecondary;
     final child = Material(
-      color: context.colors.surfaceMuted,
+      color: bg,
       borderRadius: BorderRadius.circular(Radii.pill),
       child: InkWell(
         onTap: onTap,
@@ -897,10 +1017,10 @@ class _AttrChip extends StatelessWidget {
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: Spacing.md, vertical: Spacing.sm),
           child: Row(mainAxisSize: MainAxisSize.min, children: [
-            Icon(icon, size: 16, color: context.colors.inkSecondary),
+            Icon(icon, size: 16, color: fg),
             const SizedBox(width: 6),
             Flexible(
-              child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 13, color: context.colors.inkSecondary)),
+              child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 13, color: fg)),
             ),
           ]),
         ),

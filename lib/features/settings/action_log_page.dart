@@ -6,11 +6,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:plain/app/bootstrap.dart';
 import 'package:plain/app/theme/app_colors.dart';
 import 'package:plain/app/theme/design_tokens.dart';
+import 'package:plain/core/refresh/data_invalidation.dart';
 import 'package:plain/core/time/date_format.dart';
 import 'package:plain/data/repositories/change_log_repository.dart';
 import 'package:plain/design_system/app_empty_state.dart';
 
 final _actionLogProvider = FutureProvider<List<ChangeLogItem>>((ref) async {
+  ref.watch(ledgerVersionProvider);
   final deps = ref.watch(appDependenciesProvider);
   final res = await deps.changeLogRepository.listRecent(limit: 200);
   return res.successOrNull ?? const [];

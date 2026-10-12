@@ -18,6 +18,7 @@ class CreateEntryInput {
     required this.amountExpression, required this.type, required this.categoryId,
     this.accountId, this.toAccountId, this.note, this.occurredAt,
     this.source = EntrySource.manual, required this.bookId, required this.deviceId,
+    this.reimburseStatus = ReimburseStatus.none,
   });
 
   final String amountExpression;
@@ -30,6 +31,9 @@ class CreateEntryInput {
   final EntrySource source;
   final String bookId;
   final String deviceId;
+
+  /// STORY-1.8：报销状态。
+  final ReimburseStatus reimburseStatus;
 }
 
 class CreateEntryUseCase {
@@ -77,6 +81,7 @@ class CreateEntryUseCase {
       amount: Money(eval.money.cents.abs()), currency: MoneyRules.defaultCurrency,
       categoryId: input.categoryId, accountId: input.accountId, toAccountId: input.toAccountId,
       occurredAt: occurred, note: input.note, source: input.source,
+      reimburseStatus: input.reimburseStatus,
       createdAt: now, updatedAt: now, revision: 1, deviceId: input.deviceId, baseRevision: 0,
     );
 
@@ -104,7 +109,7 @@ class UpdateEntryUseCase {
     required LedgerEntry existing, Money? amount, String? categoryId,
     String? accountId, String? toAccountId, String? note,
     DateTime? occurredAt, EntryType? type,
-    bool clearNote = false, bool clearCategoryId = false,
+    bool clearNote = false, bool clearCategoryId = false, bool clearAccount = false,
   }) async {
     if (amount != null && !amount.withinProductLimit) {
       return err<LedgerEntry>(const ValidationFailure('entry.amount_over_limit', 'over'));
@@ -114,6 +119,7 @@ class UpdateEntryUseCase {
       toAccountId: toAccountId, note: note, occurredAt: occurredAt, type: type,
       updatedAt: _clock.now(), revision: existing.revision + 1,
       baseRevision: existing.revision, clearNote: clearNote, clearCategoryId: clearCategoryId,
+      clearAccount: clearAccount,
     ));
   }
 }

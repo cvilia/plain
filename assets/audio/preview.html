@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>素记 · 记账音效试听</title>
+<style>
+:root{--bg:#f6f7f8;--card:#fff;--ink:#1b1f23;--ink2:#5b6570;--line:#e4e7ea;
+--brand:#0F9E90;--softer:#f0fbf8;--warm:#C2410C;--warmbg:#fff7ed;}
+*{box-sizing:border-box}
+body{margin:0;padding:32px 20px 48px;background:var(--bg);color:var(--ink);
+font:14px/1.55 -apple-system,"Segoe UI","Microsoft YaHei",sans-serif}
+h1{margin:0 0 6px;font-size:20px;font-weight:600;letter-spacing:.01em}
+.sub{color:var(--ink2);margin:0 0 26px;font-size:13px}
+h2{display:flex;align-items:center;gap:9px;margin:26px 0 12px;font-size:15px;font-weight:600}
+h2:first-of-type{margin-top:8px}
+h2 em{font-style:normal;font-size:11px;font-weight:500;color:#fff;background:var(--brand);
+border-radius:99px;padding:2px 9px;letter-spacing:.02em}
+h2.warm em{background:var(--warm)}
+.grid{display:grid;gap:12px;max-width:780px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 18px;
+display:grid;grid-template-columns:1fr auto;gap:5px 16px;align-items:center}
+.card.warm{background:var(--warmbg);border-color:#f5d9c2}
+.name{font-weight:600}
+.meta{font-size:12px;color:var(--ink2);font-variant-numeric:tabular-nums}
+.desc{color:var(--ink2);font-size:12.5px;grid-column:1}
+button{grid-row:1/3;grid-column:2;width:60px;height:60px;border-radius:50%;border:1px solid var(--line);
+background:#fff;color:var(--brand);font-size:18px;cursor:pointer;transition:.15s}
+.card.warm button{color:var(--warm)}
+button:hover{border-color:currentColor;background:var(--softer)}
+button:active{transform:scale(.96)}
+button.on{background:var(--brand);border-color:var(--brand);color:#fff}
+.card.warm button.on{background:var(--warm);border-color:var(--warm)}
+audio{display:none}
+</style></head><body>
+<h1>素记 · 记账确认音效</h1>
+<p class="sub">44.1 kHz / 16-bit / 单声道 &nbsp;·&nbsp; 峰值统一 −3 dBFS &nbsp;·&nbsp; A 加权响度已对齐 &nbsp;·&nbsp; 点击圆形按钮试听</p>
+<h2>俏皮版<em>本轮方向</em></h2>
+<div class="grid">
+  <div class="card">
+    <button data-a="playful0" title="播放">&#9654;</button>
+    <div class="name">八音盒琶音</div>
+    <div class="meta">420 ms · 36.2 KB · -2.8 dBFS</div>
+    <div class="desc">E6→G#6→B6 三音上行，轻快优雅，最耐听的俏皮</div>
+  </div>
+  <div class="card">
+    <button data-a="playful1" title="播放">&#9654;</button>
+    <div class="name">金币叮</div>
+    <div class="meta">260 ms · 22.4 KB · -5.5 dBFS</div>
+    <div class="desc">B5→E6 芯片音，游戏感与识别度最高</div>
+  </div>
+  <div class="card">
+    <button data-a="playful2" title="播放">&#9654;</button>
+    <div class="name">气泡啵</div>
+    <div class="meta">250 ms · 21.6 KB · -2.3 dBFS</div>
+    <div class="desc">430→1150Hz 急速上滑，可爱又极短（200ms）</div>
+  </div>
+  <div class="card">
+    <button data-a="playful3" title="播放">&#9654;</button>
+    <div class="name">小鸟啾</div>
+    <div class="meta">280 ms · 24.2 KB · -3.3 dBFS</div>
+    <div class="desc">双向滑音 + 颤音，像小鸟叫，活泼可爱</div>
+  </div>
+  <div class="card">
+    <button data-a="playful4" title="播放">&#9654;</button>
+    <div class="name">弹簧蹦</div>
+    <div class="meta">340 ms · 29.3 KB · -3.0 dBFS</div>
+    <div class="desc">下滑 + 颤动，卡通夸张，俏皮度最高</div>
+  </div>
+</div>
+<h2 class="warm">稳重版<em>上一轮</em></h2>
+<div class="grid">
+  <div class="card warm">
+    <button data-a="confirm0" title="播放">&#9654;</button>
+    <div class="name">清脆铃声</div>
+    <div class="meta">340 ms · 29.3 KB · -2.1 dBFS</div>
+    <div class="desc">上行纯五度 C6→G6，明亮、收束干净</div>
+  </div>
+  <div class="card warm">
+    <button data-a="confirm1" title="播放">&#9654;</button>
+    <div class="name">木质轻敲</div>
+    <div class="meta">220 ms · 19.0 KB · -1.2 dBFS</div>
+    <div class="desc">上行五度双击，最克制</div>
+  </div>
+  <div class="card warm">
+    <button data-a="confirm2" title="播放">&#9654;</button>
+    <div class="name">柔和单音</div>
+    <div class="meta">240 ms · 20.7 KB · -3.9 dBFS</div>
+    <div class="desc">单音轻叮，最不打扰</div>
+  </div>
+  <div class="card warm">
+    <button data-a="confirm3" title="播放">&#9654;</button>
+    <div class="name">大三度上行</div>
+    <div class="meta">300 ms · 25.9 KB · -4.6 dBFS</div>
+    <div class="desc">A5→C#6，完成感最强</div>
+  </div>
+</div>
+<audio id="playful0" src="sfx_play_box.wav" preload="auto"></audio>
+<audio id="playful1" src="sfx_play_coin.wav" preload="auto"></audio>
+<audio id="playful2" src="sfx_play_pop.wav" preload="auto"></audio>
+<audio id="playful3" src="sfx_play_chirp.wav" preload="auto"></audio>
+<audio id="playful4" src="sfx_play_boing.wav" preload="auto"></audio>
+<audio id="confirm0" src="sfx_confirm_chime.wav" preload="auto"></audio>
+<audio id="confirm1" src="sfx_confirm_wood.wav" preload="auto"></audio>
+<audio id="confirm2" src="sfx_confirm_soft.wav" preload="auto"></audio>
+<audio id="confirm3" src="sfx_confirm_up.wav" preload="auto"></audio>
+<script>
+document.querySelectorAll('button').forEach(b=>{
+  const a=document.getElementById(b.dataset.a);
+  b.addEventListener('click',()=>{
+    document.querySelectorAll('audio').forEach(o=>{if(o!==a){o.pause();o.currentTime=0;}});
+    document.querySelectorAll('button').forEach(o=>o.classList.remove('on'));
+    a.currentTime=0;a.play();b.classList.add('on');
+  });
+  a.addEventListener('ended',()=>b.classList.remove('on'));
+});
+</script>
+</body></html>

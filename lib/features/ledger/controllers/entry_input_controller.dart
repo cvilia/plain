@@ -13,7 +13,10 @@ import 'package:plain/core/time/clock.dart';
 import 'package:plain/data/platform/platform_bridge.dart';
 import 'package:plain/domain/entities/enums.dart';
 import 'package:plain/domain/entities/ledger_entry.dart';
+import 'package:plain/domain/repositories/repositories.dart';
 import 'package:plain/domain/services/category_suggester.dart';
+import 'package:plain/domain/services/emotion_feedback_service.dart';
+import 'package:plain/domain/services/gamification_service.dart';
 import 'package:plain/domain/usecases/entry_usecases.dart';
 import 'package:plain/features/ledger/controllers/draft_store.dart';
 import 'package:plain/features/ledger/controllers/flow_list_controller.dart';
@@ -32,6 +35,8 @@ class EntryInputState {
     this.isEditing = false,
     this.editingId,
     this.toastMessage,
+    this.emotionFeedback,
+    this.reimburseStatus = ReimburseStatus.none,
     this.wasIncompleteExpression = false,
     this.isSubmitting = false,
     this.errorMessage,
@@ -48,6 +53,12 @@ class EntryInputState {
   final bool isEditing;
   final String? editingId;
   final String? toastMessage;
+
+  /// STORY-5.4：保存后触发的情绪反馈（null = 不给反馈）。
+  final EmotionFeedback? emotionFeedback;
+
+  /// STORY-1.8：报销状态。
+  final ReimburseStatus reimburseStatus;
   final bool wasIncompleteExpression;
   final bool isSubmitting;
   final String? errorMessage;
@@ -66,6 +77,8 @@ class EntryInputState {
     bool? isEditing,
     String? editingId,
     String? toastMessage,
+    EmotionFeedback? emotionFeedback,
+    ReimburseStatus? reimburseStatus,
     bool? wasIncompleteExpression,
     bool? isSubmitting,
     String? errorMessage,
@@ -74,6 +87,7 @@ class EntryInputState {
     bool clearNote = false,
     bool clearToast = false,
     bool clearError = false,
+    bool clearEmotion = false,
   }) {
     return EntryInputState(
       amountExpression: amountExpression ?? this.amountExpression,
@@ -87,6 +101,8 @@ class EntryInputState {
       isEditing: isEditing ?? this.isEditing,
       editingId: editingId ?? this.editingId,
       toastMessage: clearToast ? null : (toastMessage ?? this.toastMessage),
+      emotionFeedback: clearEmotion ? null : (emotionFeedback ?? this.emotionFeedback),
+      reimburseStatus: reimburseStatus ?? this.reimburseStatus,
       wasIncompleteExpression: wasIncompleteExpression ?? this.wasIncompleteExpression,
       isSubmitting: isSubmitting ?? this.isSubmitting,
       errorMessage: clearError ? null : (errorMessage ?? this.errorMessage),
@@ -199,7 +215,10 @@ class EntryInputController extends Notifier<EntryInputState> {
     );
   }
 
-  void onClearAll() => state = EntryInputState(occurredAt: state.occurredAt);
+  void onClearAll() {
+    _editingEntry = null;
+    state = EntryInputState(occurredAt: state.occurredAt);
+  }
 
   void onEquals() {
     final result = _evaluator.eval(state.amountExpression);
@@ -271,6 +290,25 @@ class EntryInputController extends Notifier<EntryInputState> {
   }
 
   /// 日期变更：若跨出当前记账月，给出「该账单计入 X 月」提示（G-1 / AC11）。
+  /// STORY-9.2：OCR 识别结果预填（不直接入库）。
+  void applyOcrPrefill({int? amountCents, String? merchant, DateTime? occurredAt, String? categoryHint}) {
+    // 金额用整数分 → 字符串，不用 double（G-4 int64 分规则）
+    String? amountStr;
+    if (amountCents != null) {
+      final neg = amountCents < 0;
+      final abs = amountCents.abs();
+      final s = '${abs ~/ 100}.${(abs % 100).toString().padLeft(2, '0')}';
+      amountStr = neg ? '-$s' : s;
+    }
+    state = state.copyWith(
+      amountExpression: amountStr ?? state.amountExpression,
+      displayAmount: amountStr ?? state.displayAmount,
+      note: (merchant != null && merchant.isNotEmpty) ? merchant : state.note,
+      occurredAt: occurredAt ?? state.occurredAt,
+    );
+    // categoryHint 由调用方在分类列表中匹配后走 onCategorySelected。
+  }
+
   void onDateSelected(DateTime date) {
     state = state.copyWith(occurredAt: date);
     final calendar = ref.read(calendarProvider);
@@ -349,9 +387,11 @@ class EntryInputController extends Notifier<EntryInputState> {
         amount: eval.money,
         categoryId: state.selectedCategoryId,
         clearCategoryId: state.selectedCategoryId == null,
-        accountId: await _resolveAccountId(state.selectedAccountId),
+        accountId: state.selectedAccountId,
+        clearAccount: state.selectedAccountId == null,
         toAccountId: state.toAccountId,
         note: state.note,
+        clearNote: state.note == null,
         occurredAt: state.occurredAt,
         type: state.type,
       );
@@ -385,6 +425,7 @@ class EntryInputController extends Notifier<EntryInputState> {
       occurredAt: state.occurredAt,
       bookId: _bookId,
       deviceId: _deviceId,
+      reimburseStatus: state.reimburseStatus,
     ));
 
     return result.when(
@@ -401,6 +442,7 @@ class EntryInputController extends Notifier<EntryInputState> {
           wasIncompleteExpression: eval.wasIncomplete,
           isSubmitting: false,
           clearError: true,
+          clearEmotion: true,
         );
         draftStore.clear(); // Clear draft after successful save
         _updateWidgetSnapshot();
@@ -408,6 +450,10 @@ class EntryInputController extends Notifier<EntryInputState> {
         ref.read(recentCategoriesProvider.notifier).use(
           state.type.wire, state.selectedCategoryId ?? '',
         );
+        // STORY-5.4：异步评估情绪反馈
+        _evaluateEmotion(entry);
+        // STORY-5.5：游戏化连续记账
+        GamificationService.recordEntry(_clock.now());
         return true;
       },
       failure: (f) {
@@ -415,6 +461,79 @@ class EntryInputController extends Notifier<EntryInputState> {
         return false;
       },
     );
+  }
+
+  /// STORY-1.8：切换「需报销」标记。
+  void toggleReimburse() {
+    final next = state.reimburseStatus == ReimburseStatus.none
+        ? ReimburseStatus.pending
+        : ReimburseStatus.none;
+    state = state.copyWith(reimburseStatus: next);
+  }
+
+  /// STORY-5.4：清除情绪反馈（UI 层展示后调用）。
+  void clearEmotion() {
+    state = state.copyWith(clearEmotion: true);
+  }
+
+  /// STORY-5.4：异步评估情绪反馈（不影响保存主流程）。
+  Future<void> _evaluateEmotion(LedgerEntry entry) async {
+    if (entry.type != EntryType.expense) return;
+    try {
+      final deps = ref.read(appDependenciesProvider);
+      final now = _clock.now();
+      // 统计窗口：该分类近 90 天已入账支出（排除刚存的本笔）
+      final windowStart = now.subtract(const Duration(days: 90));
+      final page = await deps.ledgerRepository.listPage(
+        filter: EntryFilter(
+          categoryId: entry.categoryId,
+          type: EntryType.expense.wire,
+          fromMs: windowStart.millisecondsSinceEpoch,
+          toMs: now.millisecondsSinceEpoch,
+          bookId: _bookId,
+        ),
+        limit: 500,
+      );
+      final items = (page.successOrNull?.items ?? const <LedgerEntry>[])
+          .where((e) => e.id != entry.id) // 排除本笔
+          .toList();
+      final amounts = items.map((e) => e.amount.cents).toList();
+
+      // 判断本月首笔
+      final period = deps.calendar.currentPeriod();
+      final monthStartMs = DateTime.parse(period.dayFrom).millisecondsSinceEpoch;
+      final monthEntries = await deps.ledgerRepository.listPage(
+        filter: EntryFilter(bookId: _bookId, fromMs: monthStartMs, toMs: now.millisecondsSinceEpoch),
+        limit: 2,
+      );
+      final isMonthFirst = (monthEntries.successOrNull?.items.length ?? 0) <= 1;
+
+      // 判断是否超预算
+      final budgetRes = await deps.budgetRepository.getTotal(_bookId);
+      final budget = budgetRes.successOrNull;
+      int overBudget = 0;
+      if (budget != null) {
+        final spent = await deps.budgetRepository.spentCents(
+          bookId: _bookId, fromMs: monthStartMs, toMs: now.millisecondsSinceEpoch,
+        );
+        final spentCents = spent.successOrNull ?? 0;
+        overBudget = spentCents - budget.amount.cents;
+      }
+      final isOverBudget = overBudget > 0;
+
+      final feedback = await EmotionFeedbackPrefs.evaluate(
+        amountCents: entry.amount.cents,
+        categoryAmountsCents: amounts,
+        isMonthFirstEntry: isMonthFirst,
+        isOverBudget: isOverBudget,
+        now: now,
+      );
+      if (feedback != null) {
+        state = state.copyWith(emotionFeedback: feedback);
+      }
+    } catch (_) {
+      // 反馈失败不影响业务
+    }
   }
 
   /// 保存 toast「撤销」：软删除刚新建的那一笔（5 秒窗口）。

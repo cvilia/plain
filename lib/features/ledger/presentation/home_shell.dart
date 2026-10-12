@@ -1,12 +1,11 @@
 /// Home shell: bottom nav / NavigationRail. See 04-9, 06-E3.
+/// 「记一笔」入口：AppBar 右上角图标（替代悬浮按钮）。
 library;
 
-import 'package:plain/app/theme/app_colors.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:plain/app/breakpoints.dart';
-import 'package:plain/app/theme/design_tokens.dart';
 
 class HomeShell extends ConsumerWidget {
   const HomeShell({super.key, required this.navigationShell});
@@ -14,7 +13,6 @@ class HomeShell extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // Shell stays mounted across theme switches — must follow context.colors.
     return LayoutBuilder(
       builder: (context, constraints) {
         final sizeClass = Breakpoints.sizeClassFromConstraints(constraints);
@@ -47,10 +45,6 @@ class HomeShell extends ConsumerWidget {
                 Expanded(child: navigationShell),
               ],
             ),
-            floatingActionButton: _EntryFab(
-              heroTag: 'fab_home_entry_wide',
-              onPressed: () => context.push('/entry'),
-            ),
           );
         }
 
@@ -60,10 +54,6 @@ class HomeShell extends ConsumerWidget {
             selectedIndex: navigationShell.currentIndex,
             onDestinationSelected: _onTap,
             destinations: destinations,
-          ),
-          floatingActionButton: _EntryFab(
-            heroTag: 'fab_home_entry_compact',
-            onPressed: () => context.push('/entry'),
           ),
         );
       },
@@ -75,21 +65,31 @@ class HomeShell extends ConsumerWidget {
   }
 }
 
-class _EntryFab extends StatelessWidget {
-  const _EntryFab({required this.heroTag, required this.onPressed});
-  final String heroTag;
+/// 「记一笔」AppBar 按钮（所有页面统一风格）。
+class EntryAppBarAction extends StatelessWidget {
+  const EntryAppBarAction({super.key});
+  @override
+  Widget build(BuildContext context) {
+    return IconButton(
+      icon: const Icon(Icons.add_circle_outline, size: 26),
+      tooltip: '记一笔',
+      onPressed: () => context.push('/entry'),
+    );
+  }
+}
+
+/// 通用「添加」AppBar 按钮。
+class AddAppBarAction extends StatelessWidget {
+  const AddAppBarAction({super.key, required this.tooltip, required this.onPressed});
+  final String tooltip;
   final VoidCallback onPressed;
 
   @override
   Widget build(BuildContext context) {
-    return FloatingActionButton(
-      heroTag: heroTag,
+    return IconButton(
+      icon: const Icon(Icons.add, size: 24),
+      tooltip: tooltip,
       onPressed: onPressed,
-      backgroundColor: context.colors.primary,
-      foregroundColor: context.colors.onPrimary,
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(Radii.lg)),
-      child: const Icon(Icons.add),
     );
   }
 }

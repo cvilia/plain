@@ -1,10 +1,11 @@
-/// 自动化规则列表（STORY-6.1）。
+﻿/// 自动化规则列表（STORY-6.1）。
 library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:plain/app/bootstrap.dart';
 import 'package:plain/app/theme/app_colors.dart';
+import 'package:plain/features/ledger/presentation/home_shell.dart';
 import 'package:plain/app/theme/design_tokens.dart';
 import 'package:plain/core/refresh/data_invalidation.dart';
 import 'package:plain/design_system/app_toast.dart';
@@ -46,12 +47,9 @@ class _AutomationRulesPageState extends ConsumerState<AutomationRulesPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('自动化规则')),
-      floatingActionButton: FloatingActionButton.extended(
-        heroTag: 'fab_rules_add',
-        onPressed: _showCreateSheet,
-        icon: const Icon(Icons.add),
-        label: const Text('新建规则'),
+      appBar: AppBar(
+        title: const Text('自动化规则'),
+        actions: [AddAppBarAction(tooltip: '新建规则', onPressed: _showCreateSheet)],
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
@@ -350,3 +348,4 @@ class _AutomationRulesPageState extends ConsumerState<AutomationRulesPage> {
     if (mounted) ref.invalidateData.bumpEntryMutated();
   }
 }
+

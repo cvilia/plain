@@ -98,7 +98,11 @@ class LedgerRepositoryImpl implements LedgerRepository {
       final where = StringBuffer('deleted_at IS NULL');
       final args = <Object?>[];
       if (filter?.bookId != null) { where.write(' AND book_id = ?'); args.add(filter!.bookId); }
-      if (filter?.categoryId != null) { where.write(' AND category_id = ?'); args.add(filter!.categoryId); }
+      if (filter?.categoryId != null) {
+        // 含子分类：自身 OR parent_id = 该分类
+        where.write(' AND (category_id = ? OR category_id IN (SELECT id FROM categories WHERE parent_id = ?))');
+        args..add(filter!.categoryId)..add(filter.categoryId);
+      }
       if (filter?.accountId != null) {
         where.write(' AND (account_id = ? OR to_account_id = ?)');
         args..add(filter!.accountId)..add(filter.accountId);
@@ -106,9 +110,12 @@ class LedgerRepositoryImpl implements LedgerRepository {
       if (filter?.type != null) { where.write(' AND type = ?'); args.add(filter!.type); }
       if (filter?.fromMs != null) { where.write(' AND occurred_at >= ?'); args.add(filter!.fromMs); }
       if (filter?.toMs != null) { where.write(' AND occurred_at <= ?'); args.add(filter!.toMs); }
+      if (filter?.minAmountCents != null) { where.write(' AND amount_cents >= ?'); args.add(filter!.minAmountCents); }
+      if (filter?.maxAmountCents != null) { where.write(' AND amount_cents <= ?'); args.add(filter!.maxAmountCents); }
       if (filter?.keyword != null && filter!.keyword!.isNotEmpty) {
-        where.write(' AND (note LIKE ? OR id = ?)');
-        args..add('%${filter.keyword}%')..add(filter.keyword);
+        // 匹配备注 / 账单 id / 分类名
+        where.write(' AND (note LIKE ? OR id = ? OR category_id IN (SELECT id FROM categories WHERE name LIKE ?))');
+        args..add('%${filter.keyword}%')..add(filter.keyword)..add('%${filter.keyword}%');
       }
       if (cursor != null) {
         where.write(' AND (occurred_at < ? OR (occurred_at = ? AND id < ?))');

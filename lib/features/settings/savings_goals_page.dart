@@ -1,10 +1,11 @@
-/// 储蓄目标列表（STORY-7.1）。
+﻿/// 储蓄目标列表（STORY-7.1）。
 library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:plain/app/bootstrap.dart';
 import 'package:plain/app/theme/app_colors.dart';
+import 'package:plain/features/ledger/presentation/home_shell.dart';
 import 'package:plain/app/theme/design_tokens.dart';
 import 'package:plain/core/format/amount_formatter.dart';
 import 'package:plain/core/refresh/data_invalidation.dart';
@@ -43,12 +44,9 @@ class _SavingsGoalsPageState extends ConsumerState<SavingsGoalsPage> {
   Widget build(BuildContext context) {
     final now = ref.read(appDependenciesProvider).clock.now();
     return Scaffold(
-      appBar: AppBar(title: const Text('储蓄目标')),
-      floatingActionButton: FloatingActionButton.extended(
-        heroTag: 'fab_savings_add',
-        onPressed: _showCreateSheet,
-        icon: const Icon(Icons.add),
-        label: const Text('新建目标'),
+      appBar: AppBar(
+        title: const Text('储蓄目标'),
+        actions: [AddAppBarAction(tooltip: '新建目标', onPressed: _showCreateSheet)],
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
@@ -231,3 +229,4 @@ class _SavingsGoalsPageState extends ConsumerState<SavingsGoalsPage> {
     if (mounted) ref.invalidateData.bumpBudgetMutated();
   }
 }
+

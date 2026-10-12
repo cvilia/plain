@@ -21,12 +21,17 @@ import 'package:plain/features/settings/backup_page.dart';
 import 'package:plain/features/settings/budget_page.dart';
 import 'package:plain/features/settings/category_manage_page.dart';
 import 'package:plain/features/settings/import_page.dart';
+import 'package:plain/features/settings/reimburse_center_page.dart';
 import 'package:plain/features/settings/privacy_policy_page.dart';
 import 'package:plain/features/settings/recurring_page.dart';
 import 'package:plain/features/settings/reminders_page.dart';
 import 'package:plain/features/settings/savings_goals_page.dart';
 import 'package:plain/features/settings/sync_page.dart';
 import 'package:plain/features/settings/theme_page.dart';
+import 'package:plain/features/settings/home_layout_page.dart';
+import 'package:plain/features/settings/achievements_page.dart';
+import 'package:plain/domain/services/emotion_feedback_service.dart';
+import 'package:plain/domain/services/weekly_report_service.dart';
 import 'package:plain/features/settings/trash_page.dart';
 
 class SettingsPage extends ConsumerWidget {
@@ -103,6 +108,14 @@ class SettingsPage extends ConsumerWidget {
                   subtitle: const Text('沉淀基金与专项预留'),
                   trailing: const Icon(Icons.chevron_right),
                   onTap: () => _openDetail(context, const SavingsGoalsPage()),
+                ),
+                const Divider(height: 1),
+                ListTile(
+                  leading: const Icon(Icons.receipt_long_outlined),
+                  title: const Text('报销中心'),
+                  subtitle: const Text('垫付归集与回款追踪'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => _openDetail(context, const ReimburseCenterPage()),
                 ),
                 const Divider(height: 1),
                 ListTile(
@@ -258,12 +271,44 @@ class SettingsPage extends ConsumerWidget {
                   onTap: () => _openDetail(context, const ThemePage()),
                 ),
                 const Divider(height: 1),
+                ListTile(
+                  leading: const Icon(Icons.dashboard_customize_outlined),
+                  title: const Text('首页卡片'),
+                  subtitle: const Text('排序、显示/隐藏、预设布局'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => _openDetail(context, const HomeLayoutPage()),
+                ),
+                const Divider(height: 1),
+                ListTile(
+                  leading: const Icon(Icons.emoji_events_outlined),
+                  title: const Text('我的成就'),
+                  subtitle: const Text('连续记账、徽章、权益券'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => _openDetail(context, const AchievementsPage()),
+                ),
+                const Divider(height: 1),
                 SwitchListTile(
                   secondary: const Icon(Icons.visibility_off_outlined),
                   title: const Text('隐藏金额'),
                   subtitle: const Text('以 **** 显示金额'),
                   value: hideAmounts,
                   onChanged: (v) => ref.read(hideAmountsProvider.notifier).toggle(v),
+                ),
+                const Divider(height: 1),
+                SwitchListTile(
+                  secondary: const Icon(Icons.sentiment_satisfied_alt_outlined),
+                  title: const Text('情绪反馈'),
+                  subtitle: const Text('记账后显示轻量反馈卡片'),
+                  value: ref.watch(emotionEnabledProvider),
+                  onChanged: (v) => ref.read(emotionEnabledProvider.notifier).toggle(v),
+                ),
+                const Divider(height: 1),
+                SwitchListTile(
+                  secondary: const Icon(Icons.bar_chart_outlined),
+                  title: const Text('消费周报'),
+                  subtitle: const Text('每周日推送消费画像'),
+                  value: ref.watch(weeklyReportEnabledProvider),
+                  onChanged: (v) => ref.read(weeklyReportEnabledProvider.notifier).toggle(v),
                 ),
               ]),
             ),
