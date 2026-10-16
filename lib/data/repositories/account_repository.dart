@@ -1,6 +1,7 @@
 /// Account repository implementation. Balance is derived (see 08-7.2).
 library;
 
+import 'package:plain/core/constants/app_constants.dart';
 import 'package:plain/core/result/result.dart';
 import 'package:plain/core/time/clock.dart';
 import 'package:plain/data/db/database.dart';
@@ -24,6 +25,9 @@ class AccountRepositoryImpl implements AccountRepository {
   final ChangeLogWriter _changeLog;
   final Clock _clock;
 
+  /// STORY-6.2：拆分子笔不计账户余额（金额已在父笔计入一次）。
+  static const String _notChild = "split_role <> 'child'";
+
   @override
   Future<Result<List<Account>>> listAll() async {
     try {
@@ -43,6 +47,8 @@ class AccountRepositoryImpl implements AccountRepository {
         'SELECT * FROM accounts WHERE deleted_at IS NULL ORDER BY sort_order ASC',
       );
       // One grouped query instead of 2N+1. STORY-6.2：子笔不计余额。
+      // STORY-1.7：借出/借入也要计入账户余额（G-2「计入账户余额 = 是」）——
+      // 借出是从所选账户出钱、借入是进钱，方向与转出/转入一致。
       final sums = _db.raw.select(
         'SELECT account_id, to_account_id, type, SUM(amount_cents) AS s '
         "FROM transactions WHERE deleted_at IS NULL AND split_role <> 'child' "
@@ -52,6 +58,8 @@ class AccountRepositoryImpl implements AccountRepository {
       final incomeBy = <String, int>{};
       final transferOutBy = <String, int>{};
       final transferInBy = <String, int>{};
+      final borrowOutBy = <String, int>{};
+      final borrowInBy = <String, int>{};
       for (final r in sums) {
         final acc = r['account_id'] as String?;
         final to = r['to_account_id'] as String?;
@@ -64,17 +72,31 @@ class AccountRepositoryImpl implements AccountRepository {
         } else if (type == EntryType.transfer.wire) {
           if (acc != null) transferOutBy[acc] = (transferOutBy[acc] ?? 0) + s;
           if (to != null) transferInBy[to] = (transferInBy[to] ?? 0) + s;
+        } else if (type == EntryType.borrowOut.wire && acc != null) {
+          borrowOutBy[acc] = (borrowOutBy[acc] ?? 0) + s;
+        } else if (type == EntryType.borrowIn.wire && acc != null) {
+          borrowInBy[acc] = (borrowInBy[acc] ?? 0) + s;
         }
       }
       final out = <AccountWithBalance>[];
       for (final row in rows) {
         final a = _fromRow(row);
-        final bal = a.openingBalance -
-            (expenseBy[a.id] ?? 0) +
-            (incomeBy[a.id] ?? 0) -
-            (transferOutBy[a.id] ?? 0) +
-            (transferInBy[a.id] ?? 0);
-        out.add(AccountWithBalance(account: a, balanceCents: bal));
+        out.add(AccountWithBalance(
+          account: a,
+          // G-2.1 例外：信用卡欠款余额是**存储值**，与账户余额互为负值；
+          // 其余类型走五段式派生。
+          balanceCents: a.isCredit
+              ? -a.creditDebtCents
+              : _derivedCents(
+                  opening: _openingForBalance(a),
+                  expense: expenseBy[a.id] ?? 0,
+                  income: incomeBy[a.id] ?? 0,
+                  transferOut: transferOutBy[a.id] ?? 0,
+                  transferIn: transferInBy[a.id] ?? 0,
+                  borrowOut: borrowOutBy[a.id] ?? 0,
+                  borrowIn: borrowInBy[a.id] ?? 0,
+                ),
+        ));
       }
       return ok(out);
     } on Exception catch (e) {
@@ -305,59 +327,111 @@ class AccountRepositoryImpl implements AccountRepository {
       final acct = await getById(accountId);
       final f = acct.failureOrNull;
       if (f != null) return err(f);
+      final account = acct.successOrNull!;
 
-      final opening = acct.successOrNull!.openingBalance;
+      // G-2.1：信用卡是唯一例外——欠款余额是存储值（可被对账直接修正），
+      // 账户余额与它互为负值，不做派生。
+      if (account.isCredit) {
+        return ok(AccountBalance(
+          accountId: accountId,
+          balanceCents: -account.creditDebtCents,
+          openingCents: account.openingBalance,
+          txCount: _countLiveTx(accountId),
+        ));
+      }
 
-      // Sum expenses (negative) and income (positive) for this account.
-      // STORY-6.2：子笔不计余额（仅父笔/普通）。
-      const notChild = "AND split_role <> 'child'";
-      final expenseRow = _db.raw.select(
-        'SELECT COALESCE(SUM(amount_cents), 0) AS s FROM transactions '
-        'WHERE account_id = ? AND type = ? AND deleted_at IS NULL $notChild',
-        [accountId, EntryType.expense.wire],
-      );
-      final incomeRow = _db.raw.select(
-        'SELECT COALESCE(SUM(amount_cents), 0) AS s FROM transactions '
-        'WHERE account_id = ? AND type = ? AND deleted_at IS NULL $notChild',
-        [accountId, EntryType.income.wire],
-      );
-      final countRow = _db.raw.select(
-        'SELECT COUNT(*) AS c FROM transactions '
-        'WHERE (account_id = ? OR to_account_id = ?) AND deleted_at IS NULL $notChild',
-        [accountId, accountId],
-      );
-
-      final totalExpense = expenseRow.first['s']! as int;
-      final totalIncome = incomeRow.first['s']! as int;
-      final txCount = countRow.first['c']! as int;
-
-      // Transfers: subtract outgoing, add incoming
-      final transferOut = _db.raw.select(
-        'SELECT COALESCE(SUM(amount_cents), 0) AS s FROM transactions '
-        'WHERE account_id = ? AND type = ? AND deleted_at IS NULL $notChild',
-        [accountId, EntryType.transfer.wire],
-      );
-      final transferIn = _db.raw.select(
-        'SELECT COALESCE(SUM(amount_cents), 0) AS s FROM transactions '
-        'WHERE to_account_id = ? AND type = ? AND deleted_at IS NULL $notChild',
-        [accountId, EntryType.transfer.wire],
-      );
-
-      final balance = opening -
-          totalExpense +
-          totalIncome -
-          (transferOut.first['s']! as int) +
-          (transferIn.first['s']! as int);
-
-      return ok(AccountBalance(
-        accountId: accountId,
-        balanceCents: balance,
-        openingCents: opening,
-        txCount: txCount,
-      ));
+      return ok(await _derivedBalanceOf(account));
     } on Exception catch (e) {
       return err(StorageFailure('db.query_failed', e.toString(), isRetryable: true));
     }
+  }
+
+  /// 恒走五段式派生，**不看账户类型**。
+  ///
+  /// 信用卡对账页需要「按账单实时聚合」来与存储的欠款余额比对（STORY-2.2 AC8），
+  /// 因此这个口径必须能绕开 [balanceOf] 的信用卡分流独立调用。
+  @override
+  Future<Result<AccountBalance>> derivedBalanceOf(String accountId) async {
+    try {
+      final acct = await getById(accountId);
+      final f = acct.failureOrNull;
+      if (f != null) return err(f);
+      return ok(await _derivedBalanceOf(acct.successOrNull!));
+    } on Exception catch (e) {
+      return err(StorageFailure('db.query_failed', e.toString(), isRetryable: true));
+    }
+  }
+
+  Future<AccountBalance> _derivedBalanceOf(Account account) async {
+    final id = account.id;
+    return AccountBalance(
+      accountId: id,
+      balanceCents: _derivedCents(
+        opening: _openingForBalance(account),
+        expense: _sumAmounts('account_id', id, EntryType.expense.wire),
+        income: _sumAmounts('account_id', id, EntryType.income.wire),
+        transferOut: _sumAmounts('account_id', id, EntryType.transfer.wire),
+        transferIn: _sumAmounts('to_account_id', id, EntryType.transfer.wire),
+        // STORY-1.7：借出账户出钱、借入账户进钱（G-2 计入账户余额）
+        borrowOut: _sumAmounts('account_id', id, EntryType.borrowOut.wire),
+        borrowIn: _sumAmounts('account_id', id, EntryType.borrowIn.wire),
+      ),
+      openingCents: _openingForBalance(account),
+      txCount: _countLiveTx(id),
+    );
+  }
+
+  /// 账户余额里**参与**的期初金额（分）。
+  ///
+  /// V3.0 拍板（2026-10-15）：**外币账户按单币种账户处理**，账户余额只走本位币口径。
+  /// `transactions.amount_cents` 恒为本位币（STORY-9.3），所以流水部分天然是本位币；
+  /// 而 `opening_balance_cents` 是用户在**账户自身币种**下填的数（USD 账户填 1000
+  /// 就是 1000 美元），直接相加等于把原币当本位币混加。
+  ///
+  /// 因此外币账户的期初在这里不参与；它在净值里按锁定汇率折算参与
+  /// （`NetWorthService.convertedOpeningCents`），拿不到汇率则该账户不进净值。
+  static int _openingForBalance(Account account) =>
+      account.currency == MoneyRules.defaultCurrency ? account.openingBalance : 0;
+
+  /// G-2.1 余额恒等式：
+  /// 期初 − Σ支出 + Σ收入 − Σ转出 + Σ转入 − Σ借出 + Σ借入。
+  ///
+  /// 借出/借入与转出/转入**同向**（STORY-1.7）：借出是钱离开所选账户，
+  /// 借入是钱进入所选账户；两者都不计入收支统计（G-2），只动余额。
+  static int _derivedCents({
+    required int opening,
+    required int expense,
+    required int income,
+    required int transferOut,
+    required int transferIn,
+    int borrowOut = 0,
+    int borrowIn = 0,
+  }) =>
+      opening -
+      expense +
+      income -
+      transferOut +
+      transferIn -
+      borrowOut +
+      borrowIn;
+
+  int _sumAmounts(String accountColumn, String accountId, String type) {
+    final rows = _db.raw.select(
+      'SELECT COALESCE(SUM(amount_cents), 0) AS s FROM transactions '
+      'WHERE $accountColumn = ? AND type = ? AND deleted_at IS NULL AND $_notChild',
+      [accountId, type],
+    );
+    return rows.first['s']! as int;
+  }
+
+  int _countLiveTx(String accountId) {
+    final rows = _db.raw.select(
+      'SELECT COUNT(*) AS c FROM transactions '
+      'WHERE (account_id = ? OR to_account_id = ?) '
+      'AND deleted_at IS NULL AND $_notChild',
+      [accountId, accountId],
+    );
+    return rows.first['c']! as int;
   }
 
   @override
@@ -444,12 +518,20 @@ class AccountRepositoryImpl implements AccountRepository {
       'INSERT INTO accounts '
       '(id,name,type,currency,opening_balance_cents,note,sort_order,is_hidden,'
       'credit_limit_cents,credit_debt_cents,bill_day,due_day,'
+      'credit_annual_rate_bp,min_payment_cents,'
+      'loan_principal_cents,loan_annual_rate_bp,loan_term_months,loan_repay_method,loan_first_payment_at,'
+      'valuation_mode,valuation_base_cents,valuation_rate_bp,valuation_manual_cents,valuation_started_at,'
       'created_at,updated_at,revision,device_id,base_revision) '
-      'VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
+      'VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
       [
         a.id, a.name, a.type.wire, a.currency, a.openingBalance,
         a.note, a.sortOrder, a.isHidden ? 1 : 0,
         a.creditLimitCents, a.creditDebtCents, a.billDay, a.dueDay,
+        a.creditAnnualRateBp, a.minPaymentCents,
+        a.loanPrincipalCents, a.loanAnnualRateBp, a.loanTermMonths,
+        a.loanRepayMethod?.wire, a.loanFirstPaymentAt?.millisecondsSinceEpoch,
+        a.valuationMode.wire, a.valuationBaseCents, a.valuationRateBp,
+        a.valuationManualCents, a.valuationStartedAt?.millisecondsSinceEpoch,
         a.createdAt.millisecondsSinceEpoch, a.updatedAt.millisecondsSinceEpoch,
         a.revision, a.deviceId, a.baseRevision,
       ],
@@ -460,12 +542,22 @@ class AccountRepositoryImpl implements AccountRepository {
     _db.raw.execute(
       'UPDATE accounts SET name=?,type=?,currency=?,opening_balance_cents=?,'
       'note=?,sort_order=?,is_hidden=?,credit_limit_cents=?,credit_debt_cents=?,'
-      'bill_day=?,due_day=?,updated_at=?,deleted_at=?,revision=?,'
+      'bill_day=?,due_day=?,credit_annual_rate_bp=?,min_payment_cents=?,'
+      'loan_principal_cents=?,loan_annual_rate_bp=?,'
+      'loan_term_months=?,loan_repay_method=?,loan_first_payment_at=?,'
+      'valuation_mode=?,valuation_base_cents=?,valuation_rate_bp=?,'
+      'valuation_manual_cents=?,valuation_started_at=?,'
+      'updated_at=?,deleted_at=?,revision=?,'
       'base_revision=? WHERE id=?',
       [
         a.name, a.type.wire, a.currency, a.openingBalance, a.note, a.sortOrder,
         a.isHidden ? 1 : 0,
         a.creditLimitCents, a.creditDebtCents, a.billDay, a.dueDay,
+        a.creditAnnualRateBp, a.minPaymentCents,
+        a.loanPrincipalCents, a.loanAnnualRateBp, a.loanTermMonths,
+        a.loanRepayMethod?.wire, a.loanFirstPaymentAt?.millisecondsSinceEpoch,
+        a.valuationMode.wire, a.valuationBaseCents, a.valuationRateBp,
+        a.valuationManualCents, a.valuationStartedAt?.millisecondsSinceEpoch,
         a.updatedAt.millisecondsSinceEpoch,
         a.deletedAt?.millisecondsSinceEpoch,
         a.revision, a.baseRevision, a.id,
@@ -486,6 +578,20 @@ class AccountRepositoryImpl implements AccountRepository {
         creditDebtCents: row.intOr('credit_debt_cents', 0),
         billDay: row['bill_day'] as int?,
         dueDay: row['due_day'] as int?,
+        creditAnnualRateBp: row.intOr('credit_annual_rate_bp', 0),
+        minPaymentCents: row.intOr('min_payment_cents', 0),
+        loanPrincipalCents: row.intOr('loan_principal_cents', 0),
+        loanAnnualRateBp: row.intOr('loan_annual_rate_bp', 0),
+        loanTermMonths: row['loan_term_months'] as int?,
+        loanRepayMethod: row['loan_repay_method'] == null
+            ? null
+            : LoanRepayMethod.fromWire(row['loan_repay_method'] as String?),
+        loanFirstPaymentAt: row.nullableDateTime('loan_first_payment_at'),
+        valuationMode: AssetValuationMode.fromWire(row['valuation_mode'] as String?),
+        valuationBaseCents: row.intOr('valuation_base_cents', 0),
+        valuationRateBp: row.intOr('valuation_rate_bp', 0),
+        valuationManualCents: row.intOr('valuation_manual_cents', 0),
+        valuationStartedAt: row.nullableDateTime('valuation_started_at'),
         createdAt: row.dateTime('created_at'),
         updatedAt: row.dateTime('updated_at'),
         deletedAt: row.nullableDateTime('deleted_at'),
@@ -501,5 +607,17 @@ class AccountRepositoryImpl implements AccountRepository {
         'credit_limit_cents': a.creditLimitCents,
         'credit_debt_cents': a.creditDebtCents,
         'bill_day': a.billDay, 'due_day': a.dueDay,
+        'credit_annual_rate_bp': a.creditAnnualRateBp,
+        'min_payment_cents': a.minPaymentCents,
+        'loan_principal_cents': a.loanPrincipalCents,
+        'loan_annual_rate_bp': a.loanAnnualRateBp,
+        'loan_term_months': a.loanTermMonths,
+        'loan_repay_method': a.loanRepayMethod?.wire,
+        'loan_first_payment_at': a.loanFirstPaymentAt?.millisecondsSinceEpoch,
+        'valuation_mode': a.valuationMode.wire,
+        'valuation_base_cents': a.valuationBaseCents,
+        'valuation_rate_bp': a.valuationRateBp,
+        'valuation_manual_cents': a.valuationManualCents,
+        'valuation_started_at': a.valuationStartedAt?.millisecondsSinceEpoch,
       };
 }

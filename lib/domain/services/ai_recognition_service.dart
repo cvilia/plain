@@ -5,6 +5,7 @@ library;
 
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:plain/core/constants/app_constants.dart';
+import 'package:plain/domain/services/accounting_calendar.dart';
 import 'package:plain/domain/services/receipt_parser.dart';
 
 /// 识别入口类型。
@@ -66,16 +67,21 @@ class AiRecognitionService {
   }
 
   /// 解析识别文本 → 预填草稿。不消耗额度（调用方决定）。
-  static OcrDraft parseInput(AiInputType type, String rawText) {
-    return ReceiptParser.parseText(rawText);
+  ///
+  /// [merchantToCategory] 来自学习表（`MerchantLearner.keywordMapOf`）——
+  /// 只有**学过的**商户才给分类建议；没学过就不猜（不再有写死的商户清单）。
+  static OcrDraft parseInput(
+    AiInputType type,
+    String rawText, {
+    Map<String, String> merchantToCategory = const {},
+  }) {
+    return ReceiptParser.parseText(
+      rawText,
+      merchantToCategory: merchantToCategory,
+    );
   }
 
-  /// 记账月 key（YYYY-MM，按月起始日偏移）。
-  static String _monthKey(DateTime now, int monthStartDay) {
-    final t = now.toLocal();
-    final adjusted = t.day >= monthStartDay
-        ? DateTime(t.year, t.month)
-        : DateTime(t.year == 1 ? 12 : t.year - 1, t.month == 1 ? 12 : t.month - 1);
-    return '${adjusted.year}-${adjusted.month.toString().padLeft(2, '0')}';
-  }
+  /// 记账月 key（YYYY-MM）。G-1：走记账月的唯一入口，不自己偏移月起始日。
+  static String _monthKey(DateTime now, int monthStartDay) =>
+      AccountingCalendar.labelFor(now, monthStartDay);
 }

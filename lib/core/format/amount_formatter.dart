@@ -23,8 +23,32 @@ String formatAmount(int cents, {bool hide = false}) {
   if (hide) return '****';
   final neg = cents < 0;
   final abs = cents.abs();
-  final s = '${abs ~/ 100}.${(abs % 100).toString().padLeft(2, '0')}';
+  final s = '${_grouped(abs ~/ 100)}.${(abs % 100).toString().padLeft(2, '0')}';
   return neg ? '-$s' : s;
+}
+
+/// Integer with thousand separators: 1234567 → 1,234,567.
+String _grouped(int n) {
+  final s = n.toString();
+  if (s.length <= 3) return s;
+  final buf = StringBuffer();
+  for (var i = 0; i < s.length; i++) {
+    if (i > 0 && (s.length - i) % 3 == 0) buf.write(',');
+    buf.write(s[i]);
+  }
+  return buf.toString();
+}
+
+/// Split amount into integer and decimal parts for four-part typography.
+/// Returns `intPart` with thousand separators (e.g. `3,420`) and `decPart`
+/// (e.g. `50`). Hidden mode yields `****`.
+({String intPart, String decPart}) formatAmountParts(int cents, {bool hide = false}) {
+  if (hide) return (intPart: '****', decPart: '');
+  final abs = cents.abs();
+  return (
+    intPart: _grouped(abs ~/ 100),
+    decPart: (abs % 100).toString().padLeft(2, '0'),
+  );
 }
 
 /// Format amount with currency symbol.

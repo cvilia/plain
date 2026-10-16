@@ -45,6 +45,10 @@ enum DataScope {
 
 /// Monotonic per-scope versions. Bump on write; watch on the read side.
 class DataInvalidation extends Notifier<Map<DataScope, int>> {
+  /// STORY-8.1：本地写入的旁路钩子（同步调度器注册）。
+  /// 放在这里是为了让「写→推」只有一个触发点，不给每个写路径都塞同步代码。
+  static void Function()? localMutationHook;
+
   static const Map<DataScope, int> _zero = {
     DataScope.ledger: 0,
     DataScope.accounts: 0,
@@ -63,6 +67,11 @@ class DataInvalidation extends Notifier<Map<DataScope, int>> {
   /// Increment one scope. Readers of that scope rebuild.
   void bump(DataScope scope) {
     state = {...state, scope: (state[scope] ?? 0) + 1};
+    // STORY-8.1 AC1：本地写入后立刻安排一次推送，另一端 ≤10 秒可见。
+    // 主题/首页布局是本机偏好（不同步），不触发。
+    if (scope != DataScope.theme && scope != DataScope.homeLayout) {
+      localMutationHook?.call();
+    }
   }
 
   /// Increment several scopes at once.
@@ -106,6 +115,12 @@ class DataInvalidation extends Notifier<Map<DataScope, int>> {
 
   /// Theme / appearance change (id or mode).
   void bumpTheme() => bump(DataScope.theme);
+
+  /// 所有 scope 各抬一格。
+  ///
+  /// 「加载失败 → 重试」用它：缓存型读模型全部 watch 版本号，抬一格即全部重取，
+  /// 不用每个页面各写一遍「该 invalidate 哪个 provider」。
+  void bumpEverything() => bumpAll(DataScope.values);
 
   /// Home card layout change (order / hidden / preset).
   void bumpHomeLayout() => bump(DataScope.homeLayout);

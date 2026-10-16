@@ -1,15 +1,12 @@
-/// Category / account avatar: tinted circle + icon or local image.
+/// Category / account avatar: Quiet Ledger category icon or local image.
+/// New v3 SVG icons get no backing plate (design); legacy refs keep tinted circle.
 library;
 
 import 'dart:io';
 
 import 'package:flutter/material.dart';
-import 'package:plain/design_system/category_icons.dart';
+import 'package:plain/design_system/category_icon_v3.dart';
 
-/// Tinted circle with a category/account icon (or uploaded image).
-///
-/// [size] is the icon size; the circle radius matches the established
-/// call-site convention (radius == icon size).
 class CategoryAvatar extends StatelessWidget {
   const CategoryAvatar({
     super.key,
@@ -39,16 +36,16 @@ class CategoryAvatar extends StatelessWidget {
             width: size * 1.6,
             height: size * 1.6,
             fit: BoxFit.cover,
-            errorBuilder: (_, _, _) =>
-                Icon(iconForCategory(iconRef), size: size, color: color),
+            errorBuilder: (_, _, _) => _fallback(),
           ),
         ),
       );
     }
-    return CircleAvatar(
-      radius: size,
-      backgroundColor: color.withValues(alpha: 0.1),
-      child: Icon(iconForCategory(iconRef), size: size, color: color),
-    );
+    return _fallback();
+  }
+
+  Widget _fallback() {
+    // v3: stroke icon, no pastel plate.
+    return CategoryIcon(iconRef: iconRef, size: size * 1.15, color: color);
   }
 }

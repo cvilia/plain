@@ -1,32 +1,36 @@
-/// Home flow list page. Date-grouped, keyset paginated, swipe-to-delete.
-/// Visual source of truth: 09-高保真UI.html SP-0-02.
+/// Home flow list — Quiet Ledger SP-0-02.
+/// 顶栏：日历（跳报表） | 2026年9月 | 搜索 · 更多 —— 图标 20 / 44×44 / r12
+/// Hero：结余四段式 ink（行盒 45 = 34 × CSS normal）/ 支出 ink / 收入 income 红
+/// 日分组：eyebrow（32 上距 + 8 下距，只有日期、无当日合计）+ 圆角 panel
+/// 行：6px 色点 · 名称/备注 · 金额（右对齐 + tnum）
+/// 见 redesign-v3/单独确认.html、08-SCREENS-SPEC/02-ledger.md
 library;
 
-import 'package:plain/app/theme/app_colors.dart';
-import 'package:plain/features/ledger/presentation/home_shell.dart';
-import 'package:plain/core/time/date_format.dart';
-import 'package:plain/design_system/category_avatar.dart';
-import 'package:plain/design_system/app_empty_state.dart';
 import 'package:flutter/material.dart';
-import 'package:plain/design_system/app_toast.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:plain/app/breakpoints.dart';
-import 'package:plain/app/bootstrap.dart';
-import 'package:plain/app/theme/design_tokens.dart';
-import 'package:plain/app/theme/tokens.dart';
+import 'package:plain/app/settings/home_layout_prefs.dart';
+import 'package:plain/app/settings/ledger_settings.dart';
+import 'package:plain/app/theme/app_colors.dart';
+import 'package:plain/app/theme/theme_registry.dart';
+import 'package:plain/app/theme/typography.dart';
 import 'package:plain/core/format/amount_formatter.dart';
 import 'package:plain/core/refresh/data_invalidation.dart';
+import 'package:plain/core/time/date_format.dart';
+import 'package:plain/design_system/amount_display.dart';
+import 'package:plain/design_system/app_empty_state.dart';
+import 'package:plain/design_system/app_toast.dart';
+import 'package:plain/design_system/plain_icons_v3.dart';
+import 'package:plain/design_system/plain_ui.dart';
 import 'package:plain/domain/entities/category.dart' as domain;
-import 'package:plain/features/ledger/presentation/safe_to_spend_card.dart';
-import 'package:plain/features/ledger/presentation/advanced_filter_page.dart';
-import 'package:plain/app/settings/home_layout_prefs.dart';
-import 'package:plain/domain/entities/enums.dart';
 import 'package:plain/domain/entities/ledger_entry.dart';
 import 'package:plain/features/ledger/controllers/flow_list_controller.dart';
+import 'package:plain/features/ledger/presentation/advanced_filter_page.dart';
+import 'package:plain/features/ledger/presentation/safe_to_spend_card.dart';
 
-/// 首页卡片布局（order + hidden）（STORY-5.3）。
-final _homeLayoutProvider = FutureProvider<(List<String>, Set<String>)>((ref) async {
+final _homeLayoutProvider =
+    FutureProvider<(List<String>, Set<String>)>((ref) async {
   ref.watch(homeLayoutVersionProvider);
   final order = await loadHomeCardOrder();
   final hidden = await loadHomeCardHidden();
@@ -41,58 +45,76 @@ class FlowListPage extends ConsumerWidget {
     final state = ref.watch(flowListControllerProvider);
     final controller = ref.read(flowListControllerProvider.notifier);
     final filterCatId = ref.watch(flowCategoryFilterProvider);
+    final colors = context.colors;
+    final monthStartDay = ref.watch(monthStartDayProvider);
 
-    // 写→bump→读：页面级 listen 确保返回本页时列表已重载
-    // （Notifier 内 listen 依赖 notifier 存活，页面监听更稳）。
     ref.listen(ledgerVersionProvider, (prev, next) {
       if (prev == next) return;
       controller.refresh();
     });
 
+    final now = DateTime.now();
+    final monthTitle = '${now.year}年${now.month}月';
+
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('流水'),
+      backgroundColor: colors.surface,
+      // 顶栏统一走 PlainTopBar（`.topbar`）：内容盒 56，状态栏高度由它自己的
+      // SafeArea 承担。两处照设计稿：
+      //   · 图标 20（`ic("ic_calendar", 20)`），不是 `.iconbtn` 的默认 22；
+      //   · 左侧是日历按钮（跳报表），不是返回键 —— 本页是 shell 分支，无路由可回。
+      appBar: PlainTopBar(
+        title: monthTitle,
+        leadingIcon: PlainIconData.calendar,
+        onBack: () => context.go('/reports'),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.tune, size: 22),
-            tooltip: '高级筛选',
-            onPressed: () => Navigator.push<void>(
+          PlainTopBarAction(
+            icon: PlainIconData.search,
+            iconSize: 20,
+            tooltip: '搜索 / 筛选',
+            onTap: () => Navigator.push<void>(
               context,
               MaterialPageRoute(builder: (_) => const AdvancedFilterPage()),
             ),
           ),
-          const EntryAppBarAction(),
+          PlainTopBarAction(
+            icon: PlainIconData.more,
+            iconSize: 20,
+            tooltip: '更多',
+            onTap: () {},
+          ),
         ],
       ),
+      // ⚠️ `top: false` 是必须的，别顺手改成 `SafeArea(...)`：
+      // Scaffold 在 `appBar != null` 时已把这个槽位的 `padding.top` 归零
+      //（`_addIfNonNull` 的 `removeTopPadding: widget.appBar != null`），
+      // 再叠一层只会白算一次；留着是为了横屏刘海那 44pt 的 left/right。
       body: SafeArea(
+        top: false,
         child: Column(
           children: [
             if (filterCatId != null)
-              Material(
-                color: context.colors.surfaceMuted,
-                child: ListTile(
-                  dense: true,
-                  leading: const Icon(Icons.filter_alt_outlined, size: 18),
-                  title: Text(
-                    '已筛选：${state.categoryMap[filterCatId]?.name ?? '该分类'}',
-                    style: const TextStyle(fontSize: 13),
-                  ),
-                  trailing: TextButton(
-                    onPressed: () {
-                      ref.read(flowCategoryFilterProvider.notifier).clear();
-                      controller.refresh();
-                    },
-                    child: const Text('显示全部'),
-                  ),
-                ),
+              _FilterStrip(
+                label: '已筛选：${state.categoryMap[filterCatId]?.name ?? '该分类'}',
+                onClear: () {
+                  ref.read(flowCategoryFilterProvider.notifier).clear();
+                  controller.refresh();
+                },
               ),
             Expanded(
               child: state.groups.isEmpty && !state.isLoading
                   ? ContentWidthConstraint(
-                      child: _EmptyState(onEntryTap: () => _openEntry(context)),
+                      child: _EmptyState(
+                        onEntryTap: () => context.push('/entry'),
+                        errorCode: state.errorMessage,
+                        onRetry: controller.refresh,
+                      ),
                     )
                   : ContentWidthConstraint(
-                      child: _FlowList(state: state, controller: controller),
+                      child: _FlowList(
+                        state: state,
+                        controller: controller,
+                        monthStartDay: monthStartDay,
+                      ),
                     ),
             ),
           ],
@@ -100,118 +122,206 @@ class FlowListPage extends ConsumerWidget {
       ),
     );
   }
+}
 
-  Future<void> _openEntry(BuildContext context) async {
-    await context.push('/entry');
+/// 分类筛选条 —— 设计稿里没有这一条（它是「报表下钻」带过来的态）。
+/// 保持设计系统口径：`surfaceMuted` 底 + 15/500 文本 + 右侧「显示全部」。
+class _FilterStrip extends StatelessWidget {
+  const _FilterStrip({required this.label, required this.onClear});
+
+  final String label;
+  final VoidCallback onClear;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    return ColoredBox(
+      color: colors.surfaceMuted,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                label,
+                style: TextStyle(
+                  fontSize: 15,
+                  // 不写 height 会继承 body 的 1.5714（+3.57px），条带被撑高。
+                  height: designLineHeight(15),
+                  fontWeight: FontWeight.w500,
+                  color: colors.ink,
+                ),
+              ),
+            ),
+            TextButton(
+              onPressed: onClear,
+              child: const Text('显示全部'),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 
 class _EmptyState extends StatelessWidget {
-  const _EmptyState({required this.onEntryTap});
+  const _EmptyState({required this.onEntryTap, this.errorCode, this.onRetry});
   final VoidCallback onEntryTap;
+
+  /// 非空 = 这次是**加载失败**，不是「没记过账」。
+  ///
+  /// 原先只判 `groups.isEmpty` → 失败与空账本看到的是同一屏「还没有记录」，
+  /// 用户以为数据没了（audit 2026-10-15 走查确认）。
+  final String? errorCode;
+  final VoidCallback? onRetry;
 
   @override
   Widget build(BuildContext context) {
+    if (errorCode != null) {
+      return AppEmptyState(
+        icon: PlainIconData.cloudDownload,
+        title: '流水加载失败',
+        subtitle: '数据还在本机，重试一下就好（$errorCode）',
+        action: FilledButton.icon(
+          onPressed: onRetry,
+          icon: const PlainIcon(PlainIconData.cloudDownload),
+          label: const Text('重试'),
+        ),
+      );
+    }
     return AppEmptyState(
-      icon: Icons.receipt_long_outlined,
+      icon: PlainIconData.receipt,
       title: '还没有记录',
       subtitle: '点击下方按钮记一笔',
-      action: FilledButton.icon(onPressed: onEntryTap, icon: const Icon(Icons.add), label: const Text('记一笔')),
+      action: FilledButton.icon(
+        onPressed: onEntryTap,
+        icon: const PlainIcon(PlainIconData.plus),
+        label: const Text('记一笔'),
+      ),
     );
   }
 }
 
 class _FlowList extends ConsumerWidget {
-  const _FlowList({required this.state, required this.controller});
+  const _FlowList({
+    required this.state,
+    required this.controller,
+    required this.monthStartDay,
+  });
+
   final FlowListState state;
   final FlowListController controller;
+  final int monthStartDay;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final groups = state.groups;
-    // Keep the balance card clear of the status bar / notch.
-    // 顶部安全区由外层 SafeArea 统一处理，这里只留间距
-    const topPad = Spacing.sm;
 
-    // 拍平成单一列表：日标题 + 账单各自为 ListView 顶层子项。
-    // 嵌套 Column 里的 Dismissible 在删一条后会失效（手势丢失）。
-    // 首页卡片按布局偏好排序 + 显示/隐藏（STORY-5.3）。
     final layout = ref.watch(_homeLayoutProvider).maybeWhen(
-      data: (v) => v,
-      orElse: () => (const <String>[], const <String>{}),
-    );
+          data: (v) => v,
+          orElse: () => (const <String>[], const <String>{}),
+        );
     final (cardOrder, hiddenCards) = layout;
-    // 按用户排序决定 balance/safeToSpend 的顺序
     final showBalance = !hiddenCards.contains('monthly_balance');
     final showSafe = !hiddenCards.contains('safe_to_spend');
-    final balanceIdx = cardOrder.indexOf('monthly_balance');
-    final safeIdx = cardOrder.indexOf('safe_to_spend');
-    final headerRows = <_FlowRow>[
+
+    // 拍平：hero / safe / 日头 / 行（Dismissible 需要顶层）
+    // ⚠️ 分组之间**没有** footer 行 —— 32 的间距由 `_DayHeader` 的上内边距出，
+    // 与设计稿 `.grp{margin-top:32px}` 一一对应。曾经用「footer 24 + header 8」
+    // 凑 32，读起来像两处魔法数，改任一处就会悄悄错位。
+    final rows = <_FlowRow>[
       if (showBalance) const _FlowRow.balance(),
       if (showSafe) const _FlowRow.safeToSpend(),
-    ];
-    // 按 order 中的相对位置排序
-    headerRows.sort((a, b) {
-      final ia = a.kind == _FlowRowKind.balance ? (balanceIdx < 0 ? 0 : balanceIdx) : (safeIdx < 0 ? 1 : safeIdx);
-      final ib = b.kind == _FlowRowKind.balance ? (balanceIdx < 0 ? 0 : balanceIdx) : (safeIdx < 0 ? 1 : safeIdx);
-      return ia.compareTo(ib);
-    });
-    final rows = <_FlowRow>[
-      ...headerRows,
       for (final g in groups) ...[
         _FlowRow.dayHeader(g),
-        for (final e in g.entries) _FlowRow.entry(e),
+        _FlowRow.dayPanel(g),
       ],
       if (state.hasMore) const _FlowRow.more(),
     ];
 
     return ListView.builder(
-      padding: EdgeInsets.fromLTRB(Spacing.lg, topPad, Spacing.lg, 96),
+      // `.scroll{padding:0 16px}` —— 垂直方向一律由各块自己的内边距负责，
+      // 所以这里上边距是 0（hero 自己带 14）；底部 24 = `.scroll-pad{height:24px}`。
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
       itemCount: rows.length,
       itemBuilder: (context, index) {
         final row = rows[index];
         switch (row.kind) {
           case _FlowRowKind.balance:
-            return _BalanceCard(state: state);
+            return _Hero(
+              state: state,
+              monthStartDay: monthStartDay,
+            );
           case _FlowRowKind.safeToSpend:
+            // 设计稿屏 2 没有这张卡（它来自「首页卡片自定义」）。
+            // 给它 32 的上距，免得贴死在 hero 的第二条发丝线上。
             return const SafeToSpendCard();
           case _FlowRowKind.dayHeader:
-            return _DayHeader(group: row.group!, key: ValueKey('day-${row.group!.dayKey}'));
-          case _FlowRowKind.entry:
-            final e = row.entry!;
-            return _EntryTile(
-              key: ValueKey('e-${e.id}'),
-              entry: e,
-              category: state.categoryMap[e.categoryId],
+            return _DayHeader(group: row.group!);
+          case _FlowRowKind.dayPanel:
+            return _DayPanel(
+              group: row.group!,
               controller: controller,
+              categoryMap: state.categoryMap,
             );
           case _FlowRowKind.more:
-            WidgetsBinding.instance.addPostFrameCallback((_) => controller.loadMore());
-            return const Center(child: Padding(padding: EdgeInsets.all(Spacing.lg), child: CircularProgressIndicator()));
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              controller.loadMore();
+            });
+            return const Padding(
+              padding: EdgeInsets.all(16),
+              child: Center(child: CircularProgressIndicator()),
+            );
         }
       },
     );
   }
 }
 
-enum _FlowRowKind { balance, safeToSpend, dayHeader, entry, more }
+enum _FlowRowKind { balance, safeToSpend, dayHeader, dayPanel, more }
 
 class _FlowRow {
-  const _FlowRow.balance() : kind = _FlowRowKind.balance, group = null, entry = null;
-  const _FlowRow.safeToSpend() : kind = _FlowRowKind.safeToSpend, group = null, entry = null;
-  const _FlowRow.dayHeader(DayGroup this.group) : kind = _FlowRowKind.dayHeader, entry = null;
-  const _FlowRow.entry(LedgerEntry this.entry) : kind = _FlowRowKind.entry, group = null;
-  const _FlowRow.more() : kind = _FlowRowKind.more, group = null, entry = null;
+  const _FlowRow.balance()
+      : kind = _FlowRowKind.balance,
+        group = null,
+        entry = null;
+  const _FlowRow.safeToSpend()
+      : kind = _FlowRowKind.safeToSpend,
+        group = null,
+        entry = null;
+  const _FlowRow.dayHeader(DayGroup this.group)
+      : kind = _FlowRowKind.dayHeader,
+        entry = null;
+  const _FlowRow.dayPanel(DayGroup this.group)
+      : kind = _FlowRowKind.dayPanel,
+        entry = null;
+  const _FlowRow.more()
+      : kind = _FlowRowKind.more,
+        group = null,
+        entry = null;
 
   final _FlowRowKind kind;
   final DayGroup? group;
   final LedgerEntry? entry;
 }
 
-/// 结余卡：hero 渐变 + 漂浮光斑（高保真记忆点）。
-class _BalanceCard extends ConsumerWidget {
-  const _BalanceCard({required this.state});
+/// Hero：发丝线夹住的结余 + 支出/收入 + 记账月起始。
+/// 金额：结余 ink；支出 ink（无符号）；收入 income 红（带 +）。
+///
+/// 高度账（设计稿 `spec.json` 屏 2，`.hero` 实测 200.09）：
+/// ```
+/// padding-top 14                      .hero{padding:14px 0 0}
+/// hairline 1
+/// label  margin-top 16 + 行盒 16 + margin-bottom 8   .hero-label 12/600
+/// 金额行 45（= 34 × normal 1.3235）+ margin-bottom 16
+/// split  padding-bottom 16 + 内容 39.09（= 16 + gap 3 + 20.09）
+/// hairline 1
+/// month-note  padding-top 12 + 行盒 16
+/// ```
+class _Hero extends ConsumerWidget {
+  const _Hero({required this.state, required this.monthStartDay});
   final FlowListState state;
+  final int monthStartDay;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -223,144 +333,218 @@ class _BalanceCard extends ConsumerWidget {
       expense += g.dayExpense;
     }
     final balance = income - expense;
-    final now = ref.read(appDependenciesProvider).clock.now().toLocal();
-    final monthLabel = '${now.year}年${now.month}月';
+    final colors = context.colors;
 
     return Padding(
-      padding: const EdgeInsets.only(top: Spacing.md, bottom: Spacing.lg),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(22),
-        child: Stack(
-          children: [
-            Positioned.fill(
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: heroGradient(context.colors.heroStart, context.colors.heroEnd),
+      padding: const EdgeInsets.only(top: 14),
+      child: Column(
+        // 显式写。`Column` 默认 center，而 hero 的每一块都该满宽（发丝线要通栏）。
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Divider(height: 1, thickness: 1, color: colors.border),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(2, 16, 0, 8),
+            child: Text(
+              '本月结余',
+              style: TextStyle(
+                fontSize: 12,
+                // 12 的设计行盒是 16（normal）。不写就继承 body 的 1.5714 → 18.86（+2.86）。
+                height: designLineHeight(12),
+                fontWeight: FontWeight.w600,
+                letterSpacing: 0.08 * 12,
+                color: colors.inkTertiary,
+              ),
+            ),
+          ),
+          // ⚠️ 这层 SizedBox 不是「随便垫一下」：`.hero-amt` 是**块级**元素，
+          // 它的行盒由 CSS `normal` 的 strut 决定 = 34 × 1.3235 ≈ 45；
+          // 内层 `.amt.xl` 自己的行盒只有 39.44（= 34 × 1.16），两者差 5.56。
+          // 直接把 AmountDisplay 放进来会矮 5.56，把下面整块往上带。
+          SizedBox(
+            height: 34 * designLineHeight(34),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: AmountDisplay(
+                cents: balance,
+                fontSize: 34,
+                integerWeight: FontWeight.w700,
+                // 设计：结余用 ink，不因正负变色
+                color: colors.ink,
+                decorationColor: colors.inkTertiary,
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Padding(
+            // `.hero-split{gap:28px;padding:0 0 16px}`
+            padding: const EdgeInsets.only(bottom: 16),
+            child: Row(
+              spacing: 28,
+              children: [
+                _Split(
+                  label: '支出',
+                  cents: expense,
+                  hide: hideAmounts,
+                  // 设计：支出 ink，无 − 号
+                  color: colors.ink,
+                  showSign: false,
                 ),
-              ),
+                _Split(
+                  label: '收入',
+                  cents: income,
+                  hide: hideAmounts,
+                  // 设计 `.tone-income` 的 `--income` = #DC2626 红。
+                  // ⚠️ 令牌表历史命名翻转：`AppColors.income` 实际是 `t.dnInk`（绿），
+                  // `AppColors.expense` 才是 `t.income`（红）。取红必须写 `expense`。
+                  color: colors.expense,
+                  showSign: true,
+                  isIncome: true,
+                ),
+              ],
             ),
-            // 漂浮光斑
-            Positioned(top: -34, right: -20, child: _GlowOrb(size: 120, opacity: 0.13)),
-            Positioned(bottom: -26, right: 44, child: _GlowOrb(size: 84, opacity: 0.10)),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    '本月结余',
-                    style: TextStyle(
-                      fontSize: 12,
-                      letterSpacing: 4,
-                      fontWeight: FontWeight.w500,
-                      color: Colors.white.withValues(alpha: 0.85),
-                    ),
+          ),
+          Divider(height: 1, thickness: 1, color: colors.border),
+          Padding(
+            // `.month-note{padding:12px 0 0 2px;gap:6px}`（总高 12 + 16 = 28）
+            padding: const EdgeInsets.fromLTRB(2, 12, 0, 0),
+            child: Row(
+              spacing: 6,
+              children: [
+                PlainIcon(
+                  PlainIconData.calendar,
+                  size: 13,
+                  // 设计 `.month-note svg{color:var(--faint)}` —— 是 faint，不是 muted。
+                  color: colors.inkFaint,
+                ),
+                Text(
+                  '记账月起始：$monthStartDay 日',
+                  style: TextStyle(
+                    fontSize: 12,
+                    height: designLineHeight(12),
+                    fontWeight: FontWeight.w500,
+                    color: colors.inkTertiary,
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    '${balance >= 0 ? '+' : ''}${formatAmount(balance, hide: hideAmounts)}',
-                    style: const TextStyle(
-                      fontSize: 30,
-                      fontWeight: FontWeight.w600,
-                      letterSpacing: 0.5,
-                      color: Colors.white,
-                      height: 1.15,
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  Row(
-                    children: [
-                      _BalanceStat(label: '收入', value: '+${formatAmount(income, hide: hideAmounts)}', color: const Color(0xFFFFDCC6)),
-                      const SizedBox(width: Spacing.xl),
-                      _BalanceStat(label: '支出', value: '-${formatAmount(expense, hide: hideAmounts)}', color: const Color(0xFFDFF2EC)),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-                  Text(
-                    monthLabel,
-                    style: TextStyle(fontSize: 11, color: Colors.white.withValues(alpha: 0.7)),
-                  ),
-                ],
-              ),
+                ),
+              ],
             ),
-          ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// `.hs`：12/600 标签 + amount-s 值，列间距 3。
+class _Split extends StatelessWidget {
+  const _Split({
+    required this.label,
+    required this.cents,
+    required this.hide,
+    required this.color,
+    this.showSign = false,
+    this.isIncome = false,
+  });
+
+  final String label;
+  final int cents;
+  final bool hide;
+  final Color color;
+  final bool showSign;
+  final bool isIncome;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      // `.hs{gap:3px}` —— 不是 4。差 1px 会让 hero 的 200.09 变 201.09。
+      spacing: 3,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 12,
+            height: designLineHeight(12),
+            fontWeight: FontWeight.w600,
+            letterSpacing: 0.04 * 12,
+            color: context.colors.inkTertiary,
+          ),
+        ),
+        AmountDisplay(
+          cents: cents,
+          fontSize: 15,
+          color: color,
+          // 别传 `decorationColor: inkTertiary`。设计 `.amt.s .dec{color:inherit}` +
+          // `.tone-*` 规则：收入那份四段全取 income 色（cur 压 70%），
+          // 支出那份是墨色 + cur/dec muted —— 两者都由 AmountDisplay 自己判，
+          // 硬塞一个灰色会把收入的小数位也染灰。
+          showSign: showSign,
+          isIncome: isIncome,
+        ),
+      ],
+    );
+  }
+}
+
+/// 日头 eyebrow：`9月28日 周日`（12/600 / ls .08em / muted）。
+///
+/// 32 的上距就是设计稿的 `.grp{margin-top:32px}`：分组靠留白分，不靠盒子。
+/// ⚠️ 设计稿的 eyebrow **只有日期**，右侧没有「当日合计」那一列 —— 别再加回去。
+class _DayHeader extends StatelessWidget {
+  const _DayHeader({required this.group});
+  final DayGroup group;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(2, 32, 2, 8),
+      child: Text(
+        dayLabel(group.dayKey),
+        style: TextStyle(
+          fontSize: 12,
+          height: designLineHeight(12),
+          fontWeight: FontWeight.w600,
+          letterSpacing: 0.08 * 12,
+          color: context.colors.inkTertiary,
         ),
       ),
     );
   }
 }
 
-class _GlowOrb extends StatelessWidget {
-  const _GlowOrb({required this.size, required this.opacity});
-  final double size;
-  final double opacity;
+/// 流水行（panel 内）：6px 色点 · 名称/备注 · 金额（ink，无符号）
+class _EntryRow extends ConsumerStatefulWidget {
+  const _EntryRow({
+    super.key,
+    required this.entry,
+    required this.category,
+    required this.parent,
+    required this.controller,
+    this.isFirst = false,
+  });
 
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: Colors.white.withValues(alpha: opacity),
-      ),
-    );
-  }
-}
-
-class _BalanceStat extends StatelessWidget {
-  const _BalanceStat({required this.label, required this.value, required this.color});
-  final String label;
-  final String value;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(label, style: TextStyle(fontSize: 11, color: Colors.white.withValues(alpha: 0.75))),
-        const SizedBox(height: 2),
-        Text(value, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: color)),
-      ],
-    );
-  }
-}
-
-class _DayHeader extends ConsumerWidget {
-  const _DayHeader({super.key, required this.group});
-  final DayGroup group;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final hideAmounts = ref.watch(hideAmountsProvider);
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(Spacing.lg, Spacing.lg, Spacing.lg, Spacing.sm),
-      child: Row(children: [
-        Text(dayLabel(group.dayKey), style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600, color: context.colors.ink)),
-        const Spacer(),
-        if (group.dayExpense > 0)
-          Text('-${formatAmount(group.dayExpense, hide: hideAmounts)}', style: TextStyle(fontSize: 12, color: context.colors.expense)),
-        if (group.dayIncome > 0) ...[
-          const SizedBox(width: Spacing.sm),
-          Text('+${formatAmount(group.dayIncome, hide: hideAmounts)}', style: TextStyle(fontSize: 12, color: context.colors.income)),
-        ],
-      ]),
-    );
-  }
-}
-
-class _EntryTile extends ConsumerStatefulWidget {
-  const _EntryTile({super.key, required this.entry, required this.category, required this.controller});
   final LedgerEntry entry;
+
+  /// 记账落的是**二级分类**（《08-数据模型设计》§5.1「category_id — 二级分类优先；
+  /// 允许仅一级」），色点取它的 `iconRef`。
   final domain.Category? category;
+
+  /// 二级分类的一级父类；仅一级分类记账时为 null。
+  ///
+  /// ⚠️ 数据侧**不需要新增任何表**：`categories` 本来就是**自引用两层级树**
+  /// （`preset_categories.dart` 用 `insertOne(child, id)` 把二级的 `parent_id`
+  /// 指向一级；支出 12 一级 + 41 二级），`categoryMap` 里一级二级都在，
+  /// 回查一次即可拿到一级名。
+  final domain.Category? parent;
+
   final FlowListController controller;
+  final bool isFirst;
 
   @override
-  ConsumerState<_EntryTile> createState() => _EntryTileState();
+  ConsumerState<_EntryRow> createState() => _EntryRowState();
 }
 
-class _EntryTileState extends ConsumerState<_EntryTile> {
+class _EntryRowState extends ConsumerState<_EntryRow> {
   bool _dismissing = false;
 
   @override
@@ -368,39 +552,33 @@ class _EntryTileState extends ConsumerState<_EntryTile> {
     final entry = widget.entry;
     final category = widget.category;
     final controller = widget.controller;
-    final isExpense = entry.type == EntryType.expense;
-    final isIncome = entry.type == EntryType.income;
-    final isTransfer = entry.type == EntryType.transfer;
-    final amountColor = isExpense ? context.colors.expense : isIncome ? context.colors.income : context.colors.transfer;
-    final prefix = isExpense ? '-' : isIncome ? '+' : '';
-    final amountText = isTransfer
-        ? formatAmount(entry.amount.cents, hide: ref.watch(hideAmountsProvider))
-        : '$prefix${formatAmount(entry.amount.cents, hide: ref.watch(hideAmountsProvider))}';
-    // STORY-1.7 AC4：转账双行（去向 / 来源）
-    final subtitle = isTransfer
-        ? '转账 · ${entry.accountId ?? ''} → ${entry.toAccountId ?? ''}'
-        : _subtitleOf(entry);
+    final colors = context.colors;
+    final hide = ref.watch(hideAmountsProvider);
+
+    // 设计：行内金额 ink、无符号；分类点用分类色
+    final amountText = formatAmount(entry.amount.cents, hide: hide);
+    // 《08-SCREENS-SPEC/02-ledger》§4：`.rt` = **一级**（餐饮）；
+    // `.sub` = 「二级 · 备注」（午餐 · 公司楼下）。
+    final title = widget.parent?.name ?? category?.name ?? '未分类';
+    final sub = _subtitleOf(entry, category, widget.parent);
+    final dotColor = _catColor(category);
 
     return Dismissible(
       key: Key(entry.id),
       direction: DismissDirection.endToStart,
       background: Container(
         alignment: Alignment.centerRight,
-        padding: const EdgeInsets.only(right: Spacing.lg),
-        color: context.colors.expense.withValues(alpha: 0.15),
-        child: Icon(Icons.delete_outline, color: context.colors.expense),
+        padding: const EdgeInsets.only(right: 16),
+        color: colors.expense.withValues(alpha: 0.12),
+        child: PlainIcon(PlainIconData.delete, color: colors.expense),
       ),
-      // confirmDismiss 只做防重入；真正移除必须在 onDismissed 同步完成
-      // （Flutter 要求 dismissed 后控件立刻离开树，否则触发断言）。
       confirmDismiss: (_) async {
         if (_dismissing) return false;
         _dismissing = true;
         return true;
       },
       onDismissed: (_) {
-        // ① 同步移除本地条目（不可 await）
         controller.removeLocal(entry.id);
-        // ② 异步删库 + toast
         controller.deleteEntry(entry.id).then((ok) {
           if (!context.mounted) return;
           if (ok) {
@@ -415,33 +593,178 @@ class _EntryTileState extends ConsumerState<_EntryTile> {
           }
         });
       },
-      child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: Spacing.lg, vertical: Spacing.xs),
-        leading: CategoryAvatar(iconRef: category?.iconRef ?? 'other', iconAsset: category?.iconAsset, color: amountColor),
-        title: Text(
-          '${category?.name ?? '未分类'}${entry.isSplitParent ? ' · 拆分' : entry.isSplitChild ? ' · 子笔' : ''}',
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500),
+      child: Material(
+        // ⚠️ 必须与 `_DayPanel` 同色。`Material` 是不透明层，会盖住面板底 ——
+        // 两处都写 `surfaceCard`（白卡片层），改一处就会露出一条异色的行。
+        color: colors.surfaceCard,
+        child: InkWell(
+          onTap: () => context.push('/entry/${entry.id}'),
+          child: Container(
+            constraints: const BoxConstraints(minHeight: 60),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
+            decoration: BoxDecoration(
+              border: Border(
+                top: BorderSide(
+                  color: widget.isFirst ? const Color(0x00000000) : colors.divider,
+                  width: 1,
+                ),
+              ),
+            ),
+            // `.row{gap:10px}` —— 色点到文字是 10，不是 12。
+            child: Row(
+              spacing: 10,
+              children: [
+                Container(
+                  width: 6,
+                  height: 6,
+                  decoration:
+                      BoxDecoration(color: dotColor, shape: BoxShape.circle),
+                ),
+                Expanded(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    // `.rcol{gap:2px}`
+                    spacing: 2,
+                    children: [
+                      Text(
+                        title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 15,
+                          // `.rcol .rt{font-size:15;font-weight:500}` + `lh:normal`
+                          // → 行盒 20。不写 height 会继承 body 的 1.5714 → 23.57。
+                          height: designLineHeight(15),
+                          fontWeight: FontWeight.w500,
+                          color: colors.ink,
+                        ),
+                      ),
+                      if (sub.isNotEmpty)
+                        Text(
+                          sub,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 12,
+                            height: designLineHeight(12),
+                            fontWeight: FontWeight.w500,
+                            color: colors.inkTertiary,
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                Text(
+                  amountText,
+                  style: TextStyle(
+                    fontSize: 15,
+                    // `.rw-amt{font-size:15;font-weight:600;letter-spacing:-.01em}`，行盒 20。
+                    height: designLineHeight(15),
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: -0.01 * 15,
+                    color: colors.ink,
+                    fontFeatures: kTabularFigures,
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
-        subtitle: Text(
-          subtitle,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: TextStyle(fontSize: 12, color: context.colors.inkTertiary),
-        ),
-        trailing: Text(amountText, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: amountColor)),
-        onTap: () => context.push('/entry/${entry.id}'),
       ),
     );
   }
 
-  String _subtitleOf(LedgerEntry entry) {
-    final t = entry.occurredAt.toLocal();
-    final hm = '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
+  Color _catColor(domain.Category? cat) {
+    if (cat == null) return context.colors.inkTertiary;
+    final argb = categoryColorFor(cat.iconRef);
+    return argb != null ? Color(argb) : context.colors.inkTertiary;
+  }
+
+  /// 设计 §4 的 `.sub` = 「二级分类 · 备注」（`r1s="午餐 · 公司楼下"`）。
+  ///
+  /// 备注选填 → 有二级无备注时就是「午餐」；两者都空（仅一级记账且没写备注）
+  /// 才退回时间，避免整行只剩标题。
+  String _subtitleOf(
+    LedgerEntry entry,
+    domain.Category? category,
+    domain.Category? parent,
+  ) {
     final note = entry.note;
-    if (note != null && note.isNotEmpty) return '$hm  $note';
-    return hm;
+    final parts = <String>[
+      if (parent != null && category != null) category.name,
+      if (note != null && note.isNotEmpty) note,
+    ];
+    if (parts.isNotEmpty) return parts.join(' · ');
+    final t = entry.occurredAt.toLocal();
+    return '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
   }
 }
 
+/// 日分组圆角面板：panel r16 / surface / 1px line，行间 line-soft。
+///
+/// ⚠️ 这里必须是 `Container` 而不是 `DecoratedBox`：CSS 的 `border` 占布局
+/// （实测 `.row` 从 panel 的 x+1 起），Flutter 里只有 `Container` 会把
+/// `decoration.padding` 算进子项内边距，`DecoratedBox` 不会 —— 用后者
+/// 那 1px 边框会压在行的左缘上，色点从 33 掉到 32。
+class _DayPanel extends StatelessWidget {
+  const _DayPanel({
+    required this.group,
+    required this.controller,
+    required this.categoryMap,
+  });
+
+  final DayGroup group;
+  final FlowListController controller;
+  final Map<String, domain.Category> categoryMap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    // 先解析好「二级 → 一级」，再铺行（避免在 children 里塞 Builder）。
+    final rows = <Widget>[];
+    for (var i = 0; i < group.entries.length; i++) {
+      final entry = group.entries[i];
+      final cat = categoryMap[entry.categoryId];
+      final parentId = cat?.parentId;
+      rows.add(
+        _EntryRow(
+          key: ValueKey('e-${entry.id}'),
+          entry: entry,
+          category: cat,
+          // 一级名由二级的 parentId 回查**同一张** categories 得到。
+          parent: parentId == null ? null : categoryMap[parentId],
+          controller: controller,
+          isFirst: i == 0,
+        ),
+      );
+    }
+    return Container(
+      decoration: BoxDecoration(
+        // ⚠️ 卡片底必须是 `colors.surfaceCard`（= `t.surface` = #FFFFFF），
+        // **不是** `colors.surface`（= `t.appBg` = 页面底色 #FBFBFC）。
+        // 用后者卡片会和页面融为一体，只剩 1px 的 `--line`，看上去「根本没有框」。
+        // 设计稿屏 2 中心列实测：页面 (251,251,252) / 卡片 (255,255,255) / 边框 (228,228,232)。
+        color: colors.surfaceCard,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: colors.border),
+      ),
+      clipBehavior: Clip.antiAlias,
+      // ⚠️ 这层 `ClipRRect` 不能省。`Container` 的组装顺序是
+      //   `DecoratedBox(边框+填充)` → `Padding(border 的 1px 内缩)` → `ClipPath` → 子级，
+      // 而 `ClipPath` 按**整个** rect 取半径 16。子级只被内缩了 1px、四角还是直角，
+      // 于是行里的白色 `Material`（`_EntryRow` 那层）在弧上盖住那 1px 边框：
+      // 直边和弧的两端完好，中段（约 20°–70°）消失（实测墨量 0.94 → 0.16）。
+      // 半径 15 = 16 − 1px，与外面那条弧**同心**，正好切在边框内沿，子级再也够不到边框。
+      // 与 `plain_ui.dart` 的 `PlainPanel` 是同一个修法。
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(15),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: rows,
+        ),
+      ),
+    );
+  }
+}

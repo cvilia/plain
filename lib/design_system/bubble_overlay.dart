@@ -39,7 +39,7 @@ class _BubbleOverlay extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final screen = MediaQuery.of(context).size;
+    final screen = MediaQuery.sizeOf(context);
     const bubbleMaxWidth = 260.0;
 
     // 气泡位置：目标点上方 12px，水平居中，限制在屏幕内
@@ -55,7 +55,7 @@ class _BubbleOverlay extends StatelessWidget {
         children: [
           // 全屏透明层捕获点击
           Positioned.fill(
-            child: Container(color: Colors.transparent),
+            child: Container(color: const Color(0x00000000)),
           ),
           // 气泡
           Positioned(
@@ -63,7 +63,7 @@ class _BubbleOverlay extends StatelessWidget {
             top: top < 60 ? targetPosition.dy + 24 : top,
             width: bubbleWidth,
             child: Material(
-              color: Colors.transparent,
+              type: MaterialType.transparency,
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                 decoration: BoxDecoration(
@@ -73,8 +73,8 @@ class _BubbleOverlay extends StatelessWidget {
                 child: Text(
                   text,
                   style: TextStyle(
-                    fontSize: 13,
-                    color: Colors.white,
+                    fontSize: 14,
+                    color: context.colors.surface,
                     height: 1.5,
                   ),
                 ),

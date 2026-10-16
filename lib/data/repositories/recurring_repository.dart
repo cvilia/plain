@@ -45,6 +45,20 @@ class RecurringRepositoryImpl implements RecurringRepository {
     return ok(_fromRow(rows.first));
   }
 
+  /// 产出某批次账单的那条规则（撤销批次时要据此回滚目标进度）。
+  ///
+  /// 未删除的优先；同批次只可能由一条规则产出（`lastBatchId` 在生成/确认时写定），
+  /// 因此取最近更新的一条即可。
+  @override
+  Future<Result<RecurringRule?>> findByLastBatchId(String batchId) async {
+    final rows = _db.raw.select(
+      'SELECT * FROM recurring_rules WHERE last_batch_id = ? '
+      'ORDER BY deleted_at IS NULL DESC, updated_at DESC LIMIT 1',
+      [batchId],
+    );
+    return ok(rows.isEmpty ? null : _fromRow(rows.first));
+  }
+
   @override
   Future<Result<RecurringRule>> create(RecurringRule rule) async {
     if (rule.frequency == RecurringFrequency.unknown) {
@@ -110,33 +124,6 @@ class RecurringRepositoryImpl implements RecurringRepository {
     );
   }
 
-  @override
-  Future<Result<int>> undoBatch({required String batchId, required DateTime deletedAt}) async {
-    try {
-      var count = 0;
-      _db.transaction(() {
-        final rows = _db.raw.select(
-          'SELECT * FROM transactions WHERE batch_id = ? AND deleted_at IS NULL', [batchId]);
-        count = rows.length;
-        final nowMs = deletedAt.millisecondsSinceEpoch;
-        _db.raw.execute(
-          'UPDATE transactions SET deleted_at = ?, updated_at = ?, revision = revision + 1 '
-          'WHERE batch_id = ? AND deleted_at IS NULL',
-          [nowMs, nowMs, batchId]);
-        for (final row in rows) {
-          _changeLog.write(
-            entityType: EntityType.transaction, entityId: row['id']! as String, op: ChangeOp.delete,
-            deviceId: (row['device_id'] as String?) ?? '', baseRevision: row.intOr('revision', 1),
-            before: Map<String, Object?>.from(row), after: const {}, changedAt: deletedAt,
-          );
-        }
-      });
-      return ok(count);
-    } on Exception catch (e) {
-      return err(StorageFailure('db.undo_failed', e.toString(), isRetryable: true));
-    }
-  }
-
   RecurringRule? _findById(String id) {
     final rows = _db.raw.select('SELECT * FROM recurring_rules WHERE id = ?', [id]);
     return rows.isEmpty ? null : _fromRow(rows.first);
@@ -146,8 +133,8 @@ class RecurringRepositoryImpl implements RecurringRepository {
     _db.raw.execute(
       'INSERT INTO recurring_rules (id,book_id,name,frequency,interval_n,anchor_day,weekday,skip_strategy,auto_confirm,'
       'end_type,end_at,end_count,generated_count,next_run_at,entry_type,amount_cents,category_id,account_id,to_account_id,'
-      'note,last_batch_id,is_enabled,created_at,updated_at,deleted_at,revision,device_id,base_revision) '
-      'VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
+      'note,last_batch_id,kind,goal_id,is_enabled,created_at,updated_at,deleted_at,revision,device_id,base_revision) '
+      'VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
       _rowArgs(r));
   }
 
@@ -155,11 +142,12 @@ class RecurringRepositoryImpl implements RecurringRepository {
     _db.raw.execute(
       'UPDATE recurring_rules SET name=?,frequency=?,interval_n=?,anchor_day=?,weekday=?,skip_strategy=?,auto_confirm=?,'
       'end_type=?,end_at=?,end_count=?,generated_count=?,next_run_at=?,entry_type=?,amount_cents=?,category_id=?,account_id=?,'
-      'to_account_id=?,note=?,last_batch_id=?,is_enabled=?,updated_at=?,deleted_at=?,revision=?,base_revision=? WHERE id=?',
+      'to_account_id=?,note=?,last_batch_id=?,kind=?,goal_id=?,is_enabled=?,updated_at=?,deleted_at=?,revision=?,base_revision=? WHERE id=?',
       [r.name, r.frequency.wire, r.intervalN, r.anchorDay, r.weekday, r.skipStrategy.wire,
         r.autoConfirm ? 1 : 0, r.endType.wire, r.endAt?.millisecondsSinceEpoch, r.endCount,
         r.generatedCount, r.nextRunAt.millisecondsSinceEpoch, r.entryType.wire, r.amount.cents,
-        r.categoryId, r.accountId, r.toAccountId, r.note, r.lastBatchId, r.isEnabled ? 1 : 0,
+        r.categoryId, r.accountId, r.toAccountId, r.note, r.lastBatchId, r.kind.wire, r.goalId,
+        r.isEnabled ? 1 : 0,
         r.updatedAt.millisecondsSinceEpoch, r.deletedAt?.millisecondsSinceEpoch,
         r.revision, r.baseRevision, r.id]);
   }
@@ -170,6 +158,7 @@ class RecurringRepositoryImpl implements RecurringRepository {
     r.endAt?.millisecondsSinceEpoch, r.endCount, r.generatedCount,
     r.nextRunAt.millisecondsSinceEpoch, r.entryType.wire, r.amount.cents,
     r.categoryId, r.accountId, r.toAccountId, r.note, r.lastBatchId,
+    r.kind.wire, r.goalId,
     r.isEnabled ? 1 : 0, r.createdAt.millisecondsSinceEpoch,
     r.updatedAt.millisecondsSinceEpoch, r.deletedAt?.millisecondsSinceEpoch,
     r.revision, r.deviceId, r.baseRevision,
@@ -184,7 +173,8 @@ class RecurringRepositoryImpl implements RecurringRepository {
     'next_run_at': r.nextRunAt.millisecondsSinceEpoch, 'entry_type': r.entryType.wire,
     'amount_cents': r.amount.cents, 'category_id': r.categoryId,
     'account_id': r.accountId, 'to_account_id': r.toAccountId, 'note': r.note,
-    'last_batch_id': r.lastBatchId, 'is_enabled': r.isEnabled,
+    'last_batch_id': r.lastBatchId, 'kind': r.kind.wire, 'goal_id': r.goalId,
+    'is_enabled': r.isEnabled,
     'created_at': r.createdAt.millisecondsSinceEpoch,
     'updated_at': r.updatedAt.millisecondsSinceEpoch,
     'deleted_at': r.deletedAt?.millisecondsSinceEpoch,
@@ -210,6 +200,8 @@ class RecurringRepositoryImpl implements RecurringRepository {
     accountId: row['account_id'] as String?,
     toAccountId: row['to_account_id'] as String?,
     note: row['note'] as String?,
+    kind: RecurringKind.fromWire(row['kind'] as String?),
+    goalId: row['goal_id'] as String?,
     lastBatchId: row['last_batch_id'] as String?,
     isEnabled: ((row['is_enabled'] as int?) ?? 1) == 1,
     createdAt: row.dateTime('created_at'),

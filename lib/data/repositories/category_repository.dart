@@ -6,6 +6,7 @@ import 'package:plain/core/time/clock.dart';
 import 'package:plain/data/db/database.dart';
 import 'package:plain/data/db/row_x.dart';
 import 'package:plain/data/db/run_write.dart';
+import 'package:plain/data/db/stats_maintenance.dart';
 import 'package:plain/data/sync/change_log_writer.dart';
 import 'package:plain/domain/entities/category.dart';
 import 'package:plain/domain/entities/enums.dart';
@@ -181,7 +182,8 @@ class CategoryRepositoryImpl implements CategoryRepository {
       final placeholders = List.filled(ids.length, '?').join(',');
       final rows = _db.raw.select(
         'SELECT COUNT(*) AS c FROM transactions '
-        "WHERE category_id IN ($placeholders) AND deleted_at IS NULL",
+        "WHERE category_id IN ($placeholders) AND deleted_at IS NULL "
+        "AND source <> 'reconcile'",
         ids,
       );
       return ok((rows.first['c'] as int?) ?? 0);
@@ -216,25 +218,44 @@ class CategoryRepositoryImpl implements CategoryRepository {
 
         for (final sid in sourceIds) {
           final affected = _db.raw.select(
-            'SELECT id, category_id, device_id, revision FROM transactions '
-            'WHERE category_id = ? AND deleted_at IS NULL',
+            'SELECT * FROM transactions WHERE category_id = ? AND deleted_at IS NULL',
             [sid],
           );
           if (affected.isEmpty) continue;
+          final nowMs = _clock.now().millisecondsSinceEpoch;
           _db.raw.execute(
             'UPDATE transactions SET category_id = ? WHERE category_id = ? AND deleted_at IS NULL',
             [fallbackCategoryId, sid],
           );
           moved += _db.raw.updatedRows;
           for (final row in affected) {
+            final old = ledgerEntryFromRow(row);
+            // ⚠️ 改派分类必须同步搬动按天统计，否则金额永久挂在旧分类上
+            // （报表/预算分类汇总看不到这笔；巡检只比对条数，发现不了）
+            moveStatsToCategory(
+              _db,
+              oldEntry: old,
+              toCategoryId: fallbackCategoryId,
+              dayKey: statsDayKeyOf(_clock, old.occurredAt),
+              nowMs: nowMs,
+            );
+            // ⚠️ 写**整行** payload：只写 category_id 的话，对端若没有这一行
+            // （新设备/GC 之后）会因缺必填列插入失败 → 整批 pull 失败且位点不推进
+            // → 那台设备同步永久卡住。
+            final updated = old.copyWith(
+              categoryId: fallbackCategoryId,
+              updatedAt: _clock.now(),
+              revision: old.revision + 1,
+              baseRevision: old.revision,
+            );
             _changeLog.write(
               entityType: EntityType.transaction,
-              entityId: row['id']! as String,
+              entityId: old.id,
               op: ChangeOp.update,
-              deviceId: row['device_id']! as String,
-              baseRevision: (row['revision'] as int?) ?? 1,
-              before: {'category_id': row['category_id']},
-              after: {'category_id': fallbackCategoryId},
+              deviceId: old.deviceId,
+              baseRevision: old.revision,
+              before: ledgerEntryPayloadOf(old),
+              after: ledgerEntryPayloadOf(updated),
             );
           }
         }
@@ -294,24 +315,39 @@ class CategoryRepositoryImpl implements CategoryRepository {
 
         int moveEntries(String fromId, String toId) {
           final affected = _db.raw.select(
-            'SELECT id, category_id, device_id, revision FROM transactions '
-            'WHERE category_id = ? AND deleted_at IS NULL',
+            'SELECT * FROM transactions WHERE category_id = ? AND deleted_at IS NULL',
             [fromId],
           );
           if (affected.isEmpty) return 0;
+          final nowMs = _clock.now().millisecondsSinceEpoch;
           _db.raw.execute(
             'UPDATE transactions SET category_id = ? WHERE category_id = ? AND deleted_at IS NULL',
             [toId, fromId],
           );
           for (final row in affected) {
+            final old = ledgerEntryFromRow(row);
+            // 与 deleteAndReassign 同一套：搬统计 + 写整行 payload
+            moveStatsToCategory(
+              _db,
+              oldEntry: old,
+              toCategoryId: toId,
+              dayKey: statsDayKeyOf(_clock, old.occurredAt),
+              nowMs: nowMs,
+            );
+            final updated = old.copyWith(
+              categoryId: toId,
+              updatedAt: _clock.now(),
+              revision: old.revision + 1,
+              baseRevision: old.revision,
+            );
             _changeLog.write(
               entityType: EntityType.transaction,
-              entityId: row['id']! as String,
+              entityId: old.id,
               op: ChangeOp.update,
-              deviceId: row['device_id']! as String,
-              baseRevision: (row['revision'] as int?) ?? 1,
-              before: {'category_id': row['category_id']},
-              after: {'category_id': toId},
+              deviceId: old.deviceId,
+              baseRevision: old.revision,
+              before: ledgerEntryPayloadOf(old),
+              after: ledgerEntryPayloadOf(updated),
             );
           }
           return affected.length;
@@ -398,14 +434,14 @@ class CategoryRepositoryImpl implements CategoryRepository {
 
   void _insert(Category c) {
     _db.raw.execute(
-      'INSERT INTO categories (id,parent_id,name,kind,icon_ref,icon_asset,note,sort_order,is_hidden,is_preset,is_rigid,created_at,updated_at,deleted_at,revision,device_id,base_revision) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
-      [c.id, c.parentId, c.name, c.kind.wire, c.iconRef, c.iconAsset, c.note, c.sortOrder, c.isHidden ? 1 : 0, c.isPreset ? 1 : 0, c.isRigid ? 1 : 0, c.createdAt.millisecondsSinceEpoch, c.updatedAt.millisecondsSinceEpoch, c.deletedAt?.millisecondsSinceEpoch, c.revision, c.deviceId, c.baseRevision]);
+      'INSERT INTO categories (id,parent_id,name,kind,icon_ref,icon_asset,note,sort_order,is_hidden,is_preset,is_rigid,is_deductible,created_at,updated_at,deleted_at,revision,device_id,base_revision) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
+      [c.id, c.parentId, c.name, c.kind.wire, c.iconRef, c.iconAsset, c.note, c.sortOrder, c.isHidden ? 1 : 0, c.isPreset ? 1 : 0, c.isRigid ? 1 : 0, c.isDeductible ? 1 : 0, c.createdAt.millisecondsSinceEpoch, c.updatedAt.millisecondsSinceEpoch, c.deletedAt?.millisecondsSinceEpoch, c.revision, c.deviceId, c.baseRevision]);
   }
 
   void _update(Category c) {
     _db.raw.execute(
-      'UPDATE categories SET name=?,icon_ref=?,icon_asset=?,note=?,sort_order=?,is_hidden=?,is_rigid=?,updated_at=?,deleted_at=?,revision=?,base_revision=? WHERE id=?',
-      [c.name, c.iconRef, c.iconAsset, c.note, c.sortOrder, c.isHidden ? 1 : 0, c.isRigid ? 1 : 0, c.updatedAt.millisecondsSinceEpoch, c.deletedAt?.millisecondsSinceEpoch, c.revision, c.baseRevision, c.id]);
+      'UPDATE categories SET name=?,icon_ref=?,icon_asset=?,note=?,sort_order=?,is_hidden=?,is_rigid=?,is_deductible=?,updated_at=?,deleted_at=?,revision=?,base_revision=? WHERE id=?',
+      [c.name, c.iconRef, c.iconAsset, c.note, c.sortOrder, c.isHidden ? 1 : 0, c.isRigid ? 1 : 0, c.isDeductible ? 1 : 0, c.updatedAt.millisecondsSinceEpoch, c.deletedAt?.millisecondsSinceEpoch, c.revision, c.baseRevision, c.id]);
   }
 
   Category _fromRow(Map<String, Object?> row) => Category(
@@ -416,6 +452,7 @@ class CategoryRepositoryImpl implements CategoryRepository {
     sortOrder: row['sort_order']! as int, isHidden: row.boolOr('is_hidden'),
     isPreset: row.boolOr('is_preset'),
     isRigid: row.boolOr('is_rigid'),
+    isDeductible: row.boolOr('is_deductible'),
     createdAt: row.dateTime('created_at'),
     updatedAt: row.dateTime('updated_at'),
     deletedAt: row.nullableDateTime('deleted_at'),
@@ -426,5 +463,8 @@ class CategoryRepositoryImpl implements CategoryRepository {
     'id': c.id, 'parent_id': c.parentId, 'name': c.name, 'kind': c.kind.wire,
     'icon_ref': c.iconRef, 'note': c.note, 'sort_order': c.sortOrder,
     'is_hidden': c.isHidden, 'is_preset': c.isPreset, 'is_rigid': c.isRigid,
+    // 漏列会让对端静默丢两件事：自定义图标、以及税务报表的「可抵扣」
+    // 标记（audit 2026-10-15）
+    'icon_asset': c.iconAsset, 'is_deductible': c.isDeductible,
   };
 }

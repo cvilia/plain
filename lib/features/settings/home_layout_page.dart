@@ -1,4 +1,4 @@
-/// STORY-5.3 首页卡片自定义：拖拽排序 + 显示/隐藏 + 预设布局。
+/// 首页卡片自定义（STORY-5.3 / SP-5-07）：勾选常驻卡片 + 拖拽排序。
 library;
 
 import 'package:flutter/material.dart';
@@ -7,7 +7,7 @@ import 'package:plain/app/settings/home_layout_prefs.dart';
 import 'package:plain/app/theme/app_colors.dart';
 import 'package:plain/app/theme/design_tokens.dart';
 import 'package:plain/core/refresh/data_invalidation.dart';
-import 'package:plain/design_system/app_toast.dart';
+import 'package:plain/design_system/plain_ui.dart';
 
 class HomeLayoutPage extends ConsumerStatefulWidget {
   const HomeLayoutPage({super.key});
@@ -42,85 +42,161 @@ class _HomeLayoutPageState extends ConsumerState<HomeLayoutPage> {
     await saveHomeLayout(order: _order, hidden: _hidden);
     if (mounted) {
       ref.read(dataInvalidationProvider.notifier).bumpHomeLayout();
-      showAppToast(context, '布局已保存');
     }
   }
 
-  Future<void> _applyPreset(List<HomeCardId> preset) async {
-    await applyHomePreset(preset);
-    await _load();
-    if (mounted) {
-      ref.read(dataInvalidationProvider.notifier).bumpHomeLayout();
-      showAppToast(context, '已切换预设');
-    }
-  }
+  int get _selectedCount => _designCards.where((c) => !_hidden.contains(c.id)).length;
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('首页卡片'),
-        actions: [
-          TextButton(onPressed: _save, child: const Text('保存')),
-        ],
-      ),
+      appBar: const PlainTopBar(title: '首页卡片自定义', showBack: true),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : ListView(
               padding: const EdgeInsets.all(Spacing.lg),
               children: [
-                // 预设布局
-                Text('预设布局', style: TextStyle(fontSize: 12, color: context.colors.inkTertiary, letterSpacing: 2)),
-                const SizedBox(height: Spacing.sm),
-                Wrap(
-                  spacing: Spacing.sm,
-                  children: [
-                    ActionChip(label: const Text('极简'), onPressed: () => _applyPreset(HomeLayoutPresets.minimal)),
-                    ActionChip(label: const Text('标准'), onPressed: () => _applyPreset(HomeLayoutPresets.standard)),
-                    ActionChip(label: const Text('全景'), onPressed: () => _applyPreset(HomeLayoutPresets.panoramic)),
+                _NotePanel(
+                  plain: '勾选要常驻首页的卡片。，长按可拖动排序。',
+                  parts: const [
+                    (false, '勾选要常驻首页的卡片。'),
+                    (true, '至少保留 1 张、最多 4 张'),
+                    (false, '，长按可拖动排序。'),
                   ],
                 ),
-                const SizedBox(height: Spacing.xl),
-                Text('卡片排序与显示', style: TextStyle(fontSize: 12, color: context.colors.inkTertiary, letterSpacing: 2)),
-                const SizedBox(height: Spacing.sm),
-                ReorderableListView.builder(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  itemCount: _order.length,
-                  onReorderItem: (oldIdx, newIdx) {
-                    setState(() {
-                      final item = _order.removeAt(oldIdx);
-                      _order.insert(newIdx, item);
-                    });
-                  },
-                  itemBuilder: (ctx, i) {
-                    final id = _order[i];
-                    final card = HomeCardId.values.firstWhere((c) => c.id == id, orElse: () => HomeCardId.recentEntries);
-                    final isHidden = _hidden.contains(id);
-                    return ListTile(
-                      key: ValueKey(id),
-                      leading: Icon(isHidden ? Icons.visibility_off_outlined : Icons.visibility_outlined, size: 22, color: isHidden ? context.colors.inkTertiary : context.colors.primary),
-                      title: Text(card.label, style: TextStyle(fontSize: 15, color: isHidden ? context.colors.inkTertiary : null)),
-                      trailing: const Icon(Icons.drag_handle, size: 20),
-                      onTap: () {
-                        setState(() {
-                          if (isHidden) {
-                            _hidden.remove(id);
-                          } else {
-                            _hidden.add(id);
-                          }
-                        });
-                      },
-                    );
-                  },
+                const SizedBox(height: Spacing.lg),
+                PlainEyebrow(_selectedCount == 3 ? '可选卡片 · 已选 3 / 4' : '可选卡片 · 已选 $_selectedCount / 4'),
+                PlainPanel(
+                  children: [
+                    for (var i = 0; i < _designCards.length; i++)
+                      _CardRow(
+                        index: i + 1,
+                        spec: _designCards[i],
+                        enabled: !_hidden.contains(_designCards[i].id),
+                        onChanged: (v) {
+                          setState(() {
+                            if (v) {
+                              _hidden.remove(_designCards[i].id);
+                            } else {
+                              if (_selectedCount <= 1) return;
+                              _hidden.add(_designCards[i].id);
+                            }
+                          });
+                          _save();
+                        },
+                      ),
+                  ],
                 ),
-                const SizedBox(height: Spacing.xl),
-                Text(
-                  '长按拖拽调整顺序，点击切换显示/隐藏。\n「最近账单」为首页主体，建议保留。',
-                  style: TextStyle(fontSize: 11, color: context.colors.inkTertiary, height: 1.6),
+                const SizedBox(height: Spacing.lg),
+                _NotePanel(
+                  plain: '首页卡片顺序与开关属，多端同步时不覆盖其他设备。',
+                  parts: const [
+                    (false, '首页卡片顺序与开关属'),
+                    (true, '本机偏好'),
+                    (false, '，多端同步时不覆盖其他设备。'),
+                  ],
                 ),
               ],
             ),
+    );
+  }
+}
+
+class _CardSpec {
+  const _CardSpec(this.id, this.title, this.subtitle);
+  final String id;
+  final String title;
+  final String subtitle;
+}
+
+const _designCards = [
+  _CardSpec('monthly_balance', '记账月结余', '收入 / 支出 / 结余三数值'),
+  _CardSpec('budget_progress', '预算进度', '本月预算总进度条'),
+  _CardSpec('safe_to_spend', '安全可花', '扣除预留后的日均可支配'),
+  _CardSpec('savings_goals', '目标进度', '最近一个储蓄目标的进度'),
+  _CardSpec('net_assets', '净值', '净资产与较上月变化'),
+  _CardSpec('heat_7d', '近 7 天热力图', '按日消费强度色块'),
+];
+
+class _CardRow extends StatelessWidget {
+  const _CardRow({required this.index, required this.spec, required this.enabled, required this.onChanged});
+  final int index;
+  final _CardSpec spec;
+  final bool enabled;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: 64),
+        child: Row(
+          children: [
+            Container(
+              width: 22,
+              height: 22,
+              decoration: BoxDecoration(
+                color: colors.surfaceMuted,
+                shape: BoxShape.circle,
+              ),
+              alignment: Alignment.center,
+              child: Text('$index', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: colors.inkTertiary)),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(spec.title, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500, color: enabled ? colors.ink : colors.inkTertiary)),
+                  Text(spec.subtitle, style: TextStyle(fontSize: 12, color: colors.inkTertiary)),
+                ],
+              ),
+            ),
+            PlainSwitch(value: enabled, onChanged: onChanged),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _NotePanel extends StatelessWidget {
+  const _NotePanel({required this.plain, required this.parts});
+  final String plain;
+  final List<(bool, String)> parts;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(Spacing.lg),
+      decoration: BoxDecoration(
+        color: colors.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: colors.border),
+      ),
+      child: Semantics(
+        label: plain,
+        child: Text.rich(
+          TextSpan(
+            children: [
+              for (final (isBold, text) in parts)
+                TextSpan(
+                  text: text,
+                  style: TextStyle(
+                    fontSize: 14,
+                    height: 1.6,
+                    fontWeight: isBold ? FontWeight.w700 : FontWeight.w400,
+                    color: isBold ? colors.ink : colors.inkSecondary,
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

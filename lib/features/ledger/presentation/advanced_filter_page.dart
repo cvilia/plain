@@ -10,9 +10,13 @@ import 'package:share_plus/share_plus.dart';
 import 'package:plain/app/bootstrap.dart';
 import 'package:plain/app/theme/app_colors.dart';
 import 'package:plain/app/theme/design_tokens.dart';
+import 'package:plain/app/theme/typography.dart';
 import 'package:plain/core/format/amount_formatter.dart';
 import 'package:plain/design_system/app_empty_state.dart';
 import 'package:plain/design_system/app_toast.dart';
+import 'package:plain/design_system/plain_icons_v3.dart';
+import 'package:plain/design_system/picker_sheet.dart';
+import 'package:plain/design_system/plain_ui.dart';
 import 'package:plain/domain/entities/category.dart' as domain;
 import 'package:plain/domain/entities/enums.dart';
 import 'package:plain/domain/entities/ledger_entry.dart';
@@ -154,13 +158,42 @@ class _AdvancedFilterPageState extends ConsumerState<AdvancedFilterPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('高级筛选'),
+      appBar: PlainTopBar(
+        title: '高级筛选',
+        showBack: true,
         actions: [
           if (_applied && _results.isNotEmpty)
-            TextButton(onPressed: _exportCsv, child: const Text('导出 CSV')),
+            Material(
+              color: const Color(0x00000000),
+              borderRadius: BorderRadius.circular(12),
+              child: InkWell(
+                onTap: _exportCsv,
+                borderRadius: BorderRadius.circular(12),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(minHeight: 44),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    child: Text('导出 CSV', style: TextStyle(fontSize: 14, color: context.colors.primary)),
+                  ),
+                ),
+              ),
+            ),
           if (_applied)
-            TextButton(onPressed: _clear, child: const Text('清空')),
+            Material(
+              color: const Color(0x00000000),
+              borderRadius: BorderRadius.circular(12),
+              child: InkWell(
+                onTap: _clear,
+                borderRadius: BorderRadius.circular(12),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(minHeight: 44),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    child: Text('清空', style: TextStyle(fontSize: 14, color: context.colors.primary)),
+                  ),
+                ),
+              ),
+            ),
         ],
       ),
       body: ListView(
@@ -211,14 +244,14 @@ class _AdvancedFilterPageState extends ConsumerState<AdvancedFilterPage> {
           // 结果
           if (_applied) ...[
             Row(children: [
-              Text('结果 ${_results.length} 条', style: TextStyle(fontSize: 13, color: context.colors.inkSecondary, fontWeight: FontWeight.w500)),
+              Text('结果 ${_results.length} 条', style: TextStyle(fontSize: 14, color: context.colors.inkSecondary, fontWeight: FontWeight.w500)),
               const Spacer(),
               if (_results.isNotEmpty)
-                TextButton.icon(onPressed: _exportCsv, icon: const Icon(Icons.download, size: 18), label: const Text('导出 CSV')),
+                TextButton.icon(onPressed: _exportCsv, icon: const PlainIcon(PlainIconData.export, size: 18), label: const Text('导出 CSV')),
             ]),
             const SizedBox(height: Spacing.sm),
             if (_results.isEmpty)
-              const AppEmptyState(icon: Icons.search_off_outlined, title: '没有符合条件的账单', subtitle: '试试调整筛选条件')
+              const AppEmptyState(icon: PlainIconData.empty, title: '没有符合条件的账单', subtitle: '试试调整筛选条件')
             else
               ..._results.map((e) => _ResultTile(entry: e, category: _categories[e.categoryId])),
           ],
@@ -236,7 +269,7 @@ class _SectionLabel extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.only(bottom: Spacing.sm),
-      child: Text(text, style: TextStyle(fontSize: 12, color: context.colors.inkTertiary, letterSpacing: 2)),
+      child: Text(text, style: AppTextStyles.eyebrow.copyWith(color: context.colors.inkTertiary)),
     );
   }
 }
@@ -249,15 +282,29 @@ class _CategoryDropdown extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return DropdownButtonFormField<String?>(
-      initialValue: value,
-      decoration: const InputDecoration(border: OutlineInputBorder(), contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 14)),
-      items: [
-        const DropdownMenuItem(value: null, child: Text('全部分类')),
-        for (final c in categories.where((c) => c.isRoot))
-          DropdownMenuItem(value: c.id, child: Text(c.name)),
-      ],
-      onChanged: onChanged,
+    final roots = categories.where((c) => c.isRoot).toList();
+    // 「全部分类」用空串占位：`showOptionPicker` 的取消也返回 null，
+    // 若直接用 null 当值就无法与取消区分。
+    String currentName = '全部分类';
+    for (final c in roots) {
+      if (c.id == value) currentName = c.name;
+    }
+    return PickerField(
+      label: null,
+      value: currentName,
+      onTap: () async {
+        final picked = await showOptionPicker<String>(
+          context: context,
+          title: '选择分类',
+          current: value ?? '',
+          options: [
+            const PickerOption(value: '', label: '全部分类'),
+            for (final c in roots) PickerOption(value: c.id, label: c.name),
+          ],
+        );
+        if (picked == null) return;
+        onChanged(picked.isEmpty ? null : picked);
+      },
     );
   }
 }
@@ -297,23 +344,42 @@ class _ResultTile extends StatelessWidget {
     final amountColor = isExpense ? context.colors.expense : isIncome ? context.colors.income : context.colors.transfer;
     final prefix = isExpense ? '-' : isIncome ? '+' : '';
     final t = entry.occurredAt.toLocal();
-    return Card(
+    return Container(
       margin: const EdgeInsets.only(bottom: Spacing.xs),
-      child: ListTile(
-        dense: true,
-        title: Text(
-          '${category?.name ?? '未分类'}${entry.note != null && entry.note!.isNotEmpty ? ' · ${entry.note}' : ''}',
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: const TextStyle(fontSize: 13),
-        ),
-        subtitle: Text(
-          '${t.year}-${t.month.toString().padLeft(2, '0')}-${t.day.toString().padLeft(2, '0')}',
-          style: TextStyle(fontSize: 11, color: context.colors.inkTertiary),
-        ),
-        trailing: Text(
-          '$prefix${formatAmount(entry.amount.cents)}',
-          style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: amountColor),
+      decoration: BoxDecoration(
+        color: context.colors.surfaceCard,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: context.colors.border),
+      ),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: 60),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '${category?.name ?? '未分类'}${entry.note != null && entry.note!.isNotEmpty ? ' · ${entry.note}' : ''}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500),
+                    ),
+                    Text(
+                      '${t.year}-${t.month.toString().padLeft(2, '0')}-${t.day.toString().padLeft(2, '0')}',
+                      style: TextStyle(fontSize: 12, color: context.colors.inkTertiary),
+                    ),
+                  ],
+                ),
+              ),
+              Text(
+                '$prefix${formatAmount(entry.amount.cents)}',
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: amountColor),
+              ),
+            ],
+          ),
         ),
       ),
     );

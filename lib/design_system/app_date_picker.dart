@@ -5,6 +5,8 @@ library;
 import 'package:plain/app/theme/app_colors.dart';
 import 'package:flutter/material.dart';
 import 'package:plain/app/theme/design_tokens.dart';
+import 'package:plain/app/theme/typography.dart';
+import 'package:plain/design_system/plain_icons_v3.dart';
 
 /// Show custom date picker dialog. Returns selected date (UTC).
 Future<DateTime?> showAppDatePicker({
@@ -60,9 +62,16 @@ class _AppDatePickerDialogState extends State<_AppDatePickerDialog> {
           mainAxisSize: MainAxisSize.min,
           children: [
             // Header: selected date
+            // 设计稿无 24（字阶只有 12/14/15/20/22/34/44）。这是弹窗标题式的大字，
+            // 归到 `.title` 档 = 20/w600/行盒 27。
             Text(
               _formatHeaderDate(_selectedDate),
-              style: TextStyle(fontSize: 24, fontWeight: FontWeight.w600, color: context.colors.ink),
+              style: TextStyle(
+                fontSize: 20,
+                height: designLineHeight(20),
+                fontWeight: FontWeight.w600,
+                color: context.colors.ink,
+              ),
             ),
             const SizedBox(height: Spacing.xl),
 
@@ -71,7 +80,10 @@ class _AppDatePickerDialogState extends State<_AppDatePickerDialog> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 IconButton(
-                  icon: Icon(Icons.chevron_left, color: context.colors.inkSecondary),
+                  icon: PlainIcon(
+                    PlainIconData.chevronLeft,
+                    color: context.colors.inkSecondary,
+                  ),
                   onPressed: _prevMonth,
                 ),
                 Text(
@@ -79,7 +91,10 @@ class _AppDatePickerDialogState extends State<_AppDatePickerDialog> {
                   style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500, color: context.colors.ink),
                 ),
                 IconButton(
-                  icon: Icon(Icons.chevron_right, color: context.colors.inkSecondary),
+                  icon: PlainIcon(
+                    PlainIconData.chevronRight,
+                    color: context.colors.inkSecondary,
+                  ),
                   onPressed: _nextMonth,
                 ),
               ],

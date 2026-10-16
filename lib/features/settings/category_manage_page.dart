@@ -2,9 +2,8 @@
 library;
 
 import 'package:plain/app/theme/app_colors.dart';
-import 'package:plain/features/ledger/presentation/home_shell.dart';
-import 'package:plain/design_system/category_avatar.dart';
 import 'package:flutter/material.dart';
+import 'package:plain/design_system/app_error_state.dart';
 import 'package:plain/design_system/app_toast.dart';
 import 'package:plain/design_system/bubble_overlay.dart';
 import 'package:plain/design_system/confirm_dialog.dart';
@@ -13,8 +12,12 @@ import 'package:plain/app/bootstrap.dart';
 import 'package:plain/app/theme/design_tokens.dart';
 import 'package:plain/core/refresh/data_invalidation.dart';
 import 'package:plain/data/platform/file_picker_bridge.dart';
+import 'package:plain/design_system/category_icon_v3.dart';
+import 'package:plain/design_system/plain_icons_v3.dart';
+import 'package:plain/design_system/picker_sheet.dart';
 import 'package:plain/design_system/category_icons.dart';
 import 'package:plain/design_system/custom_icon_store.dart';
+import 'package:plain/design_system/plain_ui.dart';
 import 'package:plain/domain/entities/category.dart' as domain;
 import 'package:plain/domain/entities/enums.dart';
 import 'package:plain/domain/services/category_naming.dart';
@@ -66,9 +69,16 @@ class _CategoryManagePageState extends ConsumerState<CategoryManagePage> {
     final categoriesAsync = ref.watch(_categoriesProvider);
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('分类管理'),
-        actions: [AddAppBarAction(tooltip: '添加分类', onPressed: () => _showAddSheet(context, ref))],
+      appBar: PlainTopBar(
+        title: '分类管理',
+        showBack: true,
+        actions: [
+          IconButton(
+            icon: const PlainIcon(PlainIconData.plus, size: 22),
+            tooltip: '新建分类',
+            onPressed: () => _showAddSheet(context, ref),
+          ),
+        ],
       ),
       body: Column(
         children: [
@@ -80,11 +90,19 @@ class _CategoryManagePageState extends ConsumerState<CategoryManagePage> {
               textInputAction: TextInputAction.search,
               decoration: InputDecoration(
                 hintText: '搜索分类名称',
-                prefixIcon: const Icon(Icons.search, size: 20),
+                prefixIcon: Padding(
+                  padding: const EdgeInsets.only(left: 12, right: 8),
+                  child: PlainIcon(
+                    PlainIconData.search,
+                    size: 18,
+                    color: context.colors.inkTertiary,
+                  ),
+                ),
                 suffixIcon: _query.isEmpty
                     ? null
                     : IconButton(
-                        icon: const Icon(Icons.clear, size: 18),
+                        icon: const PlainIcon(PlainIconData.close, size: 18),
+                        tooltip: '清除搜索',
                         onPressed: () {
                           _searchCtrl.clear();
                           setState(() => _query = '');
@@ -101,6 +119,9 @@ class _CategoryManagePageState extends ConsumerState<CategoryManagePage> {
           ),
           Expanded(
             child: categoriesAsync.when(
+              // 依赖版本变化（reload）时保留上一帧列表，避免整块被 loading 圈顶掉。
+              // 只有首次加载（无旧值）才显示加载态。
+              skipLoadingOnReload: true,
               data: (categories) {
                 final visible = categories
                     .where((c) => !c.isDeleted && _matches(c, categories, _query))
@@ -127,7 +148,7 @@ class _CategoryManagePageState extends ConsumerState<CategoryManagePage> {
                 );
               },
               loading: () => const Center(child: CircularProgressIndicator()),
-              error: (e, _) => Center(child: Text('加载失败: $e')),
+              error: (e, _) => AppErrorState.of(e, onRetry: () => ref.invalidateData.bumpEverything()),
             ),
           ),
         ],
@@ -140,10 +161,12 @@ class _CategoryManagePageState extends ConsumerState<CategoryManagePage> {
     return all.where((p) => p.id == c.parentId).firstOrNull?.name;
   }
 
-  void _toggleHide(WidgetRef ref, domain.Category cat) {
+  Future<void> _toggleHide(WidgetRef ref, domain.Category cat) async {
     final deps = ref.read(appDependenciesProvider);
     final updated = cat.copyWith(isHidden: !cat.isHidden, updatedAt: DateTime.now().toUtc());
-    deps.categoryRepository.update(updated);
+    // 先落库再 bump：避免「UI 已刷新但库里还没写完」导致读到旧值再刷一次。
+    await deps.categoryRepository.update(updated);
+    if (!mounted) return;
     ref.invalidateData.bumpCategoriesMutated();
   }
 
@@ -158,6 +181,7 @@ class _CategoryManagePageState extends ConsumerState<CategoryManagePage> {
     var iconRef = cat.iconRef;
     var iconAsset = cat.iconAsset;
     var isRigid = cat.isRigid;
+    var isDeductible = cat.isDeductible;
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -168,7 +192,7 @@ class _CategoryManagePageState extends ConsumerState<CategoryManagePage> {
               left: Spacing.lg,
               right: Spacing.lg,
               top: Spacing.lg,
-              bottom: MediaQuery.of(ctx).viewInsets.bottom + Spacing.lg,
+              bottom: MediaQuery.viewInsetsOf(ctx).bottom + Spacing.lg,
             ),
             child: SingleChildScrollView(
               child: Column(
@@ -215,9 +239,24 @@ class _CategoryManagePageState extends ConsumerState<CategoryManagePage> {
                 const SizedBox(height: Spacing.sm),
                 SwitchListTile(
                   title: const Text('标记为刚性支出', style: TextStyle(fontSize: 14)),
-                  subtitle: Text('房租、水电等固定必要支出，用于安全可花计算', style: TextStyle(fontSize: 11, color: Theme.of(ctx).textTheme.bodySmall?.color?.withValues(alpha: 0.6))),
+                  subtitle: Text('房租、水电等固定必要支出，用于安全可花计算', style: TextStyle(fontSize: 12, color: Theme.of(ctx).textTheme.bodySmall?.color?.withValues(alpha: 0.6))),
                   value: isRigid,
                   onChanged: (v) => setSheetState(() => isRigid = v),
+                  contentPadding: EdgeInsets.zero,
+                ),
+                // STORY-11.5：可抵扣标记（税务报表按它汇总，二级继承）
+                SwitchListTile(
+                  title: const Text('标记为可抵扣', style: TextStyle(fontSize: 14)),
+                  subtitle: Text('自由职业者可抵扣的支出，税务报表按此汇总',
+                      style: TextStyle(
+                          fontSize: 12,
+                          color: Theme.of(ctx)
+                              .textTheme
+                              .bodySmall
+                              ?.color
+                              ?.withValues(alpha: 0.6))),
+                  value: isDeductible,
+                  onChanged: (v) => setSheetState(() => isDeductible = v),
                   contentPadding: EdgeInsets.zero,
                 ),
               ],
@@ -235,6 +274,7 @@ class _CategoryManagePageState extends ConsumerState<CategoryManagePage> {
                         iconRef: iconRef,
                         iconAsset: iconAsset,
                         isRigid: isRigid,
+                        isDeductible: isDeductible,
                         clearIconAsset: iconAsset == null,
                         updatedAt: DateTime.now().toUtc(),
                         revision: cat.revision + 1,
@@ -266,19 +306,19 @@ class _CategoryManagePageState extends ConsumerState<CategoryManagePage> {
               padding: const EdgeInsets.all(Spacing.lg),
               child: Text('添加分类', style: Theme.of(ctx).textTheme.titleMedium),
             ),
-            ListTile(
-              leading: const Icon(Icons.subdirectory_arrow_right),
-              title: const Text('添加到分类下'),
-              subtitle: const Text('在已有的一级分类下新增二级条目'),
+            PlainRow(
+              leading: const PlainIcon(PlainIconData.chevronRight),
+              title: '添加到分类下',
+              subtitle: '在已有的一级分类下新增二级条目',
               onTap: () {
                 Navigator.pop(ctx);
                 _showAddLeafSheet(context, ref);
               },
             ),
-            ListTile(
-              leading: const Icon(Icons.create_new_folder_outlined),
-              title: const Text('新建一级分类'),
-              subtitle: const Text('需同时录入至少一个二级条目'),
+            PlainRow(
+              leading: const PlainIcon(PlainIconData.folderPlus),
+              title: '新建一级分类',
+              subtitle: '需同时录入至少一个二级条目',
               onTap: () {
                 Navigator.pop(ctx);
                 _showAddRootSheet(context, ref);
@@ -317,7 +357,7 @@ class _CategoryManagePageState extends ConsumerState<CategoryManagePage> {
             left: Spacing.lg,
             right: Spacing.lg,
             top: Spacing.lg,
-            bottom: MediaQuery.of(ctx).viewInsets.bottom + Spacing.lg,
+            bottom: MediaQuery.viewInsetsOf(ctx).bottom + Spacing.lg,
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -325,17 +365,21 @@ class _CategoryManagePageState extends ConsumerState<CategoryManagePage> {
             children: [
               Text('添加二级分类', style: Theme.of(ctx).textTheme.titleMedium),
               const SizedBox(height: Spacing.lg),
-              DropdownButtonFormField<domain.Category>(
-                initialValue: parent,
-                decoration: const InputDecoration(
-                  labelText: '归属一级分类',
-                  border: OutlineInputBorder(),
-                ),
-                items: [
-                  for (final r in roots)
-                    DropdownMenuItem(value: r, child: Text(_rootLabel(r))),
-                ],
-                onChanged: (v) => setSheetState(() => parent = v),
+              PickerField(
+                label: '归属一级分类',
+                value: parent == null ? '未选择' : _rootLabel(parent!),
+                onTap: () async {
+                  final picked = await showOptionPicker<domain.Category>(
+                    context: ctx,
+                    title: '归属一级分类',
+                    current: parent,
+                    options: [
+                      for (final r in roots)
+                        PickerOption(value: r, label: _rootLabel(r)),
+                    ],
+                  );
+                  if (picked != null) setSheetState(() => parent = picked);
+                },
               ),
               const SizedBox(height: Spacing.md),
               TextField(
@@ -413,7 +457,7 @@ class _CategoryManagePageState extends ConsumerState<CategoryManagePage> {
             left: Spacing.lg,
             right: Spacing.lg,
             top: Spacing.lg,
-            bottom: MediaQuery.of(ctx).viewInsets.bottom + Spacing.lg,
+            bottom: MediaQuery.viewInsetsOf(ctx).bottom + Spacing.lg,
           ),
           child: SingleChildScrollView(
             child: Column(
@@ -797,10 +841,10 @@ class _CategoryManagePageState extends ConsumerState<CategoryManagePage> {
                   itemCount: targets.length,
                   itemBuilder: (_, i) {
                     final target = targets[i];
-                    return ListTile(
-                      leading: const Icon(Icons.drive_file_move_outline),
-                      title: Text(target.name),
-                      subtitle: Text(target.kind == CategoryKind.expense ? '支出' : '收入'),
+                    return PlainRow(
+                      leading: const PlainIcon(PlainIconData.folderMove),
+                      title: target.name,
+                      subtitle: target.kind == CategoryKind.expense ? '支出' : '收入',
                       onTap: () => _confirmMove(context, ref, source, target),
                     );
                   },
@@ -860,9 +904,9 @@ class _CategoryManagePageState extends ConsumerState<CategoryManagePage> {
                   itemCount: targets.length,
                   itemBuilder: (_, i) {
                     final target = targets[i];
-                    return ListTile(
-                      leading: const Icon(Icons.merge_type),
-                      title: Text(target.name),
+                    return PlainRow(
+                      leading: const PlainIcon(PlainIconData.merge),
+                      title: target.name,
                       onTap: () => _confirmMerge(context, ref, source, target),
                     );
                   },
@@ -963,7 +1007,7 @@ class _SectionLabel extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.only(bottom: Spacing.sm),
-      child: Text(label, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: context.colors.inkSecondary)),
+      child: Text(label, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: context.colors.inkSecondary)),
     );
   }
 }
@@ -1028,9 +1072,9 @@ class _CategoryGroupState extends State<_CategoryGroup> {
                   child: AnimatedRotation(
                     turns: expanded ? 0.25 : 0,
                     duration: const Duration(milliseconds: 200),
-                    child: Icon(
-                      Icons.chevron_right,
-                      size: 20,
+                    child: PlainIcon(
+                      PlainIconData.chevronRight,
+                      size: 18,
                       color: context.colors.inkTertiary,
                     ),
                   ),
@@ -1040,7 +1084,7 @@ class _CategoryGroupState extends State<_CategoryGroup> {
         ),
         if (hasChildren && expanded)
           Padding(
-            padding: const EdgeInsets.only(left: Spacing.md),
+            padding: const EdgeInsets.only(left: Spacing.xl5),
             child: Column(
               children: [
                 for (final c in widget.children)
@@ -1101,129 +1145,187 @@ class _CategoryTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isExpense = category.kind == CategoryKind.expense;
-    final color = isExpense ? context.colors.expense : context.colors.income;
+    final colors = context.colors;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final iconColor = categoryIconColor(category.iconRef, isDark: isDark);
     final note = category.note;
+    final sub = (note != null && note.isNotEmpty) ? note : '';
 
     return BubbleOnLongPress(
       bubbleText: note,
-      child: Card(
-        margin: EdgeInsets.only(bottom: isGroup ? Spacing.sm : Spacing.xs),
-        // 一级条目有子条目时不显示水波效果
-        child: Theme(
-          data: isGroup && onTap != null
-              ? Theme.of(context).copyWith(
-                  splashColor: Colors.transparent,
-                  highlightColor: Colors.transparent,
-                  hoverColor: Colors.transparent,
-                )
-              : Theme.of(context),
-          child: ListTile(
-          dense: !isGroup,
-          contentPadding: EdgeInsets.symmetric(horizontal: Spacing.lg, vertical: isGroup ? Spacing.xs : 0),
-        leading: CategoryAvatar(iconRef: category.iconRef, iconAsset: category.iconAsset, color: color, size: 18),
-        title: Row(
-          children: [
-            Flexible(
-              child: Text(
-                category.name,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: isGroup ? 15 : 14,
-                  fontWeight: isGroup ? FontWeight.w600 : FontWeight.w500,
-                  color: category.isHidden ? context.colors.inkTertiary : context.colors.ink,
-                  decoration: category.isHidden ? TextDecoration.lineThrough : null,
+      child: Material(
+        color: colors.surface,
+        child: InkWell(
+          onTap: onTap,
+            child: Container(
+            constraints: BoxConstraints(minHeight: isGroup ? 72 : 56),
+            padding: EdgeInsets.symmetric(
+              horizontal: 8,
+              vertical: isGroup ? 12 : 8,
+            ),
+            decoration: BoxDecoration(
+              border: Border(
+                top: BorderSide(
+                  color: isGroup ? colors.border : colors.divider,
+                  width: 1,
                 ),
               ),
             ),
-            if (category.isPreset) ...[
-              const SizedBox(width: 6),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-                decoration: BoxDecoration(
-                  color: context.colors.surfaceMuted,
-                  borderRadius: BorderRadius.circular(4),
+            child: Row(
+              children: [
+                // cicon 24
+                CategoryIcon(
+                  iconRef: category.iconRef,
+                  size: isGroup ? 24 : 20,
+                  color: iconColor,
                 ),
-                child: Text('预置', style: TextStyle(fontSize: 10, color: context.colors.inkTertiary)),
-              ),
-            ],
-          ],
-        ),
-        subtitle: (note != null && note.isNotEmpty)
-            ? Text(
-                note,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(fontSize: 12, color: context.colors.inkTertiary),
-              )
-            : null,
-        onTap: onTap,
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ?trailingExpand,
-            IconButton(
-              icon: Icon(
-                category.isHidden ? Icons.visibility_off_outlined : Icons.visibility_outlined,
-                size: 20,
-              ),
-              onPressed: onToggleHide,
-            ),
-            PopupMenuButton<String>(
-              icon: const Icon(Icons.more_vert, size: 20),
-              onSelected: (v) {
-                // Default (preset) taxonomy is read-only — always answer with a toast.
-                if (category.isPreset) {
-                  showAppToast(context, '默认分类不可修改');
-                  return;
-                }
-                switch (v) {
-                  case 'rename':
-                    onRename();
-                  case 'move':
-                    onMove?.call();
-                  case 'merge':
-                    onMerge?.call();
-                  case 'delete':
-                    onDelete?.call();
-                }
-              },
-              itemBuilder: (ctx) {
-                final locked = category.isPreset;
-                final labelStyle = locked ? TextStyle(color: context.colors.inkTertiary) : null;
-                return [
-                  PopupMenuItem(
-                    value: 'rename',
-                    child: Text('编辑分类信息', style: labelStyle),
+                const SizedBox(width: 8),
+                // rcol
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        category.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: isGroup ? 15 : 13,
+                          fontWeight: isGroup ? FontWeight.w600 : FontWeight.w500,
+                          color: category.isHidden
+                              ? colors.inkTertiary
+                              : colors.ink,
+                          decoration: category.isHidden
+                              ? TextDecoration.lineThrough
+                              : null,
+                        ),
+                      ),
+                      if (sub.isNotEmpty) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          sub,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                            color: colors.inkTertiary,
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
-                  // 一级分组不可移动；仅二级条目可换归属。
-                  if (onMove != null)
-                    PopupMenuItem(
-                      value: 'move',
-                      child: Text('移动到…', style: labelStyle),
+                ),
+                if (trailingExpand != null) ...[
+                  const SizedBox(width: 2),
+                  trailingExpand!,
+                ],
+                // cnt（设计稿为笔数；无数据时显示预置标记）
+                Padding(
+                  padding: const EdgeInsets.only(left: 4, right: 2),
+                  child: Text(
+                    category.isPreset ? '预置' : '',
+                    style: TextStyle(fontSize: 12, color: colors.inkTertiary),
+                  ),
+                ),
+                GestureDetector(
+                  onTap: onToggleHide,
+                  behavior: HitTestBehavior.opaque,
+                  child: SizedBox(
+                    width: 28,
+                    height: 44,
+                    child: Center(
+                      child: PlainIcon(
+                        category.isHidden
+                            ? PlainIconData.eyeOff
+                            : PlainIconData.eye,
+                        size: 18,
+                        color: colors.inkTertiary,
+                      ),
                     ),
-                  if (onMerge != null)
-                    PopupMenuItem(
-                      value: 'merge',
-                      child: Text('合并到…', style: labelStyle),
+                  ),
+                ),
+                PopupMenuButton<String>(
+                  padding: EdgeInsets.zero,
+                  child: SizedBox(
+                    width: 28,
+                    height: 44,
+                    child: Center(
+                      child: PlainIcon(
+                        PlainIconData.dragHandle,
+                        size: 16,
+                        color: colors.inkTertiary,
+                      ),
                     ),
-                  if (onDelete != null)
-                    PopupMenuItem(
-                      value: 'delete',
-                      child: Text('删除', style: labelStyle),
-                    ),
-                ];
-              },
+                  ),
+                  onSelected: (v) {
+                    if (category.isPreset) {
+                      showAppToast(context, '默认分类不可修改');
+                      return;
+                    }
+                    switch (v) {
+                      case 'rename':
+                        onRename();
+                      case 'move':
+                        onMove?.call();
+                      case 'merge':
+                        onMerge?.call();
+                      case 'delete':
+                        onDelete?.call();
+                    }
+                  },
+                  itemBuilder: (ctx) {
+                    final locked = category.isPreset;
+                    final labelStyle =
+                        locked ? TextStyle(color: colors.inkTertiary) : null;
+                    return [
+                      PopupMenuItem(
+                        value: 'rename',
+                        child: Text('编辑分类信息', style: labelStyle),
+                      ),
+                      if (onMove != null)
+                        PopupMenuItem(
+                          value: 'move',
+                          child: Text('移动到…', style: labelStyle),
+                        ),
+                      if (onMerge != null)
+                        PopupMenuItem(
+                          value: 'merge',
+                          child: Text('合并到…', style: labelStyle),
+                        ),
+                      if (onDelete != null)
+                        PopupMenuItem(
+                          value: 'delete',
+                          child: Text('删除', style: labelStyle),
+                        ),
+                    ];
+                  },
+                ),
+              ],
             ),
-          ],
+          ),
         ),
-        ),
-      ),
       ),
     );
   }
 }
+
+/// 选择器展示的 ref 清单。
+///
+/// `kAllCategoryIconRefs` 是近 300 个**语义 ref**，而 v3 图标只有 12 枚一级，
+/// ref → 图标是**多对一**映射。若直接遍历 ref 列表，同一枚图标会在网格里
+/// 重复出现几十次（曾出现一整排相同的碗）。这里按解析后的图标去重，
+/// 每枚图标取第一个出现的 ref 作为代表。
+final List<String> _kPickerIconRefs = () {
+  final seen = <String>{};
+  final out = <String>[];
+  for (final r in kAllCategoryIconRefs) {
+    final icon = plainIconForRef(r);
+    if (icon == null) continue;
+    if (seen.add(icon.name)) out.add(r);
+  }
+  return List<String>.unmodifiable(out);
+}();
 
 class _IconPicker extends StatelessWidget {
   const _IconPicker({
@@ -1247,42 +1349,51 @@ class _IconPicker extends StatelessWidget {
             alignment: Alignment.centerLeft,
             child: TextButton.icon(
               onPressed: () => onPickImage!(),
-              icon: const Icon(Icons.add_photo_alternate_outlined, size: 18),
+              icon: const PlainIcon(PlainIconData.image, size: 18),
               label: Text(iconAsset == null ? '上传自定义图标' : '更换自定义图标'),
             ),
           ),
-        SizedBox(
-          height: 180,
-          child: GridView.builder(
-            padding: const EdgeInsets.symmetric(vertical: Spacing.sm),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 7,
-              mainAxisSpacing: 8,
-              crossAxisSpacing: 8,
-              childAspectRatio: 1,
-            ),
-            itemCount: kAllCategoryIconRefs.length,
-            itemBuilder: (context, i) {
-              final r = kAllCategoryIconRefs[i];
-              final selected = r == value && iconAsset == null;
-              return InkWell(
-                borderRadius: BorderRadius.circular(10),
-                onTap: () => onChanged(r),
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: selected
-                        ? context.colors.primary.withValues(alpha: 0.15)
-                        : context.colors.surfaceMuted,
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(
-                      color: selected ? context.colors.primary : context.colors.divider,
-                    ),
-                  ),
-                  child: Icon(iconForCategory(r), size: 20, color: context.colors.primary),
-                ),
-              );
-            },
+        GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          padding: const EdgeInsets.symmetric(vertical: Spacing.sm),
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 7,
+            mainAxisSpacing: 8,
+            crossAxisSpacing: 8,
+            childAspectRatio: 1,
           ),
+          itemCount: _kPickerIconRefs.length,
+          itemBuilder: (context, i) {
+            final r = _kPickerIconRefs[i];
+            final icon = plainIconForRef(r)!;
+            // 按「图标」而非 ref 判选中：多个 ref 解析到同一枚图标时仍能高亮。
+            final selected =
+                iconAsset == null && plainIconForRef(value)?.name == icon.name;
+            return InkWell(
+              borderRadius: BorderRadius.circular(10),
+              onTap: () => onChanged(r),
+              child: Container(
+                // 必须居中：否则子级收到 tight 约束被拉伸到整格，
+                // 图标放大约 2 倍、描边等比变粗。
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: selected
+                      ? context.colors.primary.withValues(alpha: 0.15)
+                      : context.colors.surfaceMuted,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: selected ? context.colors.primary : context.colors.divider,
+                  ),
+                ),
+                child: PlainIcon(
+                  icon,
+                  size: 20,
+                  color: context.colors.primary,
+                ),
+              ),
+            );
+          },
         ),
       ],
     );

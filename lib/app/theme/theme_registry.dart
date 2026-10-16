@@ -111,39 +111,41 @@ const double kASoftAlphaDark = 0.26;
 
 // ─── Neutral layer: 3 tones × 2 brightness ───────────────────────────────────
 
+// v3 Quiet Ledger: de-warm neutrals. Values from redesign-v3/01-tokens.json
+// (cool / neutral / sand). ToneId.warm maps to v3 "sand" (杏黄/豆绿).
 const Map<ToneId, TonePalette> _toneLight = {
   ToneId.cool: TonePalette(
-    bg: 0xFFF1F5F3, appBg: 0xFFF8FAF9, surface: 0xFFFFFFFF, surface2: 0xFFFAFCFB,
-    ink: 0xFF1F2D28, ink2: 0xFF3D524B, muted: 0xFF5A6B65, faint: 0xFF8A9691,
-    line: 0xFFE2E8E3, lineSoft: 0xFFECF0EB,
+    bg: 0xFFF4F6F6, appBg: 0xFFFAFBFB, surface: 0xFFFFFFFF, surface2: 0xFFF5F7F7,
+    ink: 0xFF0E1413, ink2: 0xFF36403E, muted: 0xFF5B6765, faint: 0xFF808C8A,
+    line: 0xFFE3E8E7, lineSoft: 0xFFEDF1F0,
   ),
   ToneId.warm: TonePalette(
-    bg: 0xFFF6F1E8, appBg: 0xFFFCF8F1, surface: 0xFFFFFEFB, surface2: 0xFFFAF6EF,
-    ink: 0xFF241F18, ink2: 0xFF4A4238, muted: 0xFF6A6257, faint: 0xFF968E80,
-    line: 0xFFE6E0D3, lineSoft: 0xFFEFEADF,
+    bg: 0xFFF7F6F4, appBg: 0xFFFCFBF9, surface: 0xFFFFFFFF, surface2: 0xFFF7F6F3,
+    ink: 0xFF121110, ink2: 0xFF3A3835, muted: 0xFF615D58, faint: 0xFF85807A,
+    line: 0xFFE6E4DF, lineSoft: 0xFFF0EEE9,
   ),
   ToneId.neutral: TonePalette(
-    bg: 0xFFF3F3F1, appBg: 0xFFFAFAF8, surface: 0xFFFFFFFF, surface2: 0xFFFCFCFA,
-    ink: 0xFF1C1C1B, ink2: 0xFF454544, muted: 0xFF656563, faint: 0xFF92928F,
-    line: 0xFFE3E3E0, lineSoft: 0xFFEDEDEA,
+    bg: 0xFFF5F5F6, appBg: 0xFFFBFBFC, surface: 0xFFFFFFFF, surface2: 0xFFF6F6F8,
+    ink: 0xFF101012, ink2: 0xFF38383D, muted: 0xFF5E5E65, faint: 0xFF838389,
+    line: 0xFFE4E4E8, lineSoft: 0xFFEFEFF2,
   ),
 };
 
 const Map<ToneId, TonePalette> _toneDark = {
   ToneId.cool: TonePalette(
-    bg: 0xFF141A18, appBg: 0xFF222C29, surface: 0xFF2B3733, surface2: 0xFF323F3A,
-    ink: 0xFFE4EBE6, ink2: 0xFFC2CFC8, muted: 0xFF8FA099, faint: 0xFF74817B,
-    line: 0xFF3A4741, lineSoft: 0xFF35423D,
+    bg: 0xFF101413, appBg: 0xFF181D1C, surface: 0xFF202625, surface2: 0xFF293130,
+    ink: 0xFFE8EDEA, ink2: 0xFFBEC8C4, muted: 0xFF8E9895, faint: 0xFF6F7975,
+    line: 0xFF2F3634, lineSoft: 0xFF272E2C,
   ),
   ToneId.warm: TonePalette(
-    bg: 0xFF191612, appBg: 0xFF26221C, surface: 0xFF2F2A22, surface2: 0xFF38332A,
-    ink: 0xFFEDE7DA, ink2: 0xFFCFC6B4, muted: 0xFF9C9382, faint: 0xFF7B7465,
-    line: 0xFF423B30, lineSoft: 0xFF3B352B,
+    bg: 0xFF131211, appBg: 0xFF1B1A18, surface: 0xFF232220, surface2: 0xFF2C2B28,
+    ink: 0xFFEDECE9, ink2: 0xFFC6C2BD, muted: 0xFF96928C, faint: 0xFF77726B,
+    line: 0xFF35332F, lineSoft: 0xFF2D2B28,
   ),
   ToneId.neutral: TonePalette(
-    bg: 0xFF1B1B1A, appBg: 0xFF232322, surface: 0xFF2C2C2B, surface2: 0xFF343433,
-    ink: 0xFFE9E9E6, ink2: 0xFFC4C4C0, muted: 0xFF96968F, faint: 0xFF767673,
-    line: 0xFF3C3C3A, lineSoft: 0xFF363634,
+    bg: 0xFF121214, appBg: 0xFF1A1A1D, surface: 0xFF222225, surface2: 0xFF2B2B2F,
+    ink: 0xFFECECEE, ink2: 0xFFC2C2C7, muted: 0xFF93939B, faint: 0xFF74747C,
+    line: 0xFF33333A, lineSoft: 0xFF2B2B32,
   ),
 };
 
@@ -321,6 +323,37 @@ const Map<String, int> categoryColorMap = {
 };
 /// Resolve a slice color from a category's iconRef; falls back to null.
 int? categoryColorFor(String iconRef) => categoryColorMap[iconRef];
+
+/// Hero 卡底色。与主题无关，亮暗各一对（04-技术架构设计.md §16.1）。
+const int kHeroCardLight0 = 0xFFFFFCF4;
+const int kHeroCardLight1 = 0xFFF4EFE1;
+const int kHeroCardDark0 = 0xFF322D25;
+const int kHeroCardDark1 = 0xFF25221D;
+
+/// 12 个一级分类的 ink（图标 / 小字前景）。
+/// 由对比度反推，最差 4.53:1（见 tokens.json 的 gates.categoryInk_min）。
+/// **搬值，不要重算** —— 推导宿主集没有留脚本。
+const Map<String, int> categoryInkLight = {
+  'food': 0xFFA23030,        'shopping': 0xFF9D3767,
+  'daily': 0xFF6849B1,       'transport': 0xFF0F638E,
+  'fruit': 0xFF186F42,       'entertainment': 0xFF972EA6,
+  'housing': 0xFF8B5516,     'medical': 0xFFA03A3A,
+  'study': 0xFF265BA4,       'social': 0xFF7341B2,
+  'other': 0xFF4E5E6F,       'telecom': 0xFF0A6963,
+};
+
+const Map<String, int> categoryInkDark = {
+  'food': 0xFFFFA5A5,        'shopping': 0xFFF8A8D1,
+  'daily': 0xFFC9B8FC,       'transport': 0xFF89D3F6,
+  'fruit': 0xFF7CE5A3,       'entertainment': 0xFFF4A9FB,
+  'housing': 0xFFFBCB98,     'medical': 0xFFFCA9A9,
+  'study': 0xFFA0C6FB,       'social': 0xFFD9B2FA,
+  'other': 0xFFBBC6D2,       'telecom': 0xFF6BE0D6,
+};
+
+/// 按亮度取分类 ink。
+int? categoryInkFor(String iconRef, bool isDark) =>
+    (isDark ? categoryInkDark : categoryInkLight)[iconRef];
 
 /// Income / expense semantic colors (fixed, not theme-derived).
 const Map<String, int> _semLight = {

@@ -4,7 +4,7 @@ library;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-const int kRecentCategoryLimit = 7;
+const int kRecentCategoryLimit = 11;
 
 String _key(String kind) => 'pref.cat.recent.$kind';
 

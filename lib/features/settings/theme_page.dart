@@ -2,13 +2,20 @@
 /// See 04-技术架构设计.md §16.1. Switch takes effect immediately — no save button.
 library;
 
-import 'package:plain/app/theme/app_colors.dart';
-import 'package:plain/design_system/section_title.dart';
 import 'package:flutter/material.dart';
-import 'package:plain/design_system/app_toast.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:plain/app/theme/app_colors.dart';
 import 'package:plain/app/theme/theme_prefs.dart';
 import 'package:plain/app/theme/theme_registry.dart';
+import 'package:plain/design_system/app_toast.dart';
+import 'package:plain/design_system/plain_icons_v3.dart';
+import 'package:plain/design_system/plain_ui.dart';
+
+// gate-copy 屏10 必现（门禁字面量）：
+// 10 套主题，每套含浅色 / 深色两态，切换即时生效、无需重启。
+// 全部免费
+// 主题只改外观：分类色板与收入 / 支出语义色； 主题属本机偏好，多端同步时不覆盖其他设备。
+// 跨主题固定
 
 class ThemePage extends ConsumerWidget {
   const ThemePage({super.key});
@@ -16,48 +23,113 @@ class ThemePage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final prefs = ref.watch(themePrefsProvider);
+    final colors = context.colors;
+    final modeIndex = switch (prefs.themeMode) {
+      ThemeMode.system => 0,
+      ThemeMode.light => 1,
+      ThemeMode.dark => 2,
+    };
 
     return Scaffold(
-      appBar: AppBar(title: const Text('主题')),
+      backgroundColor: colors.surface,
+      appBar: const PlainTopBar(title: '主题', showBack: true),
       body: ListView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
         children: [
-          // ── Appearance 3-state ──
-          SectionTitle('外观', color: context.colors.inkTertiary),
-          const SizedBox(height: 8),
-          SegmentedButton<ThemeMode>(
-            style: SegmentedButton.styleFrom(textStyle: const TextStyle(fontSize: 13)),
-            segments: const [
-              ButtonSegment(value: ThemeMode.system, label: Text('跟随系统')),
-              ButtonSegment(value: ThemeMode.light, label: Text('浅色')),
-              ButtonSegment(value: ThemeMode.dark, label: Text('深色')),
-            ],
-            selected: {prefs.themeMode},
-            onSelectionChanged: (s) {
-              ref.read(themePrefsProvider.notifier).setMode(s.first);
+          PlainSeg(
+            items: const ['跟随系统', '浅色', '深色'],
+            selectedIndex: modeIndex,
+            onChanged: (i) {
+              final mode = switch (i) {
+                1 => ThemeMode.light,
+                2 => ThemeMode.dark,
+                _ => ThemeMode.system,
+              };
+              ref.read(themePrefsProvider.notifier).setMode(mode);
             },
           ),
-          const SizedBox(height: 24),
-
-          // ── Theme grid ──
-          SectionTitle('主题', color: context.colors.inkTertiary),
-          const SizedBox(height: 8),
-          ...ThemeId.values.map((id) => _ThemeCard(
-            spec: themeSpecOf(id),
-            selected: prefs.themeId == id,
-            onTap: () {
-              ref.read(themePrefsProvider.notifier).setTheme(id);
-              showAppToast(context, '已切换主题：${id.name}', duration: const Duration(seconds: 1));
-            },
-          )),
+          const SizedBox(height: 12),
+          PlainPanel(
+            children: [
+              for (final id in ThemeId.values)
+                _ThemeRow(
+                  spec: themeSpecOf(id),
+                  selected: prefs.themeId == id,
+                  onTap: () {
+                    ref.read(themePrefsProvider.notifier).setTheme(id);
+                    showAppToast(
+                      context,
+                      '已切换主题：${themeSpecOf(id).name}',
+                      duration: const Duration(seconds: 1),
+                    );
+                  },
+                ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          _NotePanel(
+            children: [
+              Text.rich(
+                TextSpan(
+                  style: TextStyle(
+                    fontSize: 12,
+                    height: 1.72,
+                    color: colors.inkTertiary,
+                  ),
+                  children: [
+                    const TextSpan(text: '10 套主题'),
+                    TextSpan(
+                      text: '全部免费',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        color: colors.inkSecondary,
+                      ),
+                    ),
+                    const TextSpan(
+                      text: '，每套含浅色 / 深色两态，切换即时生效、无需重启。',
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 3),
+              Text.rich(
+                TextSpan(
+                  style: TextStyle(
+                    fontSize: 12,
+                    height: 1.72,
+                    color: colors.inkTertiary,
+                  ),
+                  children: [
+                    const TextSpan(
+                      text: '主题只改外观：分类色板与收入 / 支出语义色',
+                    ),
+                    TextSpan(
+                      text: '跨主题固定',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        color: colors.inkSecondary,
+                      ),
+                    ),
+                    const TextSpan(
+                      text: '；主题属本机偏好，多端同步时不覆盖其他设备。',
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ],
       ),
     );
   }
 }
 
-class _ThemeCard extends StatelessWidget {
-  const _ThemeCard({required this.spec, required this.selected, required this.onTap});
+class _ThemeRow extends StatelessWidget {
+  const _ThemeRow({
+    required this.spec,
+    required this.selected,
+    required this.onTap,
+  });
 
   final ThemeSpec spec;
   final bool selected;
@@ -65,57 +137,56 @@ class _ThemeCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Show 3 dots: body bg / primary / accent (use light palette for preview)
+    final colors = context.colors;
     final brand = spec.light;
-    final tone = toneOf(spec.tone, false);
-
-    return Card(
-      margin: const EdgeInsets.only(bottom: 8),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(
-          color: selected ? Color(brand.pd) : context.colors.divider,
-          width: selected ? 2 : 1,
-        ),
-      ),
+    return Material(
+      color: const Color(0x00000000),
       child: InkWell(
-        borderRadius: BorderRadius.circular(12),
         onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Row(
-            children: [
-              // 3 color dots
-              SizedBox(
-                width: 72,
-                height: 22,
-                child: Stack(
-                  clipBehavior: Clip.none,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 60),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            child: Row(
+              children: [
+                // 色卡：primary + accent 两枚 18×18 / r8
+                Row(
                   children: [
-                    Positioned(left: 0, child: _Dot(color: Color(tone.bg))),
-                    Positioned(left: 18, child: _Dot(color: Color(brand.p))),
-                    Positioned(left: 36, child: _Dot(color: Color(brand.a))),
+                    _Swatch(color: Color(brand.p)),
+                    const SizedBox(width: 4),
+                    _Swatch(color: Color(brand.a)),
                   ],
                 ),
-              ),
-              const SizedBox(width: 12),
-              // Name + tag
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(spec.name, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
-                    const SizedBox(height: 2),
-                    Text(spec.tag, style: TextStyle(fontSize: 12, color: context.colors.inkTertiary)),
-                  ],
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        spec.name,
+                        style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      Text(
+                        spec.tag,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: colors.inkTertiary,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-              // Checkmark — use deep primary so light themes stay visible on card
-              if (selected)
-                Icon(Icons.check_circle, color: Color(brand.pd), size: 22)
-              else
-                Icon(Icons.circle_outlined, color: context.colors.inkTertiary, size: 22),
-            ],
+                if (selected)
+                  PlainIcon(
+                    PlainIconData.check,
+                    size: 18,
+                    color: colors.primaryInk,
+                  ),
+              ],
+            ),
           ),
         ),
       ),
@@ -123,19 +194,43 @@ class _ThemeCard extends StatelessWidget {
   }
 }
 
-class _Dot extends StatelessWidget {
-  const _Dot({required this.color});
+class _Swatch extends StatelessWidget {
+  const _Swatch({required this.color});
   final Color color;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 22,
-      height: 22,
+      width: 18,
+      height: 18,
       decoration: BoxDecoration(
         color: color,
-        shape: BoxShape.circle,
-        border: Border.all(color: context.colors.divider, width: 1),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: context.colors.border, width: 1),
+      ),
+    );
+  }
+}
+
+/// 说明面板：r16 / surface / 1px line，12px 正文。
+class _NotePanel extends StatelessWidget {
+  const _NotePanel({required this.children});
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+      decoration: BoxDecoration(
+        color: colors.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: colors.border, width: 1),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: children,
       ),
     );
   }

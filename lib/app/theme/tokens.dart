@@ -1,4 +1,4 @@
-/// AppTokens: 46-field immutable value object resolved from ThemeSpec × Brightness.
+/// AppTokens: 48-field immutable value object resolved from ThemeSpec × Brightness.
 /// Field names map 1:1 from CSS variables (kebab → camelCase). See 04-技术架构设计.md §16.1.
 library;
 
@@ -28,12 +28,21 @@ class AppTokens {
     required this.heroGrad0, required this.heroGrad1,
     required this.heroDarkGrad0, required this.heroDarkGrad1,
     required this.frame,
+    required this.heroCard0, required this.heroCard1,
+    // ── FAB ──
+    required this.fabBg, required this.fabFg, required this.fabIc,
     // ── Charts ──
     required this.chartTrack, required this.barFill, required this.dash,
     // ── Glow / shadow ──
     required this.glowPrimary, required this.glowAccent,
     required this.shadowPrimary, required this.shadowAccent, required this.toastBg,
     required this.shadow1, required this.shadow2, required this.shadow3,
+    // ── v3 additions (redesign-v3) ──
+    required this.lineStrong, required this.lineStrongSoft,
+    required this.focusRing, required this.surfaceInset,
+    required this.disabledFg, required this.disabledBg,
+    required this.overlay, required this.skeleton,
+    required this.primaryPressed, required this.accentPressed,
   });
 
   // Neutral
@@ -64,6 +73,10 @@ class AppTokens {
   final Color heroGrad0; final Color heroGrad1;
   final Color heroDarkGrad0; final Color heroDarkGrad1;
   final Color frame;
+  final Color heroCard0; final Color heroCard1;
+
+  // FAB
+  final Color fabBg; final Color fabFg; final Color fabIc;
 
   // Charts
   final Color chartTrack; final Color barFill; final Color dash;
@@ -72,6 +85,13 @@ class AppTokens {
   final Color glowPrimary; final Color glowAccent;
   final Color shadowPrimary; final Color shadowAccent; final Color toastBg;
   final Color shadow1; final Color shadow2; final Color shadow3;
+
+  // v3 additions
+  final Color lineStrong; final Color lineStrongSoft;
+  final Color focusRing; final Color surfaceInset;
+  final Color disabledFg; final Color disabledBg;
+  final Color overlay; final Color skeleton;
+  final Color primaryPressed; final Color accentPressed;
 }
 
 /// Build a linear gradient from two colors.

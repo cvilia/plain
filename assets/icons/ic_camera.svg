@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" role="img" aria-label="ic_camera">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M4 8.75h3l1.5-2.5h7l1.5 2.5h3a1.75 1.75 0 0 1 1.75 1.75v7A1.75 1.75 0 0 1 20 19.25H4a1.75 1.75 0 0 1-1.75-1.75v-7A1.75 1.75 0 0 1 4 8.75z"/>
+  <circle cx="12" cy="13.5" r="3.25"/>
+  </g>
+</svg>

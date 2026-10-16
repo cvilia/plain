@@ -243,12 +243,128 @@ Future<String> extractBackupDb({
   required String password,
   required String outPath,
 }) async {
+  final r = await extractBackup(
+    backupPath: backupPath,
+    password: password,
+    outPath: outPath,
+  );
+  return r.dbPath;
+}
+
+/// STORY-1.5 AC4：附件随备份打包/还原用的暂存表名。
+///
+/// ⚠️ 这张表**只存在于备份副本里**：打包时把附件字节写进临时副本，
+/// 运行库永远不含附件字节 —— 这样「附件不进云同步」（整库上传）
+/// 与「附件计入备份」两条约束同时成立，且附图字节照样受 SQLCipher 加密。
+const String kAttachmentBlobTable = 'attachment_blobs';
+
+/// 恢复结果：明文库路径 + 还原的附件张数。
+class BackupExtractResult {
+  const BackupExtractResult({required this.dbPath, required this.restoredAttachments});
+  final String dbPath;
+  final int restoredAttachments;
+}
+
+/// 恢复用：把备份解成明文库到 [outPath]，并把附件字节写回 [attachmentDir]。
+Future<BackupExtractResult> extractBackup({
+  required String backupPath,
+  required String password,
+  required String outPath,
+  Directory? attachmentDir,
+}) async {
   final opened = await openEncryptedBackup(backupPath: backupPath, password: password);
   try {
+    var restored = 0;
+    if (attachmentDir != null) {
+      restored = await _writeAttachmentBlobs(opened.db, attachmentDir);
+    }
     final esc = outPath.replaceAll("'", "''");
     opened.db.execute("VACUUM INTO '$esc'");
-    return outPath;
+    return BackupExtractResult(dbPath: outPath, restoredAttachments: restored);
   } finally {
     opened.close();
   }
+}
+
+/// 把附件目录里的文件写进**备份副本**（备份前调用）。返回打包张数。
+///
+/// [dbCopyPath] 是 VACUUM 出来的副本（可能是设备密钥加密的），
+/// [attachmentDir] 是附件目录。表里没有的附件（文件被用户删了）跳过。
+Future<int> packAttachmentsIntoCopy({
+  required String dbCopyPath,
+  required Directory attachmentDir,
+  String? sourceKeyLiteral,
+}) async {
+  if (!attachmentDir.existsSync()) return 0;
+  Database? db;
+  try {
+    if (sourceKeyLiteral != null && sourceKeyLiteral.isNotEmpty) {
+      final candidate = sqlite3.open(dbCopyPath);
+      try {
+        candidate.execute('PRAGMA key = $sourceKeyLiteral');
+        candidate.select('SELECT count(*) FROM sqlite_master');
+        db = candidate;
+      } on Exception {
+        try {
+          candidate.close();
+        } catch (_) {}
+      }
+    }
+    db ??= sqlite3.open(dbCopyPath);
+
+    final rows = db.select(
+      'SELECT stored_name, thumbnail_name FROM attachments WHERE deleted_at IS NULL',
+    );
+    db.execute(
+      'CREATE TABLE IF NOT EXISTS $kAttachmentBlobTable ('
+      'name TEXT NOT NULL PRIMARY KEY, bytes BLOB NOT NULL)',
+    );
+    var packed = 0;
+    for (final r in rows) {
+      for (final name in [r['stored_name'] as String?, r['thumbnail_name'] as String?]) {
+        if (name == null || name.isEmpty) continue;
+        final f = File(p.join(attachmentDir.path, name));
+        if (!f.existsSync()) continue;
+        db.execute(
+          'INSERT OR REPLACE INTO $kAttachmentBlobTable (name, bytes) VALUES (?, ?)',
+          [name, f.readAsBytesSync()],
+        );
+        packed++;
+      }
+    }
+    return packed;
+  } catch (_) {
+    // 附件打包失败不该让整次备份失败：库还是要导出的
+    return 0;
+  } finally {
+    try {
+      db?.close();
+    } catch (_) {}
+  }
+}
+
+/// 把备份库里的附件字节写回附件目录。表不存在（老备份）→ 0。
+Future<int> _writeAttachmentBlobs(Database db, Directory attachmentDir) async {
+  final has = db.select(
+    "SELECT name FROM sqlite_master WHERE type='table' AND name = ?",
+    [kAttachmentBlobTable],
+  );
+  if (has.isEmpty) return 0;
+  if (!attachmentDir.existsSync()) {
+    await attachmentDir.create(recursive: true);
+  }
+  final rows = db.select('SELECT name, bytes FROM $kAttachmentBlobTable');
+  var written = 0;
+  for (final r in rows) {
+    final name = r['name'] as String?;
+    final bytes = r['bytes'];
+    if (name == null || name.isEmpty || bytes is! List<int>) continue;
+    try {
+      await File(p.join(attachmentDir.path, name)).writeAsBytes(bytes, flush: true);
+      written++;
+    } on FileSystemException {
+      // 单张写不进去不影响其余
+    }
+  }
+  return written;
 }

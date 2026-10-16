@@ -4,6 +4,7 @@ library;
 import 'package:plain/app/theme/app_colors.dart';
 import 'package:flutter/material.dart';
 import 'package:plain/app/theme/design_tokens.dart';
+import 'package:plain/design_system/plain_icons_v3.dart';
 
 class AppEmptyState extends StatelessWidget {
   const AppEmptyState({
@@ -14,7 +15,7 @@ class AppEmptyState extends StatelessWidget {
     this.action,
   });
 
-  final IconData icon;
+  final PlainIconData icon;
   final String title;
   final String? subtitle;
   final Widget? action;
@@ -25,7 +26,7 @@ class AppEmptyState extends StatelessWidget {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(icon, size: 80, color: context.colors.inkTertiary),
+          PlainIcon(icon, size: 80, color: context.colors.inkTertiary),
           const SizedBox(height: Spacing.lg),
           Text(
             title,

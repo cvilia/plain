@@ -3,6 +3,7 @@
 library;
 
 import 'package:plain/app/theme/app_colors.dart';
+import 'package:plain/app/theme/typography.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -16,7 +17,7 @@ class AmountText extends ConsumerStatefulWidget {
   const AmountText({
     super.key,
     required this.cents,
-    this.fontSize = 16,
+    this.fontSize = 15,
     this.fontWeight = FontWeight.w600,
     this.color,
     this.showSign = false,
@@ -83,8 +84,13 @@ class _AmountTextState extends ConsumerState<AmountText> {
         display,
         style: TextStyle(
           fontSize: widget.fontSize,
+          // ⚠️ 不写 height 会静默继承 DefaultTextStyle（见 amountLineHeight）。
+          // 这是**金额**，走 `.amt` 那套比值 + tracking，不用 designLineHeight。
+          height: amountLineHeight(widget.fontSize),
+          letterSpacing: amountLetterSpacing(widget.fontSize),
           fontWeight: widget.fontWeight,
           color: color,
+          fontFeatures: kTabularFigures,
         ),
       ),
     );
@@ -96,7 +102,7 @@ class AmountWithCurrency extends ConsumerStatefulWidget {
   const AmountWithCurrency({
     super.key,
     required this.cents,
-    this.fontSize = 16,
+    this.fontSize = 15,
     this.fontWeight = FontWeight.w600,
     this.color,
     this.showSign = false,
@@ -159,8 +165,12 @@ class _AmountWithCurrencyState extends ConsumerState<AmountWithCurrency> {
         '$sign$text',
         style: TextStyle(
           fontSize: widget.fontSize,
+          // ⚠️ 不写 height 会静默继承 DefaultTextStyle（见 amountLineHeight）。
+          height: amountLineHeight(widget.fontSize),
+          letterSpacing: amountLetterSpacing(widget.fontSize),
           fontWeight: widget.fontWeight,
           color: displayColor,
+          fontFeatures: kTabularFigures,
         ),
       ),
     );

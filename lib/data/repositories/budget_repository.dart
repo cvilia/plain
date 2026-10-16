@@ -115,7 +115,9 @@ class BudgetRepositoryImpl implements BudgetRepository {
   }) async {
     try {
       // STORY-6.2：预算只计「子笔 + 普通」，父笔不计（避免双算）。
-      const notParent = "AND split_role <> 'parent'";
+      // G-2：手动标记「不计入收支」的账单也不算 —— 它本来就是「这笔不计入统计」，
+      // 少了这个条件，预算会把它算进去并误报超支（audit 2026-10-15 发现）。
+      const notParent = "AND split_role <> 'parent' AND exclude_from_stats = 0";
       if (categoryId == null) {
         final rows = _db.raw.select(
           'SELECT COALESCE(SUM(amount_cents),0) AS s FROM transactions '

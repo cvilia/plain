@@ -59,6 +59,7 @@ class MainActivity : FlutterActivity() {
                     "pickFile" -> {
                         val mime = (call.argument<String>("mime")) ?: "*/*"
                         val ext = call.argument<String>("extension")
+                        val mimeTypes = call.argument<List<String>>("mimeTypes")
                         if (pendingFileResult != null) {
                             result.error("busy", "Picker already open", null)
                             return@setMethodCallHandler
@@ -68,7 +69,10 @@ class MainActivity : FlutterActivity() {
                             val intent = Intent(Intent.ACTION_GET_CONTENT).apply {
                                 addCategory(Intent.CATEGORY_OPENABLE)
                                 type = mime
-                                if (!ext.isNullOrEmpty()) {
+                                if (!mimeTypes.isNullOrEmpty()) {
+                                    // 多类型白名单（附件：jpg/png/heic/pdf）
+                                    putExtra(Intent.EXTRA_MIME_TYPES, mimeTypes.toTypedArray())
+                                } else if (!ext.isNullOrEmpty()) {
                                     putExtra(Intent.EXTRA_MIME_TYPES, mimeTypesForExtension(ext))
                                 }
                             }
@@ -94,8 +98,10 @@ class MainActivity : FlutterActivity() {
                         val title = call.argument<String>("title") ?: ""
                         val body = call.argument<String>("body") ?: ""
                         val payload = call.argument<String>("payload")
-                        ensureNotificationChannel()
-                        showLocalNotification(id, title, body, payload)
+                        // G-3 分级通知：静默只进通知中心，响铃才出声
+                        val silent = (call.argument<Boolean>("silent")) ?: false
+                        ensureNotificationChannel(silent)
+                        showLocalNotification(id, title, body, payload, silent)
                         result.success(null)
                     }
                     "cancel" -> {
@@ -162,8 +168,7 @@ class MainActivity : FlutterActivity() {
                 }
             }
 
-        // Enable privacy overlay by default
-        setSecureFlag(true)
+        // 已移除默认 FLAG_SECURE：允许截图/录屏
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
@@ -250,19 +255,36 @@ class MainActivity : FlutterActivity() {
         }
     }
 
-    private fun ensureNotificationChannel() {
+    /// G-3：响铃与静默走**两条通道**（通道决定有没有声音）。
+    private fun ensureNotificationChannel(silent: Boolean) {
         val mgr = getSystemService(NotificationManager::class.java)
-        val channel = NotificationChannel(
-            NOTIF_CHANNEL_ID,
-            "周期记账",
-            NotificationManager.IMPORTANCE_DEFAULT
-        ).apply {
-            description = "周期记账到期提醒与确认"
+        if (silent) {
+            val channel = NotificationChannel(
+                NOTIF_CHANNEL_SILENT,
+                "静默提醒",
+                NotificationManager.IMPORTANCE_LOW
+            ).apply {
+                description = "只进通知中心、不响铃"
+                setSound(null, null)
+                enableVibration(false)
+                enableLights(false)
+            }
+            mgr.createNotificationChannel(channel)
+        } else {
+            val channel = NotificationChannel(
+                NOTIF_CHANNEL_RING,
+                "响铃提醒",
+                NotificationManager.IMPORTANCE_DEFAULT
+            ).apply {
+                description = "周期记账、消费周报等需要出声的提醒"
+            }
+            mgr.createNotificationChannel(channel)
         }
-        mgr.createNotificationChannel(channel)
     }
 
-    private fun showLocalNotification(id: Int, title: String, body: String, payload: String?) {
+    private fun showLocalNotification(
+        id: Int, title: String, body: String, payload: String?, silent: Boolean
+    ) {
         val intent = Intent(this, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
             action = "com.cvilia.plain.NOTIFY"
@@ -272,14 +294,20 @@ class MainActivity : FlutterActivity() {
             this, id, intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
-        val notification = NotificationCompat.Builder(this, NOTIF_CHANNEL_ID)
+        val builder = NotificationCompat.Builder(
+            this, if (silent) NOTIF_CHANNEL_SILENT else NOTIF_CHANNEL_RING
+        )
             .setSmallIcon(android.R.drawable.stat_notify_chat)
             .setContentTitle(title)
             .setContentText(body)
             .setStyle(NotificationCompat.BigTextStyle().bigText(body))
             .setAutoCancel(true)
             .setContentIntent(pending)
-            .build()
+        if (silent) {
+            builder.setSilent(true)
+            builder.priority = NotificationCompat.PRIORITY_LOW
+        }
+        val notification = builder.build()
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) ==
             PackageManager.PERMISSION_GRANTED || Build.VERSION.SDK_INT < 33
         ) {
@@ -304,6 +332,7 @@ class MainActivity : FlutterActivity() {
     companion object {
         private const val REQUEST_PICK_FILE = 7101
         private const val REQUEST_POST_NOTIFICATIONS = 7102
-        private const val NOTIF_CHANNEL_ID = "recurring_due"
+        private const val NOTIF_CHANNEL_RING = "plain_alert_ring"
+        private const val NOTIF_CHANNEL_SILENT = "plain_alert_silent"
     }
 }

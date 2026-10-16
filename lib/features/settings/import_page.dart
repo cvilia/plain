@@ -1,14 +1,18 @@
-﻿/// CSV import wizard: paste → map columns → preview → import. PRD F7.5.
+/// CSV import wizard: paste → map columns → preview → import. PRD F7.5.
 library;
 
 import 'package:plain/app/theme/app_colors.dart';
 import 'package:flutter/material.dart';
 import 'package:plain/design_system/app_toast.dart';
+import 'package:plain/features/ledger/presentation/member_write_guard.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:plain/app/bootstrap.dart';
 import 'package:plain/app/breakpoints.dart';
 import 'package:plain/app/theme/design_tokens.dart';
 import 'package:plain/core/format/amount_formatter.dart';
+import 'package:plain/design_system/plain_icons_v3.dart';
+import 'package:plain/design_system/picker_sheet.dart';
+import 'package:plain/design_system/plain_ui.dart';
 import 'package:plain/domain/entities/enums.dart';
 import 'package:plain/domain/services/csv_importer.dart';
 
@@ -82,6 +86,8 @@ class _ImportPageState extends ConsumerState<ImportPage> {
   }
 
   Future<void> _doImport() async {
+    // STORY-8.2 AC2：导入就是批量新增账单 —— 只读成员不得用导入绕开记账权限
+    if (!await guardCanWriteLedger(context, ref)) return;
     setState(() => _importing = true);
     final deps = ref.read(appDependenciesProvider);
 
@@ -112,7 +118,7 @@ class _ImportPageState extends ConsumerState<ImportPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('数据导入')),
+      appBar: const PlainTopBar(title: '数据导入', showBack: true),
       body: ContentWidthConstraint(
         child: ListView(
           padding: const EdgeInsets.all(Spacing.lg),
@@ -142,7 +148,7 @@ class _ImportPageState extends ConsumerState<ImportPage> {
             const SizedBox(height: Spacing.sm),
             Text(
               '从竞品 App 导出 CSV 后，将内容粘贴到下方。支持钱迹、随手记、挖财等主流格式。',
-              style: TextStyle(fontSize: 13, color: context.colors.inkSecondary),
+              style: TextStyle(fontSize: 14, color: context.colors.inkSecondary),
             ),
             const SizedBox(height: Spacing.lg),
             TextField(
@@ -180,7 +186,7 @@ class _ImportPageState extends ConsumerState<ImportPage> {
             Text('映射列', style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
             const SizedBox(height: Spacing.sm),
             Text('共 ${_rows.length - 1} 行数据，请指定各列含义',
-                style: TextStyle(fontSize: 13, color: context.colors.inkSecondary)),
+                style: TextStyle(fontSize: 14, color: context.colors.inkSecondary)),
             const SizedBox(height: Spacing.lg),
             _buildColDropdown('日期列 *', _mapping.dateCol, headers, (v) {
               if (v == null) return;
@@ -222,9 +228,22 @@ class _ImportPageState extends ConsumerState<ImportPage> {
             const SizedBox(height: Spacing.lg),
             Row(children: [
               Expanded(
-                child: OutlinedButton(
-                  onPressed: () => setState(() => _step = 0),
-                  child: const Text('返回'),
+                child: Material(
+                  color: const Color(0x00000000),
+                  child: InkWell(
+                    onTap: () => setState(() => _step = 0),
+                    borderRadius: BorderRadius.circular(12),
+                    child: Container(
+                      height: 44,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: context.colors.lineStrong),
+                      ),
+                      child: Center(
+                        child: Text('返回', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500, color: context.colors.ink)),
+                      ),
+                    ),
+                  ),
                 ),
               ),
               const SizedBox(width: Spacing.md),
@@ -239,21 +258,29 @@ class _ImportPageState extends ConsumerState<ImportPage> {
   }
 
   Widget _buildColDropdown(String label, int? value, List<String> headers, ValueChanged<int?> onChanged, {bool optional = false}) {
+    // 下标用 -1 作「（无）」哨兵：`showOptionPicker` 的取消也返回 null，
+    // 与「明确选择无」无法区分，故不用 null 当值。
+    final v = value;
+    final valid = v != null && v >= 0 && v < headers.length;
     return Padding(
       padding: const EdgeInsets.only(bottom: Spacing.md),
-      child: DropdownButtonFormField<int?>(
-        initialValue: value,
-        decoration: InputDecoration(
-          labelText: label,
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(Radii.sm)),
-          contentPadding: const EdgeInsets.symmetric(horizontal: Spacing.md, vertical: Spacing.sm),
-        ),
-        items: [
-          if (optional) const DropdownMenuItem(value: null, child: Text('（无）')),
-          for (var i = 0; i < headers.length; i++)
-            DropdownMenuItem(value: i, child: Text('$i: ${headers[i]}', maxLines: 1, overflow: TextOverflow.ellipsis)),
-        ],
-        onChanged: onChanged,
+      child: PickerField(
+        label: label,
+        value: valid ? '$v: ${headers[v]}' : (optional ? '（无）' : '请选择'),
+        onTap: () async {
+          final picked = await showOptionPicker<int>(
+            context: context,
+            title: label,
+            current: valid ? v : -1,
+            options: [
+              if (optional) const PickerOption(value: -1, label: '（无）'),
+              for (var i = 0; i < headers.length; i++)
+                PickerOption(value: i, label: '$i: ${headers[i]}'),
+            ],
+          );
+          if (picked == null) return;
+          onChanged(picked < 0 ? null : picked);
+        },
       ),
     );
   }
@@ -269,7 +296,7 @@ class _ImportPageState extends ConsumerState<ImportPage> {
             Text('预览', style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
             const SizedBox(height: Spacing.sm),
             Text('可导入 ${deduped.unique.length} 条，跳过 ${_previewErrors.length} 条异常',
-                style: TextStyle(fontSize: 13, color: context.colors.inkSecondary)),
+                style: TextStyle(fontSize: 14, color: context.colors.inkSecondary)),
             const SizedBox(height: Spacing.md),
             if (_previewErrors.isNotEmpty) ...[
               Container(
@@ -283,9 +310,9 @@ class _ImportPageState extends ConsumerState<ImportPage> {
                   children: [
                     Text('异常行', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: context.colors.expense)),
                     const SizedBox(height: Spacing.xs),
-                    ..._previewErrors.take(5).map((e) => Text(e, style: TextStyle(fontSize: 11, color: context.colors.expense))),
+                    ..._previewErrors.take(5).map((e) => Text(e, style: TextStyle(fontSize: 12, color: context.colors.expense))),
                     if (_previewErrors.length > 5)
-                      Text('... 共 ${_previewErrors.length} 条', style: TextStyle(fontSize: 11, color: context.colors.expense)),
+                      Text('... 共 ${_previewErrors.length} 条', style: TextStyle(fontSize: 12, color: context.colors.expense)),
                   ],
                 ),
               ),
@@ -301,7 +328,7 @@ class _ImportPageState extends ConsumerState<ImportPage> {
                 ),
                 Expanded(
                   flex: 2,
-                  child: Text(e.categoryName ?? '未分类', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13)),
+                  child: Text(e.categoryName ?? '未分类', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 14)),
                 ),
                 Expanded(
                   flex: 3,
@@ -310,7 +337,7 @@ class _ImportPageState extends ConsumerState<ImportPage> {
                 Text(
                   '${e.type == EntryType.expense ? '-' : '+'}${formatAmount(e.amountCents)}',
                   style: TextStyle(
-                    fontSize: 13, fontWeight: FontWeight.w600,
+                    fontSize: 14, fontWeight: FontWeight.w600,
                     color: e.type == EntryType.expense ? context.colors.expense : context.colors.income,
                   ),
                 ),
@@ -324,9 +351,22 @@ class _ImportPageState extends ConsumerState<ImportPage> {
             const SizedBox(height: Spacing.lg),
             Row(children: [
               Expanded(
-                child: OutlinedButton(
-                  onPressed: _importing ? null : () => setState(() => _step = 1),
-                  child: const Text('返回'),
+                child: Material(
+                  color: const Color(0x00000000),
+                  child: InkWell(
+                    onTap: _importing ? null : () => setState(() => _step = 1),
+                    borderRadius: BorderRadius.circular(12),
+                    child: Container(
+                      height: 44,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: context.colors.lineStrong),
+                      ),
+                      child: Center(
+                        child: Text('返回', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500, color: context.colors.ink)),
+                      ),
+                    ),
+                  ),
                 ),
               ),
               const SizedBox(width: Spacing.md),
@@ -362,7 +402,7 @@ class _ImportPageState extends ConsumerState<ImportPage> {
               if (r.errors.isNotEmpty) ...[
                 const SizedBox(height: Spacing.md),
                 Text('异常详情', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: context.colors.expense)),
-                ...r.errors.take(5).map((e) => Text(e, style: TextStyle(fontSize: 11, color: context.colors.expense))),
+                ...r.errors.take(5).map((e) => Text(e, style: TextStyle(fontSize: 12, color: context.colors.expense))),
               ],
             ],
             const SizedBox(height: Spacing.xl),
@@ -399,7 +439,11 @@ class _StepIndicator extends StatelessWidget {
             ),
             child: Center(
               child: i < current
-                  ? Icon(Icons.check, size: 16, color: context.colors.onPrimary)
+                  ? PlainIcon(
+                      PlainIconData.check,
+                      size: 16,
+                      color: context.colors.onPrimary,
+                    )
                   : Text('${i + 1}', style: TextStyle(
                       fontSize: 12, fontWeight: FontWeight.w600,
                       color: i <= current ? context.colors.onPrimary : context.colors.inkTertiary,
@@ -426,7 +470,7 @@ class _ResultRow extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(label, style: TextStyle(fontSize: 14, color: context.colors.inkSecondary)),
-          Text(value, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: color)),
+          Text(value, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: color)),
         ],
       ),
     );

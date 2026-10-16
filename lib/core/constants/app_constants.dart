@@ -11,22 +11,72 @@ class MoneyRules {
 /// STORY-9.3 多币种。
 class CurrencyRules {
   CurrencyRules._();
-  /// 常用币种符号；未知币种回退为代码本身。
+  /// 常用币种符号（16 个：本位币 CNY + 15 个常用外币）。
+  ///
+  /// ⚠️ 加币种前**必须先验 MiSans 字形覆盖**（venv `fontTools` 查 cmap），
+  /// 别凭常识填：`ł`(PLN)、`د.إ`(AED)、`﷼`(SAR)、`₪`、`₴` 均缺字形，
+  /// 直接写会渲染成豆腐块。CHF 无广泛通用符号，按惯例直接用代码
+  /// （`symbolOf` 的回退逻辑天然支持，UI 会跳过重复的符号列）。
+  ///
+  /// ⚠️ 顺序即选择器顺序（按常用度排列），不要随手打乱。
+  /// ⚠️ key 必须与 [names] 完全一致（有回归测试钉死）。
   static const Map<String, String> symbols = {
+    // 本位币
     'CNY': '¥',
+    // 最常用
     'USD': r'$',
     'EUR': '€',
     'GBP': '£',
+    // 亚太（出境高频）
     'JPY': 'JP¥',
     'HKD': r'HK$',
+    'MOP': r'MOP$',
     'TWD': r'NT$',
     'KRW': '₩',
     'SGD': r'S$',
+    'THB': '฿',
+    'MYR': 'RM',
     'AUD': r'A$',
+    'NZD': r'NZ$',
+    // 欧美
     'CAD': r'C$',
+    'CHF': 'CHF',
   };
 
   static String symbolOf(String code) => symbols[code] ?? code;
+
+  /// 币种中文名。选择器与「1 USD = 7.20 CNY」这类展示都用它，
+  /// 避免用户只看到 `USD` / `TWD` 这类代码而不知道是哪个币种。
+  /// key 必须与 [symbols] 完全一致。
+  static const Map<String, String> names = {
+    'CNY': '人民币',
+    'USD': '美元',
+    'EUR': '欧元',
+    'GBP': '英镑',
+    'JPY': '日元',
+    'HKD': '港元',
+    'MOP': '澳门元',
+    'TWD': '新台币',
+    'KRW': '韩元',
+    'SGD': '新加坡元',
+    'THB': '泰铢',
+    'MYR': '马来西亚林吉特',
+    'AUD': '澳大利亚元',
+    'NZD': '新西兰元',
+    'CAD': '加拿大元',
+    'CHF': '瑞士法郎',
+  };
+
+  /// 未知代码回退为代码本身，不抛错。
+  static String nameOf(String code) => names[code] ?? code;
+
+  /// 汇率在库里存**整数微单位**（rate × 1e6），避免浮点进业务数据。
+  /// 6 位小数对汇率足够（7.203456）。
+  static const int rateMicroScale = 1000000;
+
+  static int rateToMicro(double rate) => (rate * rateMicroScale).round();
+
+  static double rateFromMicro(int micro) => micro / rateMicroScale;
 }
 
 class CategoryRules {
@@ -81,17 +131,45 @@ class ReminderRules {
   static const int quietEndHour = 7;
   /// 汇总推送时刻（次日）。
   static const int summaryHour = 8;
+  /// 夜间汇总的回看窗口：覆盖 23:00–08:00 的整段夜间。
+  static const int quietLookbackHours = 12;
   /// 提醒历史保留天数。
   static const Duration historyTtl = Duration(days: 90);
   /// 信用卡还款提醒提前天数。
   static const int creditDueAheadDays = 3;
+  /// 订阅到期提前提醒天数（与信用卡是两个独立触发源，故各留一个常量）。
+  static const int subscriptionAheadDays = 3;
+  /// 判定「连续扣款的订阅」所需的最小已扣款次数。
+  static const int subscriptionMinCharges = 2;
   /// 异常支出：单笔 > 近 90 天 P90 的倍数。
   static const double anomalyP90Factor = 2.0;
+  /// 异常支出：当日合计 > 近 N 日均值的倍数。
+  static const double anomalyDailyFactor = 3.0;
+  static const int anomalyDailyWindowDays = 30;
+
+  /// 单笔异常的**扫描回看天数**（含今天）。
+  ///
+  /// PRD 只规定判据（P90×2），没规定扫描窗口；离线 App 不常驻后台，只看今天的话
+  /// 某天没打开就永远漏报。放宽到近几天 + 按账单 id 去重，重复扫描不会重复提醒。
+  static const int anomalyScanLookbackDays = 3;
   /// 备份提醒间隔。
   static const Duration backupRemindInterval = Duration(days: 30);
   /// 默认预算预警阈值。
   static const double budgetWarnRatio = 0.8;
   static const double budgetOverRatio = 1.0;
+  /// 提醒列表的系统通知 id 基址（同一 id 重复推送会覆盖，不轰炸）。
+  static const int notificationIdBase = 1000;
+  /// 夜间汇总摘要的通知 id。
+  static const int digestNotificationId = 9900;
+  /// 提醒开关的本地偏好键。
+  ///
+  /// 与 `sync_scope.dart` 的 `kSyncedSettingKeys` 中同名键一致——
+  /// PRD 8.1 把「提醒开关」列为可同步设置。
+  static const String kPrefReminder = 'pref.reminder';
+
+  /// 是否落在夜间免打扰时段（G-3）。
+  static bool isQuietHour(int hour) =>
+      hour >= quietStartHour || hour < quietEndHour;
 }
 
 /// STORY-7.1 沉淀基金 / 储蓄目标。
@@ -99,6 +177,27 @@ class SavingsRules {
   SavingsRules._();
   /// 每月需存 =（目标 − 已存）÷ 剩余月数；剩余月数至少按 1 算，避免除零。
   static const int minRemainingMonths = 1;
+}
+
+/// STORY-11.1 预算方法论：50/30/20 三档目标比例（基点）。
+///
+/// 方法论名即比例，属**固定预设**（非用户可调项）；放在这里是为了不让
+/// 50/30/20 变成算式里的裸数字。储蓄取余下部分。
+class BudgetRatioRules {
+  BudgetRatioRules._();
+  static const int needsBp = 5000;
+  static const int wantsBp = 3000;
+  static const int savingsBp = 10000 - needsBp - wantsBp;
+}
+
+/// STORY-11.3 交叉分析：金额区间的分档边界（分）。
+///
+/// 分档为「< 上界」的累计口径：`<100 / 100–500 / 500–1000 / 1000–5000 / ≥5000`。
+class CrossAnalysisRules {
+  CrossAnalysisRules._();
+  static const List<int> boundsCents = [10000, 50000, 100000, 500000];
+  static const String underLabel = '100 元以下';
+  static const String overLabel = '5000 元及以上';
 }
 
 /// STORY-2.2 信用卡。
@@ -146,6 +245,10 @@ class GamificationRules {
   };
   /// 累计记账笔数徽章阈值。
   static const List<int> entryCountMilestones = [100, 500, 1000, 5000, 10000];
+
+  /// 坚持类徽章阈值（与 `streakVoucherMilestones` 同一批天数，但**徽章与券是两件事**：
+  /// 原先只发了券没点亮徽章，成就页三个坚持徽章永远灰着）。
+  static const List<int> streakBadgeMilestones = [7, 30, 100];
   /// 权益券生效版本标注。
   static const String voucherActivateLabel = 'V4.0 起生效';
   /// 本地存储键。
@@ -170,6 +273,95 @@ enum BadgeCategory {
   final String label;
 }
 
+/// STORY-1.5 账单附件。
+class AttachmentRules {
+  AttachmentRules._();
+
+  /// 单笔账单附件上限（张）。
+  static const int maxPerEntry = 5;
+
+  /// 单张大小上限 10MB。
+  static const int maxBytes = 10 * 1024 * 1024;
+
+  /// 超限压缩：长边压至 2048px。
+  static const int compressLongSide = 2048;
+
+  /// 列表缩略图长边。
+  static const int thumbnailLongSide = 320;
+
+  /// 孤儿附件保留期：删除账单后 30 天内可随回收站恢复，之后巡检物理清理。
+  static const Duration orphanTtl = Duration(days: 30);
+
+  /// 允许的扩展名 → MIME。jpg/png/heic/pdf（PRD 明确列举）。
+  static const Map<String, String> allowedTypes = {
+    'jpg': 'image/jpeg',
+    'jpeg': 'image/jpeg',
+    'png': 'image/png',
+    'heic': 'image/heic',
+    'heif': 'image/heif',
+    'pdf': 'application/pdf',
+  };
+
+  static String? mimeOf(String fileName) {
+    final dot = fileName.lastIndexOf('.');
+    if (dot < 0 || dot == fileName.length - 1) return null;
+    return allowedTypes[fileName.substring(dot + 1).toLowerCase()];
+  }
+
+  static bool isImage(String mime) => mime.startsWith('image/');
+}
+
+/// STORY-8.2 家庭共享（基础）。
+class MemberRules {
+  MemberRules._();
+
+  /// 邀请制人数上限：**只计活跃成员**，已退出成员不占名额（AC1/AC4）。
+  static const int maxActiveMembers = 6;
+
+  /// 邀请码长度。
+  static const int inviteCodeLength = 6;
+
+  /// 邀请码的本地键（本机账本的邀请码，跨重启保留）。
+  static const String kPrefInviteCode = 'pref.family.invite_code';
+
+  /// 默认「我」的显示名。仅作初始值，用户可改。
+  static const String defaultMyName = '我';
+}
+
+/// STORY-8.1 增量同步。
+class SyncRules {
+  SyncRules._();
+
+  /// 同账号活跃端的目标延迟（AC1：≤ 10 秒）。
+  ///
+  /// 实现方式：**写后立即推送**（本地变更触发一次 push）+ **前台每 10 秒轮询**
+  /// 拉取其它设备的日志。素记没有服务端推送通道，WebDAV 只能轮询；
+  /// 真正的「服务端推给你」需要官方云，届时换传输层即可，合并逻辑不用动。
+  static const Duration pollInterval = Duration(seconds: 10);
+
+  /// 每台设备在远端占一个日志文件（按 deviceId 命名，便于 discovery）。
+  ///
+  /// [generation] > 0 时带上「世代」后缀：**备份还原后必须换世代** ——
+  /// 还原会把本机 change_log 换成备份里的旧行，而各端记的位点还在高位，
+  /// 于是「被还原掉的变更」永远推不出去。换一个文件名等于告诉对端
+  /// 「这台设备的日志是新的」，对端位点归零、全量重放。
+  static String logFileNameOf(String deviceId, {int generation = 0}) =>
+      generation <= 0 ? 'log_$deviceId.jsonl' : 'log_${deviceId}_g$generation.jsonl';
+
+  /// 从远端文件名里取「设备 + 世代」标识（同时用作位点 key）。
+  /// 不是日志文件、或本机自己的文件时返回 null。
+  static String? generationKeyOf(String fileName, String myDeviceId) {
+    if (!fileName.startsWith('log_') || !fileName.endsWith('.jsonl')) return null;
+    final key = fileName.substring(4, fileName.length - '.jsonl'.length);
+    if (key.isEmpty) return null;
+    if (key == myDeviceId || key.startsWith('${myDeviceId}_')) return null;
+    return key;
+  }
+
+  /// 单次推送的记录上限（GC 已把 change_log 控制在 5 万行内，这里再兜一层）。
+  static const int maxRecordsPerPush = 20000;
+}
+
 /// STORY-9.4 AI 识别记账：额度制。
 class AiRecognitionRules {
   AiRecognitionRules._();
@@ -188,7 +380,20 @@ class WeeklyReportRules {
   /// 推送时间：周日 20:00。
   static const int pushWeekday = DateTime.sunday;
   static const int pushHour = 20;
+
+  /// 「本周」的起点是周一（PRD 未规定周首日，取国内习惯的自然周，全产品唯一口径）。
+  static const int weekStartWeekday = DateTime.monday;
+
+  /// 周报系统通知 id（固定值：同 id 覆盖，不轰炸通知中心）。
+  static const int notificationId = 2001;
+
+  /// 分类占比变化的**陈述阈值**（百分点）。低于它不写进周报，
+  /// 避免把正常波动说成结论。口径由 9.5 的「只陈述」基调决定，非业务数据。
+  static const int shareShiftPoints = 10;
+
   /// 本地键。
   static const String kPrefEnabled = 'pref.weekly_report.enabled';
   static const String kPrefLastPush = 'pref.weekly_report.last_push';
+  /// 提醒方式：'ring' 响铃 / 'silent' 静默（AC1「按用户设置」）。
+  static const String kPrefLevel = 'pref.weekly_report.level';
 }

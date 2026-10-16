@@ -1,4 +1,9 @@
 /// STORY-9.3 多币种：汇率锁定、原币/本位币双显示、跨币种转账。
+///
+/// **无外部汇率源**：汇率只有两个来源——用户为这笔账单填的值（`overrideRate`），
+/// 或用户为该币种对设定的**锁定汇率**（持久化在 `currency_rates`）。
+/// 因此本服务是纯函数：锁定汇率由调用方传入，不再持有静态可变状态
+/// （原先存在内存 Map 里，重启即丢，也无法测试）。
 library;
 
 import 'package:plain/core/constants/app_constants.dart';
@@ -19,42 +24,36 @@ class CurrencyConversion {
   final String fromCurrency;
   final String toCurrency;
 
+  /// 是否发生了实际换算（同币种时为 false）。
+  bool get isConverted => fromCurrency != toCurrency;
+
   /// 原币显示字符串。
-  String get originalDisplay => '${CurrencyRules.symbolOf(fromCurrency)}${(originalCents / 100).toStringAsFixed(2)}';
+  String get originalDisplay =>
+      '${CurrencyRules.symbolOf(fromCurrency)}${(originalCents / 100).toStringAsFixed(2)}';
 
   /// 折算显示字符串。
-  String get convertedDisplay => '${CurrencyRules.symbolOf(toCurrency)}${(convertedCents / 100).toStringAsFixed(2)}';
+  String get convertedDisplay =>
+      '${CurrencyRules.symbolOf(toCurrency)}${(convertedCents / 100).toStringAsFixed(2)}';
+
+  /// 双显示，例如 `$100.00 ≈ ¥720.00`；同币种只显示一次。
+  String get dualDisplay =>
+      isConverted ? '$originalDisplay ≈ $convertedDisplay' : originalDisplay;
 }
 
-/// 币种服务：汇率换算与锁定。
 class CurrencyService {
-  /// 手动设置的锁定汇率（原币→本位币）。
-  /// 锁定后后续记录使用同一汇率，不受市场变动影响。
-  static final Map<String, double> _lockedRates = {};
+  const CurrencyService();
 
-  /// 锁定汇率（key = 'USD/CNY' 等）。
-  static void lockRate(String from, String to, double rate) {
-    _lockedRates['$from/$to'] = rate;
-  }
-
-  /// 获取锁定汇率。
-  static double? lockedRate(String from, String to) => _lockedRates['$from/$to'];
-
-  /// 解锁汇率。
-  static void unlockRate(String from, String to) {
-    _lockedRates.remove('$from/$to');
-  }
-
-  /// 是否已锁定。
-  static bool isLocked(String from, String to) => _lockedRates.containsKey('$from/$to');
-
-  /// 换算金额。使用锁定汇率（如有），否则使用默认汇率。
-  /// 默认汇率：同币种 = 1.0，不同币种需要外部提供（无自动汇率 API）。
-  static CurrencyConversion convert({
+  /// 换算金额。优先用 [overrideRate]（这笔账单锁定的值），
+  /// 否则用 [lockedRates]（该币种对的锁定值，键为 `USD/CNY`）。
+  ///
+  /// 两者都没有且币种不同时，rate = 0 且 converted = 0——调用方应据此
+  /// 拦截「跨币种未填汇率」（AC3），而不是拿 0 当结果用。
+  CurrencyConversion convert({
     required int originalCents,
     required String fromCurrency,
     required String toCurrency,
     double? overrideRate,
+    Map<String, double> lockedRates = const {},
   }) {
     if (fromCurrency == toCurrency) {
       return CurrencyConversion(
@@ -65,9 +64,8 @@ class CurrencyService {
         toCurrency: toCurrency,
       );
     }
-    // 优先使用锁定汇率
-    double rate = overrideRate ?? lockedRate(fromCurrency, toCurrency) ?? 0.0;
-    final converted = (originalCents * rate).round();
+    final rate = overrideRate ?? lockedRates['$fromCurrency/$toCurrency'] ?? 0.0;
+    final converted = rate > 0 ? (originalCents * rate).round() : 0;
     return CurrencyConversion(
       originalCents: originalCents,
       convertedCents: converted,
@@ -77,9 +75,9 @@ class CurrencyService {
     );
   }
 
-  /// 跨币种转账校验（STORY-9.3 AC3）。
+  /// 跨币种转账校验（AC3）。
   /// 返回 null = 校验通过；返回错误信息 = 拦截。
-  static String? validateTransfer({
+  String? validateTransfer({
     required String fromCurrency,
     required String toCurrency,
     required double? rate,

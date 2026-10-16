@@ -51,7 +51,8 @@ class ApplyRuleRetroactively {
       final (next, _) = engine.applyAll(e, [rule], scope: RuleScope.all);
       if (next.categoryId == e.categoryId &&
           next.accountId == e.accountId &&
-          next.note == e.note) {
+          next.note == e.note &&
+          next.excludeFromStats == e.excludeFromStats) {
         continue;
       }
       final r = await _repository.update(next);

@@ -142,8 +142,11 @@ class RuleEngine {
           out = out.copyWith(note: note);
           summaries.add('备注前缀「$prefix」');
         case RuleActionType.setNotInOutflow:
-          // 依赖「不计入收支」字段（V2.0），先记摘要
-          summaries.add('标不计入收支');
+          // G-2：标记「不计入收支」。只改统计口径，不影响账户余额。
+          if (out.canMarkExcluded && !out.excludeFromStats) {
+            out = out.copyWith(excludeFromStats: true);
+            summaries.add('标不计入收支');
+          }
         case RuleActionType.setReimbursable:
           summaries.add('标待报销');
         case RuleActionType.unknown:

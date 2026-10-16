@@ -8,6 +8,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:local_auth/local_auth.dart';
 import 'package:plain/app/theme/design_tokens.dart';
+import 'package:plain/design_system/plain_icons_v3.dart';
 import 'package:plain/features/security/app_lock_prefs.dart';
 
 /// Runtime enable flag (mirrors persisted prefs after preload).
@@ -178,7 +179,11 @@ class _AppLockScreenState extends ConsumerState<AppLockScreen> {
                     color: context.colors.primary.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(Radii.lg),
                   ),
-                  child: Icon(Icons.lock_outline, size: 40, color: context.colors.primary),
+                  child: PlainIcon(
+                    PlainIconData.lock,
+                    size: 40,
+                    color: context.colors.primary,
+                  ),
                 ),
                 const SizedBox(height: Spacing.xl),
                 Text('素记已锁定', style: Theme.of(context).textTheme.titleMedium),
@@ -187,7 +192,7 @@ class _AppLockScreenState extends ConsumerState<AppLockScreen> {
                   lockState.failedAttempts > 0
                       ? '失败次数: ${lockState.failedAttempts}/${AppLockController.maxAttempts}'
                       : '使用生物识别或 PIN 解锁',
-                  style: TextStyle(fontSize: 13, color: context.colors.inkTertiary),
+                  style: TextStyle(fontSize: 14, color: context.colors.inkTertiary),
                 ),
                 const SizedBox(height: Spacing.xxl),
                 if (lock.canUseBiometric) ...[
@@ -195,7 +200,7 @@ class _AppLockScreenState extends ConsumerState<AppLockScreen> {
                     width: double.infinity,
                     child: FilledButton.icon(
                       onPressed: _checking ? null : _tryBiometric,
-                      icon: const Icon(Icons.fingerprint),
+                      icon: const PlainIcon(PlainIconData.fingerprint),
                       label: const Text('使用生物识别'),
                     ),
                   ),
@@ -212,7 +217,12 @@ class _AppLockScreenState extends ConsumerState<AppLockScreen> {
                     keyboardType: TextInputType.number,
                     inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                     textAlign: TextAlign.center,
-                    style: const TextStyle(fontSize: 24, letterSpacing: 8),
+                    // 设计稿字阶只有 12/14/15/20/22/34/44，无 24 → 收到最近的 22。
+                    // 这是 PIN 圆点（`obscureText`）的定制输入框，`letterSpacing: 8`
+                    // 是按 200dp 宽塞 6 位自定的，设计稿没有对应控件，保持不动。
+                    // 不写 `height`：TextField 的 style 里改行高会牵动内部固有尺寸，
+                    // 而继承 `body` 的 19/14 只差 0.86px，不值得冒这个险。
+                    style: const TextStyle(fontSize: 22, letterSpacing: 8),
                     decoration: const InputDecoration(
                       counterText: '',
                       border: OutlineInputBorder(),

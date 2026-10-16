@@ -6,8 +6,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:plain/app/bootstrap.dart';
 import 'package:plain/app/theme/app_colors.dart';
 import 'package:plain/app/theme/design_tokens.dart';
+import 'package:plain/app/theme/typography.dart';
 import 'package:plain/core/format/amount_formatter.dart';
 import 'package:plain/core/refresh/data_invalidation.dart';
+import 'package:plain/design_system/plain_icons_v3.dart';
 import 'package:plain/domain/services/safe_to_spend_service.dart';
 
 final _safeToSpendProvider = FutureProvider<SafeToSpendResult?>((ref) async {
@@ -68,7 +70,12 @@ class _CardState extends State<_Card> {
 
     return Padding(
       padding: const EdgeInsets.only(bottom: Spacing.md),
-      child: Card(
+      child: Container(
+        decoration: BoxDecoration(
+          color: colors.surfaceCard,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: colors.border),
+        ),
         child: InkWell(
           borderRadius: BorderRadius.circular(16),
           onTap: () => setState(() => _expanded = !_expanded),
@@ -83,15 +90,25 @@ class _CardState extends State<_Card> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('今日可花', style: TextStyle(fontSize: 12, color: colors.inkTertiary, letterSpacing: 2)),
+                          Text('今日可花', style: AppTextStyles.eyebrow.copyWith(color: colors.inkTertiary)),
                           const SizedBox(height: 4),
+                          // 设计稿字阶无 28。29 屏里也没覆盖本卡片本身
+                          // （只在「首页卡片自定义」把它当行名提到，15/500），
+                          // 所以只有「收到字阶内」一条约束：取 `.amt.l` 的 22。
+                          // 首页 hero（本月结余）已是 34，这里 22 才有层级差。
+                          //
+                          // 保留裸 `Text` 而不换 `AmountDisplay`：后者会加上 `¥` 与
+                          // 四段式拆分，属于**可见内容**变更，不在本次字号整改范围内。
+                          // 但既然是金额（带 `kTabularFigures`），行高走 `amountLineHeight`
+                          // 的 1.24，而不是 `normal` 的 29/22 —— 原值 `height: 1.1` 是自创的。
                           Text(
                             formatAmount(safe, hide: hideAmounts),
                             style: TextStyle(
-                              fontSize: 28,
+                              fontSize: 22,
                               fontWeight: FontWeight.w600,
                               color: r.isNegative ? colors.expense : colors.ink,
-                              height: 1.1,
+                              height: amountLineHeight(22),
+                              fontFeatures: kTabularFigures,
                             ),
                           ),
                         ],
@@ -100,13 +117,18 @@ class _CardState extends State<_Card> {
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
-                        Text('日均', style: TextStyle(fontSize: 11, color: colors.inkTertiary)),
+                        Text('日均', style: TextStyle(fontSize: 12, color: colors.inkTertiary)),
                         const SizedBox(height: 2),
                         Text(
                           formatAmount(daily, hide: hideAmounts),
-                          style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500, color: colors.inkSecondary),
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w500,
+                            color: colors.inkSecondary,
+                            fontFeatures: kTabularFigures,
+                          ),
                         ),
-                        Text('剩 ${r.remainingDays} 天', style: TextStyle(fontSize: 10, color: colors.inkTertiary)),
+                        Text('剩 ${r.remainingDays} 天', style: TextStyle(fontSize: 12, color: colors.inkTertiary)),
                       ],
                     ),
                   ],
@@ -127,9 +149,14 @@ class _CardState extends State<_Card> {
                 const SizedBox(height: Spacing.sm),
                 Row(
                   children: [
-                    Icon(_expanded ? Icons.expand_less : Icons.expand_more, size: 18, color: colors.inkTertiary),
+                    // 展开态用 chevronUp，折叠态用 chevronDown —— 不再靠旋转凑。
+                    PlainIcon(
+                      _expanded ? PlainIconData.chevronUp : PlainIconData.chevronDown,
+                      size: 18,
+                      color: colors.inkTertiary,
+                    ),
                     const SizedBox(width: 4),
-                    Text(_expanded ? '收起明细' : '展开明细', style: TextStyle(fontSize: 11, color: colors.inkTertiary)),
+                    Text(_expanded ? '收起明细' : '展开明细', style: TextStyle(fontSize: 12, color: colors.inkTertiary)),
                   ],
                 ),
               ],
@@ -156,7 +183,12 @@ class _BreakRow extends StatelessWidget {
           Expanded(child: Text(label, style: TextStyle(fontSize: 12, color: context.colors.inkSecondary))),
           Text(
             '${value >= 0 ? '+' : ''}${formatAmount(value.abs())}',
-            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: color),
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+              color: color,
+              fontFeatures: kTabularFigures,
+            ),
           ),
         ],
       ),

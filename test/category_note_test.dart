@@ -11,13 +11,14 @@ import 'package:plain/domain/entities/enums.dart';
 import 'package:plain/app/theme/theme_registry.dart';
 
 void main() {
-  test('A1 fresh install has categories.note and user_version 11', () {
+  test('A1 fresh install has categories.note and current user_version', () {
     final db = AppDatabase.inMemory();
     addTearDown(db.close);
     final cols = db.raw.select('PRAGMA table_info(categories)');
     expect(cols.any((r) => r['name'] == 'note'), isTrue);
     final ver = db.raw.select('PRAGMA user_version').first.values.first;
-    expect(ver, 11);
+    // 断言当前版本常量而非字面量，迁移加版本时不必改这里
+    expect(ver, kSchemaVersion);
   });
 
   test('A2 migrate adds note idempotently', () {

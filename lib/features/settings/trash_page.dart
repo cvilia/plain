@@ -4,8 +4,12 @@ library;
 import 'package:plain/app/theme/app_colors.dart';
 import 'package:plain/design_system/category_avatar.dart';
 import 'package:plain/design_system/confirm_dialog.dart';
+import 'package:plain/design_system/plain_icons_v3.dart';
+import 'package:plain/design_system/plain_ui.dart';
 import 'package:flutter/material.dart';
+import 'package:plain/design_system/app_error_state.dart';
 import 'package:plain/design_system/app_toast.dart';
+import 'package:plain/features/ledger/presentation/member_write_guard.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:plain/app/bootstrap.dart';
 import 'package:plain/app/breakpoints.dart';
@@ -57,6 +61,8 @@ class _TrashPageState extends ConsumerState<TrashPage> {
   }
 
   Future<void> _restore(LedgerEntry entry) async {
+    // STORY-8.2 AC2：恢复 = 让账单重新入账，只读成员不得做
+    if (!await guardCanWriteLedger(context, ref)) return;
     try {
       final deps = ref.read(appDependenciesProvider);
       final res = await deps.restoreEntry(entry.id);
@@ -84,6 +90,8 @@ class _TrashPageState extends ConsumerState<TrashPage> {
     );
     if (confirmed != true || !mounted) return;
 
+    // STORY-8.2 AC2：恢复 = 让账单重新入账，只读成员不得做
+    if (!await guardCanWriteLedger(context, ref)) return;
     final deps = ref.read(appDependenciesProvider);
     var okCount = 0;
     String? lastError;
@@ -172,8 +180,9 @@ class _TrashPageState extends ConsumerState<TrashPage> {
     final hide = ref.watch(hideAmountsProvider);
     final async = ref.watch(_trashProvider);
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('回收站'),
+      appBar: PlainTopBar(
+        title: '回收站',
+        showBack: true,
         actions: [
           if (async.value?.entries.isNotEmpty ?? false) ...[
             TextButton(
@@ -190,7 +199,7 @@ class _TrashPageState extends ConsumerState<TrashPage> {
       body: ContentWidthConstraint(
         child: async.when(
           loading: () => const Center(child: CircularProgressIndicator()),
-          error: (e, _) => Center(child: Text('加载失败: $e')),
+          error: (e, _) => AppErrorState.of(e, onRetry: () => ref.invalidateData.bumpEverything()),
           data: (data) {
             final entries = data.entries;
             final categoryMap = data.categoryMap;
@@ -235,11 +244,15 @@ class _EmptyTrash extends StatelessWidget {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.delete_outline, size: 64, color: context.colors.inkTertiary.withValues(alpha: 0.5)),
+          PlainIcon(
+            PlainIconData.delete,
+            size: 64,
+            color: context.colors.inkTertiary.withValues(alpha: 0.5),
+          ),
           const SizedBox(height: Spacing.lg),
           Text('回收站是空的', style: Theme.of(context).textTheme.titleMedium?.copyWith(color: context.colors.inkSecondary)),
           const SizedBox(height: Spacing.sm),
-          Text('删除的账单会暂时存放在这里', style: TextStyle(fontSize: 13, color: context.colors.inkTertiary)),
+          Text('删除的账单会暂时存放在这里', style: TextStyle(fontSize: 14, color: context.colors.inkTertiary)),
         ],
       ),
     );
@@ -303,13 +316,17 @@ class _TrashTile extends StatelessWidget {
             ),
             const SizedBox(width: Spacing.xs),
             IconButton(
-              icon: const Icon(Icons.restore, size: 20),
+              icon: const PlainIcon(PlainIconData.undo, size: 20),
               tooltip: '恢复',
               visualDensity: VisualDensity.compact,
               onPressed: onRestore,
             ),
             IconButton(
-              icon: Icon(Icons.delete_forever_outlined, size: 20, color: context.colors.inkTertiary),
+              icon: PlainIcon(
+                PlainIconData.delete,
+                size: 20,
+                color: context.colors.inkTertiary,
+              ),
               tooltip: '彻底删除',
               visualDensity: VisualDensity.compact,
               onPressed: onPurge,

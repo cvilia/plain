@@ -250,7 +250,7 @@ void main() {
       final gen = (await generate()).requireValue;
       final batchId = gen.created.first.batchId!;
 
-      final undo = UndoRecurringBatchUseCase(repository: recurringRepo, clock: clock);
+      final undo = UndoRecurringBatchUseCase(repository: ledgerRepo, clock: clock);
       final undone = await undo(batchId);
       expect(undone.successOrNull, 1);
 
@@ -298,7 +298,8 @@ void main() {
       final cat = db.raw.select('PRAGMA table_info(categories)');
       expect(cat.any((r) => r['name'] == 'is_rigid'), true);
       final ver = db.raw.select('PRAGMA user_version').first.values.first;
-      expect(ver, 11);
+      // 断言当前版本常量而非字面量，迁移加版本时不必改这里
+      expect(ver, kSchemaVersion);
     });
 
     test('v4 index idx_entry_parent exists', () {

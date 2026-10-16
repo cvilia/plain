@@ -12,6 +12,10 @@ import 'package:plain/core/format/amount_formatter.dart';
 import 'package:plain/core/money/money.dart';
 import 'package:plain/core/refresh/data_invalidation.dart';
 import 'package:plain/design_system/app_empty_state.dart';
+import 'package:plain/design_system/app_error_state.dart';
+import 'package:plain/design_system/picker_sheet.dart';
+import 'package:plain/design_system/plain_icons_v3.dart';
+import 'package:plain/design_system/plain_ui.dart';
 import 'package:plain/data/platform/notification_bridge.dart';
 import 'package:plain/domain/entities/enums.dart';
 import 'package:plain/domain/entities/recurring_rule.dart';
@@ -24,6 +28,25 @@ final _rulesProvider = FutureProvider<List<RecurringRule>>((ref) async {
   final res = await deps.recurringRepository.listByBook(deps.bookId);
   return res.successOrNull ?? const [];
 });
+
+// 表单选项文案的唯一来源：底部弹层的候选行与字段回显都取自这里，
+// 避免出现「选的时候叫每月、显示成 Monthly」这类漂移。
+const Map<EntryType, String> _kEntryTypeLabels = {
+  EntryType.expense: '支出',
+  EntryType.income: '收入',
+};
+
+const Map<RecurringFrequency, String> _kFrequencyLabels = {
+  RecurringFrequency.daily: '每天',
+  RecurringFrequency.weekly: '每周',
+  RecurringFrequency.monthly: '每月',
+  RecurringFrequency.yearly: '每年',
+};
+
+const Map<RecurringEndType, String> _kEndLabels = {
+  RecurringEndType.never: '不结束',
+  RecurringEndType.count: '生成 N 次后结束',
+};
 
 class RecurringPage extends ConsumerStatefulWidget {
   const RecurringPage({super.key});
@@ -112,35 +135,36 @@ class _RecurringPageState extends ConsumerState<RecurringPage> {
     final hide = ref.watch(hideAmountsProvider);
     final async = ref.watch(_rulesProvider);
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('周期记账'),
+      appBar: PlainTopBar(
+        title: '周期记账',
+        showBack: true,
         actions: [
-          IconButton(
+          PlainTopBarAction(
+            icon: PlainIconData.plus,
             tooltip: '新建规则',
-            onPressed: _create,
-            icon: const Icon(Icons.add),
+            onTap: _create,
           ),
-          IconButton(
+          PlainTopBarAction(
+            icon: PlainIconData.play,
             tooltip: '立即执行到期规则',
-            onPressed: _runDueNow,
-            icon: const Icon(Icons.play_arrow),
+            onTap: _runDueNow,
           ),
         ],
       ),
       body: ContentWidthConstraint(
         child: async.when(
           loading: () => const Center(child: CircularProgressIndicator()),
-          error: (e, _) => Center(child: Text('加载失败: $e')),
+          error: (e, _) => AppErrorState.of(e, onRetry: () => ref.invalidateData.bumpEverything()),
           data: (rules) {
             if (rules.isEmpty) {
               return Center(
                 child: AppEmptyState(
-                  icon: Icons.event_repeat_outlined,
+                  icon: PlainIconData.recurring,
                   title: '还没有周期记账',
                   subtitle: '房租、订阅、工资都可以自动入账',
                   action: FilledButton.icon(
                     onPressed: _create,
-                    icon: const Icon(Icons.add),
+                    icon: const PlainIcon(PlainIconData.plus),
                     label: const Text('新建周期记账'),
                   ),
                 ),
@@ -204,7 +228,7 @@ class _PendingConfirmTile extends StatelessWidget {
             const SizedBox(height: 4),
             Text(
               '${formatAmountYuan(rule.amount.cents, hide: hide)} · 待确认入账',
-              style: TextStyle(fontSize: 13, color: context.colors.inkSecondary),
+              style: TextStyle(fontSize: 14, color: context.colors.inkSecondary),
             ),
             const SizedBox(height: Spacing.sm),
             Row(
@@ -255,7 +279,7 @@ class _RuleTile extends StatelessWidget {
             : IconButton(
                 tooltip: '撤销上次生成',
                 onPressed: onUndo,
-                icon: const Icon(Icons.undo),
+                icon: const PlainIcon(PlainIconData.undo),
               ),
       ),
     );
@@ -323,7 +347,7 @@ class _RecurringEditPageState extends ConsumerState<RecurringEditPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('新建周期记账')),
+      appBar: const PlainTopBar(title: '新建周期记账', showBack: true),
       body: ContentWidthConstraint(
         child: Form(
           key: _formKey,
@@ -351,26 +375,38 @@ class _RecurringEditPageState extends ConsumerState<RecurringEditPage> {
                 },
               ),
               const SizedBox(height: Spacing.md),
-              DropdownButtonFormField<EntryType>(
-                initialValue: _entryType,
-                decoration: const InputDecoration(labelText: '类型'),
-                items: const [
-                  DropdownMenuItem(value: EntryType.expense, child: Text('支出')),
-                  DropdownMenuItem(value: EntryType.income, child: Text('收入')),
-                ],
-                onChanged: (v) => setState(() => _entryType = v ?? EntryType.expense),
+              PickerField(
+                label: '类型',
+                value: _kEntryTypeLabels[_entryType] ?? '支出',
+                onTap: () async {
+                  final picked = await showOptionPicker<EntryType>(
+                    context: context,
+                    title: '类型',
+                    current: _entryType,
+                    options: [
+                      for (final e in _kEntryTypeLabels.entries)
+                        PickerOption(value: e.key, label: e.value),
+                    ],
+                  );
+                  if (picked != null) setState(() => _entryType = picked);
+                },
               ),
               const SizedBox(height: Spacing.md),
-              DropdownButtonFormField<RecurringFrequency>(
-                initialValue: _frequency,
-                decoration: const InputDecoration(labelText: '频率'),
-                items: const [
-                  DropdownMenuItem(value: RecurringFrequency.daily, child: Text('每天')),
-                  DropdownMenuItem(value: RecurringFrequency.weekly, child: Text('每周')),
-                  DropdownMenuItem(value: RecurringFrequency.monthly, child: Text('每月')),
-                  DropdownMenuItem(value: RecurringFrequency.yearly, child: Text('每年')),
-                ],
-                onChanged: (v) => setState(() => _frequency = v ?? RecurringFrequency.monthly),
+              PickerField(
+                label: '频率',
+                value: _kFrequencyLabels[_frequency] ?? '每月',
+                onTap: () async {
+                  final picked = await showOptionPicker<RecurringFrequency>(
+                    context: context,
+                    title: '频率',
+                    current: _frequency,
+                    options: [
+                      for (final e in _kFrequencyLabels.entries)
+                        PickerOption(value: e.key, label: e.value),
+                    ],
+                  );
+                  if (picked != null) setState(() => _frequency = picked);
+                },
               ),
               if (_frequency == RecurringFrequency.monthly ||
                   _frequency == RecurringFrequency.yearly)
@@ -400,14 +436,21 @@ class _RecurringEditPageState extends ConsumerState<RecurringEditPage> {
                 value: _autoConfirm,
                 onChanged: (v) => setState(() => _autoConfirm = v),
               ),
-              DropdownButtonFormField<RecurringEndType>(
-                initialValue: _endType,
-                decoration: const InputDecoration(labelText: '结束条件'),
-                items: const [
-                  DropdownMenuItem(value: RecurringEndType.never, child: Text('不结束')),
-                  DropdownMenuItem(value: RecurringEndType.count, child: Text('生成 N 次后结束')),
-                ],
-                onChanged: (v) => setState(() => _endType = v ?? RecurringEndType.never),
+              PickerField(
+                label: '结束条件',
+                value: _kEndLabels[_endType] ?? '不结束',
+                onTap: () async {
+                  final picked = await showOptionPicker<RecurringEndType>(
+                    context: context,
+                    title: '结束条件',
+                    current: _endType,
+                    options: [
+                      for (final e in _kEndLabels.entries)
+                        PickerOption(value: e.key, label: e.value),
+                    ],
+                  );
+                  if (picked != null) setState(() => _endType = picked);
+                },
               ),
               if (_endType == RecurringEndType.count)
                 TextFormField(

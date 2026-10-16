@@ -1,4 +1,4 @@
-﻿/// WebDAV sync settings page. PRD F7.3.
+/// WebDAV sync settings page. PRD F7.3.
 library;
 
 import 'package:plain/app/theme/app_colors.dart';
@@ -9,8 +9,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:plain/app/bootstrap.dart';
 import 'package:plain/app/breakpoints.dart';
 import 'package:plain/app/theme/design_tokens.dart';
+import 'package:plain/core/refresh/data_invalidation.dart';
+import 'package:plain/design_system/plain_icons_v3.dart';
+import 'package:plain/design_system/plain_ui.dart';
 import 'package:plain/data/sync/webdav_client.dart';
 import 'package:plain/data/sync/webdav_sync_service.dart';
+import 'package:plain/features/settings/conflict_center_page.dart';
 
 class SyncPage extends ConsumerStatefulWidget {
   const SyncPage({super.key});
@@ -29,6 +33,10 @@ class _SyncPageState extends ConsumerState<SyncPage> {
   bool _syncing = false;
   String? _status;
   bool _configured = false;
+
+  /// STORY-8.1：增量同步开关与待裁决冲突数
+  bool _syncEnabled = true;
+  int _openConflicts = 0;
 
   @override
   void initState() {
@@ -57,7 +65,53 @@ class _SyncPageState extends ConsumerState<SyncPage> {
       _passController.text = getK('webdav.pass');
       _pathController.text = getK('webdav.path').isEmpty ? '/plain/sync' : getK('webdav.path');
       _configured = _urlController.text.isNotEmpty;
+      _syncEnabled = syncEnabledOf(deps.db);
     });
+    await _refreshConflictCount();
+  }
+
+  Future<void> _refreshConflictCount() async {
+    final deps = ref.read(appDependenciesProvider);
+    final res = await deps.syncConflictRepository.countOpen(bookId: deps.bookId);
+    if (!mounted) return;
+    setState(() => _openConflicts = res.successOrNull ?? 0);
+  }
+
+  /// STORY-8.1：手动跑一轮增量同步（推 + 拉）。
+  Future<void> _syncIncremental() async {
+    setState(() {
+      _syncing = true;
+      _status = null;
+    });
+    final deps = ref.read(appDependenciesProvider);
+    final config = webDavConfigOf(deps.db);
+    if (config == null) {
+      setState(() {
+        _syncing = false;
+        _status = '请先保存服务器配置';
+      });
+      return;
+    }
+    final service = buildIncrementalSync(deps, config);
+    try {
+      final result = await service.syncNow(config);
+      // 拉到的变更要让界面重取
+      ref.invalidateData.bumpEntryMutated();
+      ref.invalidateData.bumpCategoriesMutated();
+      ref.invalidateData.bumpAccountsMutated();
+      ref.invalidateData.bumpBudgetMutated();
+      ref.invalidateData.bumpRecurringMutated();
+      setState(() {
+        _status = result.success
+            ? '增量同步成功：上传 ${result.pushed} 条 · 应用 ${result.pulled} 条'
+                '${result.conflicts > 0 ? ' · 新冲突 ${result.conflicts} 条' : ''}'
+            : '增量同步失败：${result.message ?? '未知错误'}';
+      });
+    } finally {
+      service.dispose();
+      if (mounted) setState(() => _syncing = false);
+      await _refreshConflictCount();
+    }
   }
 
   void _saveConfig() {
@@ -148,7 +202,7 @@ class _SyncPageState extends ConsumerState<SyncPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('WebDAV 同步')),
+      appBar: const PlainTopBar(title: 'WebDAV 同步', showBack: true),
       body: ContentWidthConstraint(
         child: ListView(
           padding: const EdgeInsets.all(Spacing.lg),
@@ -163,7 +217,7 @@ class _SyncPageState extends ConsumerState<SyncPage> {
                     const SizedBox(height: Spacing.sm),
                     Text(
                       '支持坚果云、NextCloud 等 WebDAV 服务。数据仅在你自己的服务器上，不经过第三方。',
-                      style: TextStyle(fontSize: 13, color: context.colors.inkSecondary),
+                      style: TextStyle(fontSize: 14, color: context.colors.inkSecondary),
                     ),
                     const SizedBox(height: Spacing.lg),
                     TextField(
@@ -190,7 +244,10 @@ class _SyncPageState extends ConsumerState<SyncPage> {
                         labelText: '密码 / 应用专用密码',
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(Radii.sm)),
                         suffixIcon: IconButton(
-                          icon: Icon(_obscurePass ? Icons.visibility_off : Icons.visibility),
+                          icon: PlainIcon(
+                            _obscurePass ? PlainIconData.eyeOff : PlainIconData.eye,
+                          ),
+                          tooltip: _obscurePass ? '显示密码' : '隐藏密码',
                           onPressed: () => setState(() => _obscurePass = !_obscurePass),
                         ),
                       ),
@@ -207,11 +264,24 @@ class _SyncPageState extends ConsumerState<SyncPage> {
                     const SizedBox(height: Spacing.lg),
                     Row(children: [
                       Expanded(
-                        child: OutlinedButton(
-                          onPressed: _testing ? null : _testConnection,
-                          child: _testing
-                              ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
-                              : const Text('测试连接'),
+                        child: Material(
+                          color: const Color(0x00000000),
+                          child: InkWell(
+                            onTap: _testing ? null : _testConnection,
+                            borderRadius: BorderRadius.circular(12),
+                            child: Container(
+                              height: 44,
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: context.colors.lineStrong),
+                              ),
+                              child: Center(
+                                child: _testing
+                                    ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                                    : Text('测试连接', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500, color: context.colors.ink)),
+                              ),
+                            ),
+                          ),
                         ),
                       ),
                       const SizedBox(width: Spacing.md),
@@ -234,24 +304,45 @@ class _SyncPageState extends ConsumerState<SyncPage> {
                     const SizedBox(height: Spacing.sm),
                     Text(
                       '上传会将本地数据备份到云端；恢复会用云端备份覆盖本地数据。',
-                      style: TextStyle(fontSize: 13, color: context.colors.inkSecondary),
+                      style: TextStyle(fontSize: 14, color: context.colors.inkSecondary),
                     ),
                     const SizedBox(height: Spacing.lg),
                     SizedBox(
                       width: double.infinity,
                       child: FilledButton.icon(
                         onPressed: _configured && !_syncing ? _upload : null,
-                        icon: const Icon(Icons.cloud_upload_outlined),
+                        icon: const PlainIcon(PlainIconData.cloudUpload),
                         label: Text(_syncing ? '同步中...' : '上传备份到云端'),
                       ),
                     ),
                     const SizedBox(height: Spacing.md),
                     SizedBox(
                       width: double.infinity,
-                      child: OutlinedButton.icon(
-                        onPressed: _configured && !_syncing ? _download : null,
-                        icon: const Icon(Icons.cloud_download_outlined),
-                        label: const Text('从云端恢复'),
+                      child: Material(
+                        color: const Color(0x00000000),
+                        child: InkWell(
+                          onTap: _configured && !_syncing ? _download : null,
+                          borderRadius: BorderRadius.circular(12),
+                          child: Container(
+                            height: 44,
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: context.colors.lineStrong),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                PlainIcon(
+                                  PlainIconData.cloudDownload,
+                                  size: 18,
+                                  color: context.colors.ink,
+                                ),
+                                const SizedBox(width: 8),
+                                Text('从云端恢复', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500, color: context.colors.ink)),
+                              ],
+                            ),
+                          ),
+                        ),
                       ),
                     ),
                     if (_status != null) ...[
@@ -264,9 +355,63 @@ class _SyncPageState extends ConsumerState<SyncPage> {
                               : context.colors.expense.withValues(alpha: 0.08),
                           borderRadius: BorderRadius.circular(Radii.sm),
                         ),
-                        child: Text(_status!, style: const TextStyle(fontSize: 13)),
+                        child: Text(_status!, style: const TextStyle(fontSize: 14)),
                       ),
                     ],
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: Spacing.lg),
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(Spacing.lg),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('增量同步', style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
+                    const SizedBox(height: Spacing.sm),
+                    Text(
+                      '按账单级变更同步：本机写入后立刻推送，前台每 10 秒拉取一次。'
+                      '附件只同步「哪笔账单挂了附件」，图片本身不出设备。',
+                      style: TextStyle(fontSize: 14, color: context.colors.inkSecondary),
+                    ),
+                    const SizedBox(height: Spacing.md),
+                    PlainRow(
+                      title: '自动同步',
+                      subtitle: _syncEnabled ? '已开启' : '已关闭（手动同步仍可用）',
+                      trailing: PlainSwitch(
+                        value: _syncEnabled,
+                        onChanged: (v) {
+                          setSyncEnabled(ref.read(appDependenciesProvider).db, v);
+                          setState(() => _syncEnabled = v);
+                        },
+                      ),
+                    ),
+                    const SizedBox(height: Spacing.md),
+                    SizedBox(
+                      width: double.infinity,
+                      child: FilledButton.icon(
+                        onPressed: _configured && !_syncing ? _syncIncremental : null,
+                        icon: const PlainIcon(PlainIconData.cloudUpload),
+                        label: Text(_syncing ? '同步中...' : '立即增量同步'),
+                      ),
+                    ),
+                    const SizedBox(height: Spacing.md),
+                    PlainRow(
+                      title: '冲突中心',
+                      subtitle: _openConflicts == 0
+                          ? '没有待裁决的冲突'
+                          : '$_openConflicts 条待裁决',
+                      showChevron: true,
+                      onTap: () {
+                        Navigator.push<void>(
+                          context,
+                          MaterialPageRoute(
+                              builder: (_) => const ConflictCenterPage()),
+                        ).then((_) => _refreshConflictCount());
+                      },
+                    ),
                   ],
                 ),
               ),

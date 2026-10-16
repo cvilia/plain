@@ -19,6 +19,8 @@ class CreateEntryInput {
     this.accountId, this.toAccountId, this.note, this.occurredAt,
     this.source = EntrySource.manual, required this.bookId, required this.deviceId,
     this.reimburseStatus = ReimburseStatus.none,
+    this.exchangeRate, this.originalCurrency,
+    this.memberId,
   });
 
   final String amountExpression;
@@ -34,6 +36,17 @@ class CreateEntryInput {
 
   /// STORY-1.8：报销状态。
   final ReimburseStatus reimburseStatus;
+
+  /// STORY-8.2：归属成员；null = 由用例回落到本机成员。
+  final String? memberId;
+
+  /// STORY-9.3：账户币种不是本位币时才有值。
+  ///
+  /// 此时 [amountExpression] 是**原币**金额，[exchangeRate] 是折成本位币的
+  /// 锁定汇率；用例据此写入 `originalAmountCents`，并把 `amount` 折算成本位币
+  /// （所有统计口径都用 `amount`，因此不受多币种影响）。
+  final double? exchangeRate;
+  final String? originalCurrency;
 }
 
 class CreateEntryUseCase {
@@ -41,6 +54,7 @@ class CreateEntryUseCase {
     required LedgerRepository repository, required Clock clock, required UuidV7 idGen,
     ExpressionEvaluator evaluator = const ExpressionEvaluator(),
     this.ruleRepository,
+    this.memberRepository,
   })  : _repository = repository, _clock = clock, _idGen = idGen, _evaluator = evaluator;
 
   final LedgerRepository _repository;
@@ -50,6 +64,9 @@ class CreateEntryUseCase {
 
   /// STORY-6.1：可选规则仓储；非空时在写入前套用 post 阶段规则。
   final AutomationRuleRepository? ruleRepository;
+
+  /// STORY-8.2：可选成员仓储。非空时把新账单归属到本机成员（「我」）。
+  final MemberRepository? memberRepository;
 
   Future<Result<LedgerEntry>> call(CreateEntryInput input) async {
     final eval = _evaluator.eval(input.amountExpression);
@@ -76,12 +93,39 @@ class CreateEntryUseCase {
     }
     final now = _clock.now();
     final occurred = input.occurredAt?.toUtc() ?? now;
+
+    // STORY-9.3：原币记账时把输入金额视为原币，折算出本位币金额。
+    // `amount` 始终是本位币（统计口径不变），原币金额另存一列。
+    final typed = Money(eval.money.cents.abs());
+    var amount = typed;
+    int? originalAmountCents;
+    final foreignRate = input.exchangeRate;
+    final foreignCurrency = input.originalCurrency;
+    if (foreignRate != null &&
+        foreignCurrency != null &&
+        foreignCurrency != MoneyRules.defaultCurrency) {
+      if (foreignRate <= 0) {
+        return err<LedgerEntry>(
+            const ValidationFailure('entry.fx_rate_invalid', 'rate'));
+      }
+      originalAmountCents = typed.cents;
+      amount = Money((typed.cents * foreignRate).round());
+      if (amount.isZero) {
+        // 折算后不足 1 分：金额列有 CHECK(>0)，明确拦下来而不是让 DB 抛错
+        return err<LedgerEntry>(
+            const ValidationFailure('entry.amount_rounds_to_zero', 'zero'));
+      }
+    }
+
     var entry = LedgerEntry(
       id: _idGen.generate(at: occurred), bookId: input.bookId, type: input.type,
-      amount: Money(eval.money.cents.abs()), currency: MoneyRules.defaultCurrency,
+      amount: amount, currency: MoneyRules.defaultCurrency,
+      originalAmountCents: originalAmountCents,
+      exchangeRate: originalAmountCents == null ? null : foreignRate,
       categoryId: input.categoryId, accountId: input.accountId, toAccountId: input.toAccountId,
       occurredAt: occurred, note: input.note, source: input.source,
       reimburseStatus: input.reimburseStatus,
+      memberId: input.memberId ?? await _currentMemberId(input.bookId),
       createdAt: now, updatedAt: now, revision: 1, deviceId: input.deviceId, baseRevision: 0,
     );
 
@@ -96,6 +140,14 @@ class CreateEntryUseCase {
 
     return _repository.create(entry);
   }
+
+  /// STORY-8.2：默认归属到本机成员（「我」）。拿不到就留 null（不猜）。
+  Future<String?> _currentMemberId(String bookId) async {
+    final repo = memberRepository;
+    if (repo == null) return null;
+    final me = await repo.getMe(bookId);
+    return me.successOrNull?.id;
+  }
 }
 
 class UpdateEntryUseCase {
@@ -109,6 +161,7 @@ class UpdateEntryUseCase {
     required LedgerEntry existing, Money? amount, String? categoryId,
     String? accountId, String? toAccountId, String? note,
     DateTime? occurredAt, EntryType? type,
+    int? originalAmountCents, double? exchangeRate,
     bool clearNote = false, bool clearCategoryId = false, bool clearAccount = false,
   }) async {
     if (amount != null && !amount.withinProductLimit) {
@@ -117,6 +170,7 @@ class UpdateEntryUseCase {
     return _repository.update(existing.copyWith(
       amount: amount, categoryId: categoryId, accountId: accountId,
       toAccountId: toAccountId, note: note, occurredAt: occurredAt, type: type,
+      originalAmountCents: originalAmountCents, exchangeRate: exchangeRate,
       updatedAt: _clock.now(), revision: existing.revision + 1,
       baseRevision: existing.revision, clearNote: clearNote, clearCategoryId: clearCategoryId,
       clearAccount: clearAccount,

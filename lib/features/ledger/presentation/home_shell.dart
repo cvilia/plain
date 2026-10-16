@@ -1,11 +1,17 @@
-/// Home shell: bottom nav / NavigationRail. See 04-9, 06-E3.
-/// 「记一笔」入口：AppBar 右上角图标（替代悬浮按钮）。
+/// Home shell — Quiet Ledger nav.
+/// CSS: .nav 60px / border-top line / .navitem column gap 3 / .navfab 44×44 r14 accent
+/// See redesign-v3/单独确认.html
 library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:plain/app/breakpoints.dart';
+import 'package:plain/app/theme/app_colors.dart';
+import 'package:plain/app/theme/typography.dart';
+import 'package:plain/design_system/app_toast.dart';
+import 'package:plain/design_system/plain_icons_v3.dart';
+import 'package:plain/domain/services/member_service.dart';
 
 class HomeShell extends ConsumerWidget {
   const HomeShell({super.key, required this.navigationShell});
@@ -18,28 +24,32 @@ class HomeShell extends ConsumerWidget {
         final sizeClass = Breakpoints.sizeClassFromConstraints(constraints);
         final isWide = sizeClass != SizeClass.compact;
 
-        final destinations = const [
-          NavigationDestination(icon: Icon(Icons.receipt_long_outlined), selectedIcon: Icon(Icons.receipt_long), label: '流水'),
-          NavigationDestination(icon: Icon(Icons.pie_chart_outline), selectedIcon: Icon(Icons.pie_chart), label: '报表'),
-          NavigationDestination(icon: Icon(Icons.account_balance_wallet_outlined), selectedIcon: Icon(Icons.account_balance_wallet), label: '资产'),
-          NavigationDestination(icon: Icon(Icons.settings_outlined), selectedIcon: Icon(Icons.settings), label: '我的'),
-        ];
-
         if (isWide) {
           return Scaffold(
             body: Row(
               children: [
                 NavigationRail(
-                  selectedIndex: navigationShell.currentIndex,
-                  onDestinationSelected: _onTap,
+                  selectedIndex: _railIndex(navigationShell.currentIndex),
+                  onDestinationSelected: (i) => _onTap(_branchFromRail(i)),
                   labelType: NavigationRailLabelType.all,
-                  destinations: destinations
-                      .map((d) => NavigationRailDestination(
-                            icon: d.icon,
-                            selectedIcon: d.selectedIcon,
-                            label: Text(d.label),
-                          ))
-                      .toList(),
+                  destinations: const [
+                    NavigationRailDestination(
+                      icon: PlainIcon(PlainIconData.navLedger, size: 22),
+                      label: Text('流水'),
+                    ),
+                    NavigationRailDestination(
+                      icon: PlainIcon(PlainIconData.navReport, size: 22),
+                      label: Text('报表'),
+                    ),
+                    NavigationRailDestination(
+                      icon: PlainIcon(PlainIconData.navAssets, size: 22),
+                      label: Text('资产'),
+                    ),
+                    NavigationRailDestination(
+                      icon: PlainIcon(PlainIconData.navProfile, size: 22),
+                      label: Text('我的'),
+                    ),
+                  ],
                 ),
                 const VerticalDivider(width: 1),
                 Expanded(child: navigationShell),
@@ -48,48 +58,224 @@ class HomeShell extends ConsumerWidget {
           );
         }
 
+        // ⚠️ `resizeToAvoidBottomInset: false` 不能省。
+        // 外壳自身没有任何需要系统键盘的输入 —— 子页面（流水/报表/资产/我的）
+        // 都只读列表，输入都在各自的独立路由或 bottom sheet 里。
+        // 默认 true 时，只要任何一个 bottom sheet / 弹窗唤起系统键盘，
+        // 这个 60 高的自绘导航条 `_QuietNav` 就会被顶到键盘上方，
+        // 出现「导航条浮在键盘上」的错位（Flutter 的 Scaffold 在
+        // resizeToAvoidBottomInset 为 true 时会把 bottomNavigationBar
+        // 一起抬到 viewInsets 之上）。关掉后导航条留在原位、被键盘正常覆盖。
         return Scaffold(
+          resizeToAvoidBottomInset: false,
           body: navigationShell,
-          bottomNavigationBar: NavigationBar(
-            selectedIndex: navigationShell.currentIndex,
-            onDestinationSelected: _onTap,
-            destinations: destinations,
+          bottomNavigationBar: _QuietNav(
+            branchIndex: navigationShell.currentIndex,
+            onTap: _onTap,
+            // STORY-8.2 AC2：只读成员没有记账权限 —— 入口当场说明，
+            // 不要等他输完金额再在保存时拦（保存拦截仍在，双保险）。
+            onAdd: () {
+              if (!ref.read(canWriteLedgerProvider)) {
+                showAppToast(context, '你是「只读」成员，没有记账权限');
+                return;
+              }
+              context.push('/entry');
+            },
           ),
         );
       },
     );
   }
 
-  void _onTap(int index) {
-    navigationShell.goBranch(index, initialLocation: index == navigationShell.currentIndex);
-  }
-}
+  // shell branches: 0=流水 1=报表 2=资产 3=我的（记一笔是独立路由，不是 branch）
+  int _railIndex(int branch) => branch;
+  int _branchFromRail(int rail) => rail;
 
-/// 「记一笔」AppBar 按钮（所有页面统一风格）。
-class EntryAppBarAction extends StatelessWidget {
-  const EntryAppBarAction({super.key});
-  @override
-  Widget build(BuildContext context) {
-    return IconButton(
-      icon: const Icon(Icons.add_circle_outline, size: 26),
-      tooltip: '记一笔',
-      onPressed: () => context.push('/entry'),
+  void _onTap(int branch) {
+    navigationShell.goBranch(
+      branch,
+      initialLocation: branch == navigationShell.currentIndex,
     );
   }
 }
 
-/// 通用「添加」AppBar 按钮。
-class AddAppBarAction extends StatelessWidget {
-  const AddAppBarAction({super.key, required this.tooltip, required this.onPressed});
-  final String tooltip;
+/// .nav 60px · border-top · appBg · 5 slots with center FAB.
+class _QuietNav extends StatelessWidget {
+  const _QuietNav({
+    required this.branchIndex,
+    required this.onTap,
+    required this.onAdd,
+  });
+
+  final int branchIndex;
+  final ValueChanged<int> onTap;
+  final VoidCallback onAdd;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+
+    // 导航条一体：上边框 + 60 内容高 + 安全区，避免 bottom overflow
+    return Container(
+      decoration: BoxDecoration(
+        color: colors.surface,
+        border: Border(top: BorderSide(color: colors.border, width: 1)),
+      ),
+      // ⚠️ `maintainBottomViewPadding: true` 不能省。
+      //
+      // SafeArea 默认读 `MediaQuery.padding`，其 `bottom` 是
+      // `max(0, viewPadding − viewInsets)` —— 系统键盘一弹就变成 0。
+      // 外壳用了 `resizeToAvoidBottomInset: false`（见上），Scaffold 不会把
+      // 底栏抬走，但 SafeArea 仍然会把自己的底部内边距从 34 掉到 0：
+      // 底栏总高 94 → 60，Scaffold 把多出的 34pt 让给 body，
+      // 于是四个子页面里「贴底对齐」的内容整体下滑 34pt（静默重排）。
+      //
+      // 该参数只把 **bottom** 换成 `viewPadding.bottom`（与键盘无关的原始安全区），
+      // left / top / right 仍取 `padding` —— 横屏刘海那 44pt 左右安全区不受影响。
+      child: SafeArea(
+        top: false,
+        maintainBottomViewPadding: true,
+        // ⚠️ 59 不是 60。设计 `.nav{height:60px;border-top:1px}` 走的是
+        // `box-sizing:border-box` —— 那 1px 边框**算在 60 里面**（实测
+        // navitem h=59，图标落在 802 = 793 + 9）。Flutter 的 `Container`
+        // 反过来把 `decoration.padding`（= 边框宽度）加在内容**之外**，
+        // 写 60 会得到 61，图标整体下移 0.5px。
+        child: SizedBox(
+          height: 59,
+          child: Row(
+            children: [
+              _NavItem(
+                icon: PlainIconData.navLedger,
+                label: '流水',
+                selected: branchIndex == 0,
+                onTap: () => onTap(0),
+              ),
+              _NavItem(
+                icon: PlainIconData.navReport,
+                label: '报表',
+                selected: branchIndex == 1,
+                onTap: () => onTap(1),
+              ),
+              // 记一笔：嵌在导航条中间，不是悬浮球
+              Expanded(
+                child: Center(child: _NavFab(onPressed: onAdd)),
+              ),
+              _NavItem(
+                icon: PlainIconData.navAssets,
+                label: '资产',
+                selected: branchIndex == 2,
+                onTap: () => onTap(2),
+              ),
+              _NavItem(
+                icon: PlainIconData.navProfile,
+                label: '我的',
+                selected: branchIndex == 3,
+                onTap: () => onTap(3),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _NavItem extends StatelessWidget {
+  const _NavItem({
+    required this.icon,
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final PlainIconData icon;
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    // `.navitem{color:var(--muted)}` / `.navitem.on{color:var(--primary-ink)}`。
+    // ⚠️ 选中色是 `primary-ink`（在主色底上可读的那一档），不是 `primary` 本体 ——
+    // 用 `primary` 在浅主题下对比度不够，深主题下又会糊在底上。
+    final fg = selected ? colors.primaryInk : colors.inkTertiary;
+    return Expanded(
+      child: InkWell(
+        onTap: onTap,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          // `.navitem{gap:3px}`
+          spacing: 3,
+          children: [
+            // 设计稿实测 svg 22×22（不是 24）。
+            PlainIcon(icon, size: 22, color: fg),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                // `.navlab{font-size:12;font-weight:500}` + `lh:normal` → 行盒 16。
+                height: designLineHeight(12),
+                fontWeight: FontWeight.w500,
+                color: fg,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _NavFab extends StatelessWidget {
+  const _NavFab({required this.onPressed});
   final VoidCallback onPressed;
 
   @override
   Widget build(BuildContext context) {
-    return IconButton(
-      icon: const Icon(Icons.add, size: 24),
-      tooltip: tooltip,
-      onPressed: onPressed,
+    final colors = context.colors;
+    // `.navfab{width:44px;height:44px;border-radius:14px;background:var(--accent);
+    //          color:var(--fab-ic);box-shadow:0 2px 8px var(--shadow-accent)}`
+    //
+    // 底 / 图标一律走 FAB 令牌（`fabBg` = accent、`fabIc` = onAccent），
+    // 与设计 `gen_tokens.py` 的「FAB 3」段一一对应，别再手挑 accent/onPrimary。
+    //
+    // ⚠️ 图标色**不是** `onPrimary`、也**不是**运行时算的对比色：`onAccent` 由设计侧
+    // `pick_on(accent, tone.ink, 4.5)` 定死并进 4.5:1 门禁。主色与强调色是两套色 ——
+    // 素白主题 accent 是蜜桃橙 `#FB923C`，`onPrimary` 配的却是近黑 `#3F3F46` 那支。
+    // 踩过的坑：`inkFor(accent, primary, 3.0)` 在 `subai.light` 上
+    // `contrast = 4.614 ≥ 3.0` → 第一步直接返回 accent 本身 → 橘底画橘，图标整个消失。
+    return Container(
+      width: 44,
+      height: 44,
+      decoration: BoxDecoration(
+        color: colors.fabBg,
+        borderRadius: BorderRadius.circular(14),
+        boxShadow: [
+          BoxShadow(
+            color: colors.shadowAccent,
+            offset: const Offset(0, 2),
+            blurRadius: 8,
+          ),
+        ],
+      ),
+      child: Material(
+        color: const Color(0x00000000),
+        borderRadius: BorderRadius.circular(14),
+        child: InkWell(
+          onTap: onPressed,
+          borderRadius: BorderRadius.circular(14),
+          child: Center(
+            child: PlainIcon(
+              PlainIconData.navAdd,
+              size: 22,
+              color: colors.fabIc,
+              semanticLabel: '记一笔',
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

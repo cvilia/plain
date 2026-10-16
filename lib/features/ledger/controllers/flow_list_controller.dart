@@ -81,6 +81,15 @@ class FlowListController extends Notifier<FlowListState> {
       }
       Future.microtask(refresh);
     });
+    // STORY-8.2：成员筛选同理
+    ref.listen(flowMemberFilterProvider, (prev, next) {
+      if (prev == next) return;
+      if (state.isLoading) {
+        _pendingRefresh = true;
+        return;
+      }
+      Future.microtask(refresh);
+    });
     // Auto-load on first access
     Future.microtask(loadInitial);
     return const FlowListState();
@@ -103,7 +112,11 @@ class FlowListController extends Notifier<FlowListState> {
     final catMap = {for (final c in cats) c.id: c};
 
     final result = await _repository.listPage(
-      filter: EntryFilter(bookId: _bookId, categoryId: ref.read(flowCategoryFilterProvider)),
+      filter: EntryFilter(
+        bookId: _bookId,
+        categoryId: ref.read(flowCategoryFilterProvider),
+        memberId: ref.read(flowMemberFilterProvider),
+      ),
       limit: 50,
     );
 
@@ -137,7 +150,11 @@ class FlowListController extends Notifier<FlowListState> {
     state = state.copyWith(isLoading: true);
 
     final result = await _repository.listPage(
-      filter: EntryFilter(bookId: _bookId, categoryId: ref.read(flowCategoryFilterProvider)),
+      filter: EntryFilter(
+        bookId: _bookId,
+        categoryId: ref.read(flowCategoryFilterProvider),
+        memberId: ref.read(flowMemberFilterProvider),
+      ),
       cursor: _cursor,
       limit: 50,
     );
@@ -234,3 +251,14 @@ class FlowCategoryFilter extends Notifier<String?> {
 
 final flowCategoryFilterProvider =
     NotifierProvider<FlowCategoryFilter, String?>(FlowCategoryFilter.new);
+
+/// STORY-8.2 AC3：家庭页下钻用——流水列表的**归属成员**过滤（null = 不过滤）。
+class FlowMemberFilter extends Notifier<String?> {
+  @override
+  String? build() => null;
+  void set(String? id) => state = id;
+  void clear() => state = null;
+}
+
+final flowMemberFilterProvider =
+    NotifierProvider<FlowMemberFilter, String?>(FlowMemberFilter.new);

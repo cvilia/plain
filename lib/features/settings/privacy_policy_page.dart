@@ -4,6 +4,7 @@ library;
 import 'package:flutter/material.dart';
 import 'package:plain/app/theme/app_colors.dart';
 import 'package:plain/app/theme/design_tokens.dart';
+import 'package:plain/design_system/plain_ui.dart';
 
 class PrivacyPolicyPage extends StatelessWidget {
   const PrivacyPolicyPage({super.key});
@@ -42,7 +43,7 @@ class PrivacyPolicyPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('隐私政策')),
+      appBar: const PlainTopBar(title: '隐私政策', showBack: true),
       body: ListView(
         padding: const EdgeInsets.all(Spacing.lg),
         children: [

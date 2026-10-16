@@ -1,190 +1,174 @@
-/// Onboarding (first launch). Matches 09-高保真UI.html SP-0-01.
+/// Onboarding (first launch). Quiet Ledger single screen.
+/// Order: wordmark → claim → sub → amount sample → 3 features → CTA
+/// See redesign-v3/08-SCREENS-SPEC/01-guide.md.
 library;
 
-import 'package:plain/app/theme/app_colors.dart';
 import 'package:flutter/material.dart';
-import 'package:plain/app/theme/design_tokens.dart';
-import 'package:plain/design_system/brand_mark.dart';
+import 'package:plain/app/theme/app_colors.dart';
+import 'package:plain/design_system/amount_display.dart';
+import 'package:plain/design_system/plain_icons_v3.dart';
+import 'package:plain/design_system/plain_ui.dart';
 
-class OnboardingPage extends StatefulWidget {
+class OnboardingPage extends StatelessWidget {
   const OnboardingPage({super.key, this.onDone});
   final Future<void> Function()? onDone;
 
-  @override
-  State<OnboardingPage> createState() => _OnboardingPageState();
-}
-
-class _OnboardingPageState extends State<OnboardingPage> {
-  final _pageController = PageController();
-  int _currentPage = 0;
-
-  @override
-  void dispose() {
-    _pageController.dispose();
-    super.dispose();
-  }
-
-  void _next() {
-    if (_currentPage < 2) {
-      _pageController.nextPage(
-        duration: const Duration(milliseconds: 280),
-        curve: Curves.easeOut,
-      );
-    } else {
-      final done = widget.onDone;
-      if (done != null) {
-        done();
-      } else {
-        Navigator.of(context).pop(true);
-      }
+  Future<void> _done(BuildContext context) async {
+    final done = onDone;
+    if (done != null) {
+      await done();
+    } else if (context.mounted) {
+      Navigator.of(context).pop(true);
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.colors;
     return Scaffold(
-      backgroundColor: context.colors.surfaceCard,
+      backgroundColor: colors.surface,
       body: SafeArea(
-        child: Column(
-          children: [
-            Expanded(
-              child: PageView(
-                controller: _pageController,
-                onPageChanged: (i) => setState(() => _currentPage = i),
-                children: [
-                  _ObStep(
-                    brandMark: true,
-                    logo: '记',
-                    title: '3 秒，记一笔',
-                    subtitle: '选好分类点 OK 即可，键盘极简\n数字/小数点/OK · 离线全功能',
-                    onPrimary: '开始使用',
-                    onNext: _next,
-                  ),
-                  _ObStep(
-                    logo: '✓',
-                    title: '四条承诺',
-                    promises: const [
-                      '无广告、无开屏',
-                      '数据只存在你的手机里',
-                      '不申请与记账无关的权限',
-                      '数据随时导出，永不锁定',
-                    ],
-                    onPrimary: '我了解了',
-                    onNext: _next,
-                  ),
-                  _ObStep(
-                    logo: '🔔',
-                    title: '需要通知权限吗？',
-                    subtitle: '当前版本不需要任何权限。\n未来的预算超支提醒（V1.1）会用到通知，\n到时再开启也完全来得及。',
-                    onPrimary: '暂不开启，直接进入',
-                    onNext: _next,
-                  ),
-                ],
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(24, 24, 24, 24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // 1. 字标
+              Text(
+                '素记 Plain',
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.06 * 15,
+                  color: colors.ink,
+                ),
               ),
-            ),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: List.generate(3, (i) {
-                final on = _currentPage == i;
-                return AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
-                  margin: const EdgeInsets.symmetric(horizontal: 4),
-                  width: on ? 22 : 8,
-                  height: 8,
-                  decoration: BoxDecoration(
-                    color: on ? context.colors.primary : context.colors.border,
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                );
-              }),
-            ),
-            const SizedBox(height: Spacing.xxl),
-          ],
+              const SizedBox(height: 30),
+              // 2. 主张
+              Text(
+                '记账，三秒钟的事',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w700,
+                  color: colors.ink,
+                ),
+              ),
+              const SizedBox(height: 8),
+              // 3. 副题
+              Text(
+                '本地存储 · 无广告 · 无理财',
+                style: TextStyle(
+                  fontSize: 14,
+                  height: 1.65,
+                  color: colors.inkTertiary,
+                ),
+              ),
+              const SizedBox(height: 28),
+              // 4. 产品实样：两条发丝线夹金额（结构靠线，无卡片）
+              Divider(height: 1, thickness: 1, color: colors.border),
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 18),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '本月结余',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 0.08 * 12,
+                        color: colors.inkTertiary,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    const AmountDisplay(cents: 1248000, fontSize: 34),
+                  ],
+                ),
+              ),
+              Divider(height: 1, thickness: 1, color: colors.border),
+              const SizedBox(height: 8),
+              // 5. 三条特性
+              Expanded(
+                child: ListView(
+                  padding: EdgeInsets.zero,
+                  children: const [
+                    _Feature(
+                      icon: PlainIconData.navAdd,
+                      title: '三秒记一笔',
+                      subtitle: '只记数字，不填表格',
+                    ),
+                    _Feature(
+                      icon: PlainIconData.lock,
+                      title: '数据只在你手机里',
+                      subtitle: '没有账号，没有服务器',
+                    ),
+                    _Feature(
+                      icon: PlainIconData.palette,
+                      title: '十套配色，昼夜两态',
+                      subtitle: '冷底暖点，久看不累',
+                    ),
+                  ],
+                ),
+              ),
+              // 6. CTA
+              PlainPrimaryButton(
+                label: '开始记账',
+                onPressed: () => _done(context),
+              ),
+              const SizedBox(height: 12),
+              Center(
+                child: Text(
+                  '数据全部本地存储 · 卸载前请先备份',
+                  style: TextStyle(fontSize: 12, color: colors.inkFaint),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 }
 
-class _ObStep extends StatelessWidget {
-  const _ObStep({
-    required this.logo,
+class _Feature extends StatelessWidget {
+  const _Feature({
+    required this.icon,
     required this.title,
-    required this.onPrimary,
-    required this.onNext,
-    this.subtitle,
-    this.promises,
-    this.brandMark = false,
+    required this.subtitle,
   });
 
-  final String logo;
+  final PlainIconData icon;
   final String title;
-  final String? subtitle;
-  final List<String>? promises;
-  final String onPrimary;
-  final VoidCallback onNext;
-
-  /// 首屏用手绘品牌标（透明底、跟主题色）。
-  final bool brandMark;
+  final String subtitle;
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(Spacing.xl, Spacing.xxl, Spacing.xl, Spacing.lg),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
+    final colors = context.colors;
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 14),
+      decoration: BoxDecoration(
+        border: Border(top: BorderSide(color: colors.divider)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 手绘小猪品牌标：颜色随主题，背景透明
-          if (brandMark)
-            const BrandMark(size: 120, showLabel: true)
-          else
-            Icon(Icons.savings_outlined, size: 80, color: context.colors.primary),
-          const SizedBox(height: Spacing.xxl),
-          Text(
-            title,
-            textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 24, fontWeight: FontWeight.w700, color: context.colors.ink),
-          ),
-          const SizedBox(height: Spacing.md),
-          if (subtitle != null)
-            Text(
-              subtitle!,
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 14, color: context.colors.inkSecondary, height: 1.7),
+          PlainIcon(icon, size: 22, color: colors.inkSecondary),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  subtitle,
+                  style: TextStyle(fontSize: 12, color: colors.inkTertiary),
+                ),
+              ],
             ),
-          if (promises != null) ...[
-            const SizedBox(height: Spacing.lg),
-            Card(
-              margin: EdgeInsets.zero,
-              child: Column(
-                children: [
-                  for (var i = 0; i < promises!.length; i++)
-                    Container(
-                      decoration: BoxDecoration(
-                        border: i == promises!.length - 1
-                            ? null
-                            : Border(bottom: BorderSide(color: context.colors.divider)),
-                      ),
-                      padding: const EdgeInsets.symmetric(horizontal: Spacing.lg, vertical: 14),
-                      child: Row(
-                        children: [
-                          Icon(Icons.check_circle_outline, size: 18, color: context.colors.primary),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Text(promises![i], style: TextStyle(fontSize: 13, color: context.colors.ink)),
-                          ),
-                        ],
-                      ),
-                    ),
-                ],
-              ),
-            ),
-          ],
-          const SizedBox(height: Spacing.xxl),
-          SizedBox(
-            width: double.infinity,
-            height: 48,
-            child: FilledButton(onPressed: onNext, child: Text(onPrimary)),
           ),
         ],
       ),

@@ -49,14 +49,8 @@ class PlatformBridge {
     }
   }
 
-  /// Set Android FLAG_SECURE (hide from task switcher).
-  static Future<void> setSecureFlag(bool enabled) async {
-    try {
-      await _securityChannel.invokeMethod('setSecureFlag', enabled);
-    } on PlatformException {
-      // Not available
-    }
-  }
+  /// 已禁用：允许截图/录屏，不再设置 FLAG_SECURE。
+  static Future<void> setSecureFlag(bool enabled) async {}
 
   /// Set iOS privacy overlay (covers content when backgrounded).
   static Future<void> setPrivacyOverlay(bool enabled) async {

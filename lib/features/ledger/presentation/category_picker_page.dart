@@ -8,7 +8,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:plain/app/bootstrap.dart';
 import 'package:plain/app/theme/design_tokens.dart';
 import 'package:plain/core/refresh/data_invalidation.dart';
+import 'package:plain/design_system/app_error_state.dart';
 import 'package:plain/design_system/app_toast.dart';
+import 'package:plain/design_system/plain_icons_v3.dart';
+import 'package:plain/design_system/picker_sheet.dart';
+import 'package:plain/design_system/plain_ui.dart';
 import 'package:plain/domain/entities/category.dart' as domain;
 import 'package:plain/domain/services/category_naming.dart';
 import 'package:plain/domain/entities/enums.dart';
@@ -36,16 +40,15 @@ class _CategoryPickerPageState extends ConsumerState<CategoryPickerPage> {
     final categoriesAsync = ref.watch(_allCategoriesProvider);
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('选择分类'),
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(56),
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(Spacing.lg, 0, Spacing.lg, Spacing.sm),
+      appBar: PlainTopBar(title: '选择分类', showBack: true),
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(Spacing.lg, Spacing.sm, Spacing.lg, Spacing.sm),
             child: TextField(
               decoration: InputDecoration(
                 hintText: '搜索分类...',
-                prefixIcon: const Icon(Icons.search, size: 20),
+                prefixIcon: const PlainIcon(PlainIconData.search, size: 20),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(Radii.pill),
                   borderSide: BorderSide(color: context.colors.border),
@@ -57,64 +60,66 @@ class _CategoryPickerPageState extends ConsumerState<CategoryPickerPage> {
               onChanged: (v) => setState(() => _searchQuery = v.trim()),
             ),
           ),
-        ),
-      ),
-      body: categoriesAsync.when(
-        data: (categories) {
-          var filtered = categories.where((c) => c.kind == widget.kind).toList();
-          if (_searchQuery.isNotEmpty) {
-            final q = _searchQuery.toLowerCase();
-            // Match first- and second-level titles; when a root hits, keep its
-            // children so they can be shown expanded under it.
-            filtered = filtered.where((c) {
-              if (c.name.toLowerCase().contains(q)) return true;
-              if (c.parentId != null) {
-                final parent = categories.where((p) => p.id == c.parentId).firstOrNull;
-                return parent != null && parent.name.toLowerCase().contains(q);
-              }
-              return false;
-            }).toList();
-          }
+          Expanded(
+            child: categoriesAsync.when(
+              data: (categories) {
+                var filtered = categories.where((c) => c.kind == widget.kind).toList();
+                if (_searchQuery.isNotEmpty) {
+                  final q = _searchQuery.toLowerCase();
+                  // Match first- and second-level titles; when a root hits, keep its
+                  // children so they can be shown expanded under it.
+                  filtered = filtered.where((c) {
+                    if (c.name.toLowerCase().contains(q)) return true;
+                    if (c.parentId != null) {
+                      final parent = categories.where((p) => p.id == c.parentId).firstOrNull;
+                      return parent != null && parent.name.toLowerCase().contains(q);
+                    }
+                    return false;
+                  }).toList();
+                }
 
-          if (filtered.isEmpty) {
-            return Center(
-              child: Text(
-                _searchQuery.isEmpty ? '暂无分类' : '未找到匹配分类',
-                style: TextStyle(color: context.colors.inkTertiary),
-              ),
-            );
-          }
+                if (filtered.isEmpty) {
+                  return Center(
+                    child: Text(
+                      _searchQuery.isEmpty ? '暂无分类' : '未找到匹配分类',
+                      style: TextStyle(color: context.colors.inkTertiary),
+                    ),
+                  );
+                }
 
-          final roots = filtered.where((c) => c.isRoot).toList();
-          final children = filtered.where((c) => !c.isRoot).toList();
+                final roots = filtered.where((c) => c.isRoot).toList();
+                final children = filtered.where((c) => !c.isRoot).toList();
 
-          return ListView(
-            padding: const EdgeInsets.all(Spacing.md),
-            children: [
-              ...roots.map((root) {
-                final rootChildren = children.where((c) => c.parentId == root.id).toList();
-                return _ExpandableCategoryGroup(
-                  root: root,
-                  children: rootChildren,
-                  searching: _searchQuery.isNotEmpty,
-                  onSelected: (cat) => Navigator.pop(context, cat.id),
+                return ListView(
+                  padding: const EdgeInsets.all(Spacing.md),
+                  children: [
+                    ...roots.map((root) {
+                      final rootChildren = children.where((c) => c.parentId == root.id).toList();
+                      return _ExpandableCategoryGroup(
+                        root: root,
+                        children: rootChildren,
+                        searching: _searchQuery.isNotEmpty,
+                        onSelected: (cat) => Navigator.pop(context, cat.id),
+                      );
+                    }),
+                    ...children
+                        .where((c) => !roots.any((r) => r.id == c.parentId))
+                        .map((c) => _CategoryTile(
+                              category: c,
+                              onTap: () => Navigator.pop(context, c.id),
+                            )),
+                  ],
                 );
-              }),
-              ...children
-                  .where((c) => !roots.any((r) => r.id == c.parentId))
-                  .map((c) => _CategoryTile(
-                        category: c,
-                        onTap: () => Navigator.pop(context, c.id),
-                      )),
-            ],
-          );
-        },
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('加载失败: $e')),
+              },
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (e, _) => AppErrorState.of(e, onRetry: () => ref.invalidateData.bumpEverything()),
+            ),
+          ),
+        ],
       ),
       floatingActionButton: FloatingActionButton.extended(
         heroTag: 'fab_category_picker_add',
-        icon: const Icon(Icons.add),
+        icon: const PlainIcon(PlainIconData.plus),
         label: const Text('新增'),
         backgroundColor: context.colors.primary,
         foregroundColor: context.colors.onPrimary,
@@ -147,7 +152,7 @@ class _CategoryPickerPageState extends ConsumerState<CategoryPickerPage> {
             left: Spacing.lg,
             right: Spacing.lg,
             top: Spacing.lg,
-            bottom: MediaQuery.of(ctx).viewInsets.bottom + Spacing.lg,
+            bottom: MediaQuery.viewInsetsOf(ctx).bottom + Spacing.lg,
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -155,17 +160,21 @@ class _CategoryPickerPageState extends ConsumerState<CategoryPickerPage> {
             children: [
               Text('新增分类条目', style: Theme.of(ctx).textTheme.titleMedium),
               const SizedBox(height: Spacing.lg),
-              DropdownButtonFormField<domain.Category>(
-                initialValue: parent,
-                decoration: const InputDecoration(
-                  labelText: '归属一级分类',
-                  border: OutlineInputBorder(),
-                ),
-                items: [
-                  for (final r in roots)
-                    DropdownMenuItem(value: r, child: Text(r.name)),
-                ],
-                onChanged: (v) => setSheetState(() => parent = v),
+              PickerField(
+                label: '归属一级分类',
+                value: parent == null ? '未选择' : parent!.name,
+                onTap: () async {
+                  final picked = await showOptionPicker<domain.Category>(
+                    context: ctx,
+                    title: '归属一级分类',
+                    current: parent,
+                    options: [
+                      for (final r in roots)
+                        PickerOption(value: r, label: r.name),
+                    ],
+                  );
+                  if (picked != null) setSheetState(() => parent = picked);
+                },
               ),
               const SizedBox(height: Spacing.md),
               TextField(
@@ -273,7 +282,11 @@ class _ExpandableCategoryGroupState extends State<_ExpandableCategoryGroup> {
                   child: AnimatedRotation(
                     turns: expanded ? 0.25 : 0,
                     duration: const Duration(milliseconds: 200),
-                    child: Icon(Icons.chevron_right, size: 20, color: context.colors.inkTertiary),
+                    child: PlainIcon(
+                      PlainIconData.chevronRight,
+                      size: 20,
+                      color: context.colors.inkTertiary,
+                    ),
                   ),
                 )
               : null,
@@ -317,18 +330,33 @@ class _CategoryTile extends StatelessWidget {
     final isExpense = category.kind == CategoryKind.expense;
     final color = isExpense ? context.colors.expense : context.colors.income;
 
-    return ListTile(
-      contentPadding: const EdgeInsets.symmetric(horizontal: Spacing.sm),
-      leading: CategoryAvatar(iconRef: category.iconRef, iconAsset: category.iconAsset, color: color, size: 18),
-      title: Text(
-        category.name,
-        style: TextStyle(
-          fontSize: 15,
-          fontWeight: category.isRoot ? FontWeight.w500 : FontWeight.w400,
+    return Material(
+      color: const Color(0x00000000),
+      child: InkWell(
+        onTap: onTap,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 60),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            child: Row(
+              children: [
+                CategoryAvatar(iconRef: category.iconRef, iconAsset: category.iconAsset, color: color, size: 18),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    category.name,
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: category.isRoot ? FontWeight.w500 : FontWeight.w400,
+                    ),
+                  ),
+                ),
+                if (trailing != null) ...[const SizedBox(width: 8), trailing!],
+              ],
+            ),
+          ),
         ),
       ),
-      trailing: trailing,
-      onTap: onTap,
     );
   }
 }

@@ -7,6 +7,7 @@ import 'package:plain/domain/entities/recurring_rule.dart';
 import 'package:plain/domain/entities/savings_goal.dart';
 import 'package:plain/domain/repositories/repositories.dart';
 import 'package:plain/domain/services/accounting_calendar.dart';
+import 'package:plain/domain/services/goal_progress_service.dart';
 
 /// 安全可花计算结果与三行拆解。
 class SafeToSpendResult {
@@ -101,12 +102,17 @@ class SafeToSpendCalculator {
     }
 
     // 4) 目标待拨付：各储蓄目标本月尚需存入
+    //    进度按 V3.0 口径读虚拟账户派生余额（复用第 1 步已经取到的余额，不再查库）
     final goalsRes = await savingsGoalRepository.listByBook(bookId);
     final goals = goalsRes.successOrNull ?? const <SavingsGoal>[];
+    final goalProgress = const GoalProgressService().ofAll(
+      goals: goals,
+      balanceByAccount: GoalProgressService.balanceIndex(accounts),
+    );
     var goalAllocation = 0;
-    for (final g in goals) {
-      if (g.isAchieved) continue;
-      goalAllocation += g.monthlyRequiredCentsAt(now);
+    for (final v in goalProgress) {
+      if (v.isAchieved) continue;
+      goalAllocation += v.monthlyRequiredCentsAt(now);
     }
 
     // 5) 刚性支出预留：isRigid 分类的剩余预算

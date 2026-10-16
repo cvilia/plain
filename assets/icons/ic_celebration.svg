@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" role="img" aria-label="ic_celebration">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M4.25 19.75 10.25 8.25 15.75 13.75z"/>
+  <path d="M14.5 6.75 16.25 5"/>
+  <circle cx="18.25" cy="4.75" r="1.05" fill="currentColor" stroke="none"/>
+  <circle cx="19.75" cy="9" r="1.05" fill="currentColor" stroke="none"/>
+  </g>
+</svg>

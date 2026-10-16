@@ -22,6 +22,7 @@ class SavingsGoal {
     required this.savedCents,
     this.goalType = GoalType.savings,
     this.remainingTerms,
+    this.goalAccountId,
     this.dueAt,
     this.accountId,
     this.autoTransfer = false,
@@ -44,8 +45,21 @@ class SavingsGoal {
 
   /// 还债：剩余期数。
   final int? remainingTerms;
+
+  /// STORY-7.1：目标的**虚拟账户** id（`accounts.type = 'goal'`）。
+  /// 存款是「可用账户 → 该虚拟账户」的内部转账，转入端就是它。
+  /// null = 还没存过（首次存入时惰性创建）。
+  final String? goalAccountId;
+
   final DateTime? dueAt;
   final String? accountId;
+
+  /// 存款的转出端（G-2：转账不计入收支）。未关联账户时无法执行存入。
+  bool get canDeposit => accountId != null && accountId!.isNotEmpty;
+
+  /// 还债目标（STORY-7.2）：关联到贷款账户后可显示剩余利息与预计还清日，
+  /// 且**不做「存入」**——还债靠还款，不是往目标里存钱。
+  bool get isDebt => goalType == GoalType.debt;
 
   /// 自动按月划拨（走周期调度器）。
   final bool autoTransfer;
@@ -107,6 +121,7 @@ class SavingsGoal {
     int? savedCents,
     GoalType? goalType,
     int? remainingTerms,
+    String? goalAccountId,
     DateTime? dueAt,
     String? accountId,
     bool? autoTransfer,
@@ -124,6 +139,7 @@ class SavingsGoal {
       savedCents: savedCents ?? this.savedCents,
       goalType: goalType ?? this.goalType,
       remainingTerms: remainingTerms ?? this.remainingTerms,
+      goalAccountId: goalAccountId ?? this.goalAccountId,
       dueAt: clearDueAt ? null : (dueAt ?? this.dueAt),
       accountId: accountId ?? this.accountId,
       autoTransfer: autoTransfer ?? this.autoTransfer,

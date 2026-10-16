@@ -16,6 +16,7 @@ class RecurringRule {
     this.generatedCount = 0, required this.nextRunAt,
     required this.entryType, required this.amount,
     this.categoryId, this.accountId, this.toAccountId, this.note,
+    this.kind = RecurringKind.recurring, this.goalId,
     this.lastBatchId, this.isEnabled = true,
     required this.createdAt, required this.updatedAt,
     this.deletedAt, this.revision = 1,
@@ -42,6 +43,13 @@ class RecurringRule {
   final String? accountId;
   final String? toAccountId;
   final String? note;
+
+  /// STORY-7.3：生成来源类型（周期记账 / 储蓄划拨 / 贷款还款）。
+  final RecurringKind kind;
+
+  /// [RecurringKind.savingsTransfer] 专用：生成后要把金额记到哪个储蓄目标上。
+  final String? goalId;
+
   final String? lastBatchId;
   final bool isEnabled;
   final DateTime createdAt;
@@ -68,6 +76,7 @@ class RecurringRule {
     int? endCount, int? generatedCount, DateTime? nextRunAt,
     EntryType? entryType, Money? amount, String? categoryId,
     String? accountId, String? toAccountId, String? note,
+    RecurringKind? kind, String? goalId,
     String? lastBatchId, bool? isEnabled,
     DateTime? updatedAt, DateTime? deletedAt, int? revision, int? baseRevision,
   }) {
@@ -86,6 +95,7 @@ class RecurringRule {
       accountId: accountId ?? this.accountId,
       toAccountId: toAccountId ?? this.toAccountId,
       note: note ?? this.note, lastBatchId: lastBatchId ?? this.lastBatchId,
+      kind: kind ?? this.kind, goalId: goalId ?? this.goalId,
       isEnabled: isEnabled ?? this.isEnabled,
       createdAt: createdAt, updatedAt: updatedAt ?? this.updatedAt,
       deletedAt: deletedAt ?? this.deletedAt,

@@ -7,6 +7,8 @@ import 'package:plain/app/theme/color_math.dart' as cm;
 import 'package:plain/app/theme/theme_registry.dart';
 import 'package:plain/app/theme/app_colors.dart';
 import 'package:plain/app/theme/tokens.dart';
+import 'package:plain/app/theme/tokens_v3_data.dart';
+import 'package:plain/app/theme/typography.dart';
 
 /// Resolve platform brightness + user preference → effective Brightness.
 Brightness resolveBrightness(ThemeMode mode, Brightness platform) {
@@ -22,6 +24,7 @@ AppTokens resolveTokens(ThemeSpec spec, Brightness brightness) {
   final isDark = brightness == Brightness.dark;
   final tone = toneOf(spec.tone, isDark);
   final brand = isDark ? spec.dark : spec.light;
+  final v3 = _v3Of(spec, isDark);
 
   // Soft-layer alphas (global constants, §4.1).
   final softA = isDark ? kSoftAlphaDark : kSoftAlphaLight;
@@ -105,6 +108,32 @@ AppTokens resolveTokens(ThemeSpec spec, Brightness brightness) {
   final barFill = Color(cm.barFill(tone.appBg, brand.p, isDark));
   final dash = Color(cm.dashColor(tone.line, tone.muted));
 
+  // ── Hero card（与主题无关，见 theme_registry.dart 的常量）──
+  final heroCard0 = isDark ? kHeroCardDark0 : kHeroCardLight0;
+  final heroCard1 = isDark ? kHeroCardDark1 : kHeroCardLight1;
+
+  // ── FAB：底恒为强调色、图标恒为 onAccent（亮暗同式，不做极性反转）──
+  //
+  // 设计真值（`redesign-v3/_build/gen_tokens.py` 的「FAB 3」段，逐字）：
+  //   t["fabBg"] = a              # accent，两态一致
+  //   t["fabFg"] = t["onAccent"]
+  //   t["fabIc"] = t["onAccent"]  # 直接复用 onAccent，**不是** inkFor 算出来的
+  // 对应 CSS：`.navfab{background:var(--accent); color:var(--fab-ic)}`。
+  //
+  // ⚠️ 曾写成「亮态用主色、暗态翻强调色」+ `inkFor(accent, fabBg, 3.0)`，两个坑：
+  //   ① 亮态 `fabBg = primary` 与 CSS 的 `--accent` 不是一个色；
+  //   ② `inkFor` 是「够不上阈值才追深」的兜底函数，目标阈值只给到 3.0，于是
+  //      **20 个组合全部落在错色上**（实测旧值如 `#8C3B3B` / `#492F03` / `#734F97`
+  //      —— 都是「压暗一档的 accent」，对不上设计的 `onAccent`）。
+  //      最惨的是 `subai.light`：`contrast(#FB923C, #3F3F46) = 4.614 ≥ 3.0`
+  //      → **第一步就 return 前景本身**，`fabIc == accent == #FB923C`
+  //      → 橘底上画橘色 `+`（实机截图该区域整块 (251,147,60)，无一深色像素）。
+  //      `onAccent` 由设计侧 `pick_on(accent, tone.ink, 4.5)` 定死，并进了 4.5:1
+  //      门禁，比运行时 3.0 兜底更严也更准。
+  final fabBgInt = brand.a;
+  final fabFgInt = onAccent;
+  final fabIcInt = onAccent;
+
   // ── Glow / shadow alphas
   final glowAlpha = isDark ? 0.12 : 0.08;
   final shadowAlpha = isDark ? 0.18 : 0.10;
@@ -142,6 +171,8 @@ AppTokens resolveTokens(ThemeSpec spec, Brightness brightness) {
     heroGrad0: Color(hero0), heroGrad1: Color(hero1),
     heroDarkGrad0: Color(heroDark0), heroDarkGrad1: Color(heroDark1),
     frame: Color(brand.frame),
+    heroCard0: Color(heroCard0), heroCard1: Color(heroCard1),
+    fabBg: Color(fabBgInt), fabFg: Color(fabFgInt), fabIc: Color(fabIcInt),
 
     chartTrack: chartTrack, barFill: barFill, dash: dash,
 
@@ -155,10 +186,37 @@ AppTokens resolveTokens(ThemeSpec spec, Brightness brightness) {
       (brand.a >> 16) & 0xFF, (brand.a >> 8) & 0xFF, brand.a & 0xFF, shadowAlpha),
     // Toast is a decorative layer: inverted ink, never a hard-coded hex.
     toastBg: Color(tone.ink),
-    shadow1: Color.fromRGBO(0, 0, 0, isDark ? 0.20 : 0.06),
-    shadow2: Color.fromRGBO(0, 0, 0, isDark ? 0.28 : 0.10),
-    shadow3: Color.fromRGBO(0, 0, 0, isDark ? 0.36 : 0.14),
+    // v3: warm-black shadows in light (not pure black); dark keeps black.
+    shadow1: isDark
+        ? const Color.fromRGBO(0, 0, 0, 0.22)
+        : const Color.fromRGBO(48, 41, 30, 0.05),
+    shadow2: isDark
+        ? const Color.fromRGBO(0, 0, 0, 0.34)
+        : const Color.fromRGBO(48, 41, 30, 0.08),
+    shadow3: isDark
+        ? const Color.fromRGBO(0, 0, 0, 0.46)
+        : const Color.fromRGBO(48, 41, 30, 0.14),
+    lineStrong: Color(v3[0]),
+    lineStrongSoft: Color(v3[1]),
+    focusRing: Color(v3[2]),
+    surfaceInset: Color(v3[3]),
+    disabledFg: Color(v3[4]),
+    disabledBg: Color(v3[5]),
+    overlay: Color(v3[6]),
+    skeleton: Color(v3[7]),
+    primaryPressed: Color(v3[8]),
+    accentPressed: Color(v3[9]),
   );
+}
+
+/// v3Additions lookup: theme.id × brightness → 10 colors.
+List<int> _v3Of(ThemeSpec spec, bool isDark) {
+  final key = '${spec.id.id}.${isDark ? 'dark' : 'light'}';
+  final v = kV3Additions[key];
+  if (v == null) {
+    throw StateError('missing v3Additions for $key');
+  }
+  return v;
 }
 
 // ─── ThemeData construction (§4.7) ───────────────────────────────────────────
@@ -202,6 +260,8 @@ ThemeData buildThemeData(AppTokens tokens, Brightness brightness) {
     useMaterial3: true,
     colorScheme: scheme,
     brightness: brightness,
+    fontFamily: kFontFamily,
+    fontFamilyFallback: kFontFallback,
     scaffoldBackgroundColor: tokens.appBg,
     appBarTheme: AppBarTheme(
       backgroundColor: tokens.appBg,
@@ -223,7 +283,7 @@ ThemeData buildThemeData(AppTokens tokens, Brightness brightness) {
     snackBarTheme: SnackBarThemeData(
       behavior: SnackBarBehavior.floating,
       backgroundColor: tokens.toastBg,
-      contentTextStyle: TextStyle(color: brightness == Brightness.dark ? tokens.appBg : tokens.surface, fontSize: 13),
+      contentTextStyle: TextStyle(color: brightness == Brightness.dark ? tokens.appBg : tokens.surface, fontSize: 14),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
     ),
     filledButtonTheme: FilledButtonThemeData(
@@ -244,15 +304,15 @@ ThemeData buildThemeData(AppTokens tokens, Brightness brightness) {
       }),
     ),
     textTheme: TextTheme(
-      bodyLarge: TextStyle(color: tokens.ink, fontSize: 16),
-      bodyMedium: TextStyle(color: tokens.ink, fontSize: 14),
-      bodySmall: TextStyle(color: tokens.ink2, fontSize: 12),
-      titleLarge: TextStyle(color: tokens.ink, fontSize: 22, fontWeight: FontWeight.w600),
-      titleMedium: TextStyle(color: tokens.ink, fontSize: 16, fontWeight: FontWeight.w600),
-      titleSmall: TextStyle(color: tokens.ink, fontSize: 14, fontWeight: FontWeight.w600),
-      labelLarge: TextStyle(color: tokens.ink, fontSize: 14, fontWeight: FontWeight.w500),
-      labelMedium: TextStyle(color: tokens.ink2, fontSize: 12),
-      labelSmall: TextStyle(color: tokens.muted, fontSize: 11),
+      bodyLarge: AppTextStyles.body.copyWith(color: tokens.ink),
+      bodyMedium: AppTextStyles.body.copyWith(color: tokens.ink),
+      bodySmall: AppTextStyles.meta.copyWith(color: tokens.ink2),
+      titleLarge: AppTextStyles.titleLg.copyWith(color: tokens.ink),
+      titleMedium: AppTextStyles.titleSm.copyWith(color: tokens.ink),
+      titleSmall: AppTextStyles.bodyStrong.copyWith(color: tokens.ink),
+      labelLarge: AppTextStyles.bodyStrong.copyWith(color: tokens.ink),
+      labelMedium: AppTextStyles.meta.copyWith(color: tokens.ink2),
+      labelSmall: AppTextStyles.eyebrow.copyWith(color: tokens.muted),
     ),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,

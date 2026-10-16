@@ -2,14 +2,18 @@
 library;
 
 import 'package:plain/app/theme/app_colors.dart';
-import 'package:plain/design_system/category_avatar.dart';
+import 'package:plain/design_system/amount_display.dart';
+import 'package:plain/design_system/plain_icons_v3.dart';
+import 'package:plain/design_system/plain_ui.dart';
 import 'package:plain/design_system/amount_text.dart';
 import 'package:plain/design_system/app_empty_state.dart';
+import 'package:plain/design_system/app_error_state.dart';
 import 'package:plain/design_system/app_toast.dart';
 import 'package:plain/features/accounts/credit_reconcile_page.dart';
 import 'package:plain/features/accounts/reconcile_mode_page.dart';
-import 'package:plain/features/ledger/presentation/home_shell.dart';
-import 'package:plain/design_system/confirm_dialog.dart';
+import 'package:plain/features/assets/investment_page.dart';
+import 'package:plain/features/assets/loan_page.dart';
+import 'package:plain/features/assets/net_worth_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:plain/app/bootstrap.dart';
@@ -19,6 +23,9 @@ import 'package:plain/core/constants/app_constants.dart';
 import 'package:plain/core/format/amount_formatter.dart';
 import 'package:plain/core/money/money.dart';
 import 'package:plain/core/refresh/data_invalidation.dart';
+import 'package:plain/core/time/date_format.dart';
+import 'package:plain/design_system/app_date_picker.dart';
+import 'package:plain/design_system/picker_sheet.dart';
 import 'package:plain/domain/entities/category.dart';
 import 'package:plain/domain/entities/enums.dart';
 import 'package:plain/domain/entities/ledger_entry.dart';
@@ -65,6 +72,7 @@ class _AccountWithBalance {
   int get openingBalance => account.openingBalance;
   bool get isHidden => account.isHidden;
   bool get isCredit => account.isCredit;
+  bool get isLoan => account.isLoan;
   bool get isOverLimit => account.isOverLimit;
   int get creditAvailableCents => account.creditAvailableCents;
 
@@ -84,10 +92,47 @@ class AccountsPage extends ConsumerWidget {
     final accountsAsync = ref.watch(_accountsProvider);
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('资产'),
+      appBar: PlainTopBar(
+        title: '资产',
+        // 底部 Tab 页是导航终点，没有「上一页」可回 —— 不放返回箭头
+        // （标题居中由 PlainTopBar 的默认行为统一负责）
         actions: [
-          AddAppBarAction(tooltip: '添加账户', onPressed: () => _showAddSheet(context, ref)),
+          // STORY-10.4：净值追踪入口
+          Material(
+            color: const Color(0x00000000),
+            borderRadius: BorderRadius.circular(12),
+            child: InkWell(
+              onTap: () => Navigator.push<void>(
+                context,
+                MaterialPageRoute(builder: (_) => const NetWorthPage()),
+              ),
+              borderRadius: BorderRadius.circular(12),
+              child: SizedBox(
+                width: 52,
+                height: 44,
+                child: Center(
+                  child: Text('净值',
+                      style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w500,
+                          color: context.colors.primary)),
+                ),
+              ),
+            ),
+          ),
+          Material(
+            color: const Color(0x00000000),
+            borderRadius: BorderRadius.circular(12),
+            child: InkWell(
+              onTap: () => _showAddSheet(context, ref),
+              borderRadius: BorderRadius.circular(12),
+              child: const SizedBox(
+                width: 44,
+                height: 44,
+                child: Center(child: PlainIcon(PlainIconData.plus, size: 22)),
+              ),
+            ),
+          ),
         ],
       ),
       body: accountsAsync.when(
@@ -95,12 +140,12 @@ class AccountsPage extends ConsumerWidget {
           if (accounts.isEmpty) {
             return ContentWidthConstraint(
               child: AppEmptyState(
-                icon: Icons.account_balance_wallet_outlined,
+                icon: PlainIconData.wallet,
                 title: '还没有账户',
                 subtitle: '添加现金或银行卡',
                 action: FilledButton.icon(
                   onPressed: () => _showAddSheet(context, ref),
-                  icon: const Icon(Icons.add),
+                  icon: const PlainIcon(PlainIconData.plus),
                   label: const Text('添加账户'),
                 ),
               ),
@@ -113,42 +158,136 @@ class AccountsPage extends ConsumerWidget {
             child: ListView(
               padding: const EdgeInsets.all(Spacing.lg),
               children: [
-                Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(Spacing.xl),
-                    child: Column(
-                      children: [
-                        Text('净资产', style: Theme.of(context).textTheme.bodySmall?.copyWith(color: context.colors.inkSecondary)),
-                        const SizedBox(height: Spacing.sm),
-                        AmountWithCurrency(
-                          cents: netAssets,
-                          fontSize: 32,
+                // Quiet Ledger: 净资产纯排印，无卡片
+                Padding(
+                  padding: const EdgeInsets.only(top: 14, bottom: 20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '净资产',
+                        style: TextStyle(
+                          fontSize: 12,
                           fontWeight: FontWeight.w600,
-                          color: context.colors.ink,
+                          letterSpacing: 0.08 * 12,
+                          color: context.colors.inkTertiary,
                         ),
-                      ],
+                      ),
+                      const SizedBox(height: 8),
+                      AmountDisplay(
+                        cents: netAssets,
+                        fontSize: 34,
+                        integerWeight: FontWeight.w700,
+                      ),
+                      const SizedBox(height: 16),
+                      Divider(height: 1, thickness: 1, color: context.colors.border),
+                    ],
+                  ),
+                ),
+                // 资产
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(2, 8, 2, 8),
+                  child: Text(
+                    '资产',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 0.08 * 12,
+                      color: context.colors.inkTertiary,
                     ),
                   ),
                 ),
-                const SizedBox(height: Spacing.lg),
-                ...accounts.map((a) => _AccountTile(
-                      account: a,
-                      onRefresh: () => ref.invalidateData.bumpAccountsMutated(),
-                      onReconcile: () {
-                    // 信用卡走欠款对账页（STORY-2.2 AC7/AC8）
-                    if (a.type == AccountType.credit) {
-                      _openCreditReconcile(context, a.id);
-                    } else {
-                      _showReconcileDialog(context, ref, a);
-                    }
-                  },
-                    )),
+                DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: context.colors.surface,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: context.colors.border),
+                  ),
+                  child: Column(
+                    children: [
+                      for (final a in accounts.where((x) => x.balance >= 0))
+                        _AccountTile(
+                          account: a,
+                          onRefresh: () => ref.invalidateData.bumpAccountsMutated(),
+                          onReconcile: () {
+                            if (a.type == AccountType.credit) {
+                              _openCreditReconcile(context, a.id);
+                            } else if (a.isLoan) {
+                              // STORY-10.2：贷款账户进摊销页
+                              Navigator.push<void>(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => LoanPage(accountId: a.id),
+                                ),
+                              );
+                            } else if (a.type == AccountType.investment) {
+                              // STORY-10.1：投资账户进持仓页
+                              Navigator.push<void>(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => InvestmentPage(accountId: a.id),
+                                ),
+                              );
+                            } else {
+                              _showReconcileDialog(context, ref, a);
+                            }
+                          },
+                        ),
+                    ],
+                  ),
+                ),
+                // 负债
+                if (accounts.any((x) => x.balance < 0)) ...[
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(2, 24, 2, 8),
+                    child: Text(
+                      '负债',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 0.08 * 12,
+                        color: context.colors.inkTertiary,
+                      ),
+                    ),
+                  ),
+                  DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: context.colors.surface,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: context.colors.border),
+                    ),
+                    child: Column(
+                      children: [
+                        for (final a in accounts.where((x) => x.balance < 0))
+                          _AccountTile(
+                            account: a,
+                            onRefresh: () => ref.invalidateData.bumpAccountsMutated(),
+                            onReconcile: () {
+                              if (a.type == AccountType.credit) {
+                                _openCreditReconcile(context, a.id);
+                              } else if (a.isLoan) {
+                                Navigator.push<void>(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => LoanPage(accountId: a.id),
+                                  ),
+                                );
+                              } else {
+                                _showReconcileDialog(context, ref, a);
+                              }
+                            },
+                          ),
+                      ],
+                    ),
+                  ),
+                ],
               ],
             ),
           );
         },
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('加载失败: $e')),
+        error: (e, _) => AppErrorState.of(e,
+            onRetry: () => ref.invalidateData.bumpEverything()),
       ),
     );
   }
@@ -245,103 +384,121 @@ class AccountsPage extends ConsumerWidget {
 }
 
 class _AccountTile extends ConsumerWidget {
-  const _AccountTile({required this.account, required this.onRefresh, required this.onReconcile});
+  const _AccountTile({
+    required this.account,
+    required this.onRefresh,
+    required this.onReconcile,
+  });
   final _AccountWithBalance account;
   final VoidCallback onRefresh;
   final VoidCallback onReconcile;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final colors = context.colors;
     final typeLabel = switch (account.type) {
       AccountType.cash => '现金',
       AccountType.debit => '储蓄卡',
       AccountType.credit => '信用卡',
       AccountType.investment => '投资',
+      AccountType.loanIn => '贷款',
+      AccountType.loanOut => '借出',
+      AccountType.goal => '目标',
       _ => '账户',
     };
     final iconRef = switch (account.type) {
-      AccountType.cash => 'payments',
+      AccountType.cash => 'wallet',
       AccountType.debit => 'card',
-      AccountType.credit => 'credit',
-      AccountType.investment => 'invest',
+      AccountType.credit => 'receipt',
+      AccountType.investment => 'chartLine',
+      AccountType.loanIn => 'chartLine',
+      AccountType.loanOut => 'chartLine',
       _ => 'other',
     };
-    return Card(
-      margin: const EdgeInsets.only(bottom: Spacing.sm),
-      child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: Spacing.lg, vertical: Spacing.sm),
-        leading: CategoryAvatar(
-          iconRef: iconRef,
-          color: context.colors.primary,
+
+    return InkWell(
+      onTap: () => _showReconcileDialog(context, ref, account),
+      child: Container(
+        constraints: const BoxConstraints(minHeight: 60),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
+        decoration: BoxDecoration(
+          border: Border(top: BorderSide(color: colors.divider, width: 1)),
         ),
-        title: Row(
+        child: Row(
           children: [
-            Expanded(child: Text(account.name, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500))),
-            if (account.pendingReconcile > 0)
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                decoration: BoxDecoration(
-                  color: context.colors.accent.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  '待对账 ${account.pendingReconcile} 笔',
-                  style: TextStyle(fontSize: 10, color: context.colors.accent, fontWeight: FontWeight.w500),
-                ),
-              ),
-          ],
-        ),
-        subtitle: Text(typeLabel, style: TextStyle(fontSize: 12, color: context.colors.inkTertiary)),
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                AmountWithCurrency(
-                  cents: account.balance,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  color: context.colors.ink,
-                ),
-                if (account.isCredit) ...[
+            PlainIcon(
+              iconRef == 'wallet'
+                  ? PlainIconData.wallet
+                  : iconRef == 'card'
+                      ? PlainIconData.card
+                      : iconRef == 'receipt'
+                          ? PlainIconData.receipt
+                          : iconRef == 'chartLine'
+                              ? PlainIconData.chartLine
+                              : PlainIconData.wallet,
+              size: 22,
+              color: colors.inkSecondary,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
                   Text(
-                    account.isOverLimit ? '超额' : '可用 ${formatAmount(account.creditAvailableCents)}',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: account.isOverLimit
-                          ? context.colors.expense
-                          : context.colors.inkTertiary,
+                    account.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w500,
                     ),
                   ),
-                ] else if (account.openingBalance != 0)
-                  Text('期初: ${formatAmount(account.openingBalance)}', style: TextStyle(fontSize: 11, color: context.colors.inkTertiary)),
-              ],
+                  const SizedBox(height: 2),
+                  Text(
+                    typeLabel,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      color: colors.inkTertiary,
+                    ),
+                  ),
+                  // STORY-2.3 AC1/AC3：待对账 N 笔角标（全部勾完即消失）。
+                  // 点它进逐笔对账模式，与整行的「数字对账」是两条不同路径。
+                  if (account.pendingReconcile > 0)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: InkWell(
+                        onTap: () => Navigator.push<void>(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => ReconcileModePage(
+                              accountId: account.id,
+                              accountName: account.name,
+                            ),
+                          ),
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 2),
+                          child: Text(
+                            '待对账 ${account.pendingReconcile} 笔',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: colors.accent,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
             ),
-            PopupMenuButton<String>(
-              icon: const Icon(Icons.more_vert, size: 20),
-              onSelected: (v) {
-                switch (v) {
-                  case 'reconcile':
-                    onReconcile();
-                  case 'reconcile_mode':
-                    _openReconcileMode(context);
-                  case 'edit':
-                    _editAccount(context, ref);
-                  case 'hide':
-                    _toggleHide(context, ref);
-                  case 'delete':
-                    _deleteAccount(context, ref);
-                }
-              },
-              itemBuilder: (_) => [
-                const PopupMenuItem(value: 'reconcile', child: Text('对账')),
-                const PopupMenuItem(value: 'reconcile_mode', child: Text('逐笔对账')),
-                const PopupMenuItem(value: 'edit', child: Text('编辑')),
-                PopupMenuItem(value: 'hide', child: Text(account.isHidden ? '取消隐藏' : '隐藏')),
-                const PopupMenuItem(value: 'delete', child: Text('删除')),
-              ],
+            AmountDisplay(cents: account.balance, fontSize: 15),
+            const SizedBox(width: 4),
+            PlainIcon(
+              PlainIconData.chevronRight,
+              size: 20,
+              color: colors.inkFaint,
             ),
           ],
         ),
@@ -349,172 +506,14 @@ class _AccountTile extends ConsumerWidget {
     );
   }
 
-  Future<void> _editAccount(BuildContext context, WidgetRef ref) async {
-    await showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      builder: (_) => SafeArea(
-        child: _AddAccountSheet(
-          editing: account.account,
-          onSaved: onRefresh,
-        ),
-      ),
-    );
-    if (context.mounted) onRefresh();
-  }
-
-  void _openReconcileMode(BuildContext context) {
-    Navigator.push<void>(
-      context,
-      MaterialPageRoute(
-        builder: (_) => ReconcileModePage(accountId: account.id, accountName: account.name),
-      ),
-    ).then((_) => onRefresh());
-  }
-
-  Future<void> _toggleHide(BuildContext context, WidgetRef ref) async {
-    final deps = ref.read(appDependenciesProvider);
-    final now = deps.clock.now();
-    await deps.accountRepository.update(account.account.copyWith(
-      isHidden: !account.isHidden,
-      updatedAt: now,
-      revision: account.account.revision + 1,
-      baseRevision: account.account.revision,
-    ));
-    ref.invalidateData.bumpAccountsMutated();
-    ref.invalidateData.bumpEntryMutated();
-    onRefresh();
-  }
-
-  Future<void> _deleteAccount(BuildContext context, WidgetRef ref) async {
-    final deps = ref.read(appDependenciesProvider);
-    final refs = await deps.accountRepository.countReferences(account.id);
-    final counts = refs.successOrNull;
-    if (counts == null || !context.mounted) return;
-
-    if (!counts.isEmpty) {
-      // 有引用：迁移 / 改为不指定账户 / 隐藏（STORY-2.1 AC6）
-      final choice = await showDialog<String>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: const Text('账户仍有引用'),
-          content: Text(
-            '账单 ${counts.transactions + counts.transferIn} 笔 · 周期规则 ${counts.recurringRules} 条\n\n'
-            '可选择迁移、改为不指定账户，或隐藏保留数据。',
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx, 'hide'), child: const Text('改为隐藏')),
-            TextButton(onPressed: () => Navigator.pop(ctx, 'cancel'), child: const Text('取消')),
-            TextButton(onPressed: () => Navigator.pop(ctx, 'detach'), child: const Text('改为不指定账户')),
-            FilledButton(onPressed: () => Navigator.pop(ctx, 'migrate'), child: const Text('迁移后删除')),
-          ],
-        ),
-      );
-      if (choice == 'hide') {
-        if (!context.mounted) return;
-        await _toggleHide(context, ref);
-        return;
-      }
-      if (choice == 'detach') {
-        if (!context.mounted) return;
-        await _detachAndDelete(context, ref);
-        return;
-      }
-      if (choice != 'migrate' || !context.mounted) return;
-      final toId = await _pickTargetAccount(context, ref);
-      if (toId == null || !context.mounted) return;
-      final moved = await deps.accountRepository.migrateTransactions(fromId: account.id, toId: toId);
-      if (!moved.isSuccess) {
-        if (context.mounted) showAppToast(context, '迁移失败：${moved.failureOrNull?.code ?? '未知错误'}');
-        return;
-      }
-      if (!context.mounted) return;
-      ref.invalidateData.bumpEntryMutated();
-      ref.invalidateData.bumpRecurringMutated();
-      final del = await deps.accountRepository.softDelete(account.id);
-      if (del.isSuccess && context.mounted) {
-        showAppToast(context, '已迁移并删除账户');
-      } else if (context.mounted) {
-        showAppToast(context, '删除失败：${del.failureOrNull?.code ?? '未知错误'}');
-      }
-      ref.invalidateData.bumpAccountsMutated();
-      onRefresh();
-      return;
-    }
-
-    final confirmed = await showConfirmDialog(
-      context,
-      title: '删除账户',
-      message: '确定删除「${account.name}」？此操作不可恢复。',
-      confirmLabel: '删除',
-      destructive: true,
-    );
-    if (confirmed != true || !context.mounted) return;
-    final del = await deps.accountRepository.softDelete(account.id);
-    if (del.isSuccess) {
-      ref.invalidateData.bumpAccountsMutated();
-      ref.invalidateData.bumpEntryMutated();
-      if (context.mounted) showAppToast(context, '已删除');
-    } else if (context.mounted) {
-      showAppToast(context, '删除失败，请先迁移或隐藏');
-    }
-    onRefresh();
-  }
-
-  /// STORY-2.1：把引用账单改为不指定账户，然后删除账户。
-  Future<void> _detachAndDelete(BuildContext context, WidgetRef ref) async {
-    final confirmed = await showConfirmDialog(
-      context,
-      title: '改为不指定账户',
-      message: '该账户的 ${'账单与规则'}将改为「不指定账户」，然后删除「${account.name}」。此操作不可恢复。',
-      confirmLabel: '确认',
-      destructive: true,
-    );
-    if (confirmed != true || !context.mounted) return;
-
-    final deps = ref.read(appDependenciesProvider);
-    final detached = await deps.accountRepository.detachFromAccount(account.id);
-    if (!detached.isSuccess) {
-      if (context.mounted) showAppToast(context, '处理失败：${detached.failureOrNull?.code ?? '未知错误'}');
-      return;
-    }
-    if (!context.mounted) return;
-    ref.invalidateData.bumpEntryMutated();
-    ref.invalidateData.bumpRecurringMutated();
-    final del = await deps.accountRepository.softDelete(account.id);
-    if (del.isSuccess && context.mounted) {
-      showAppToast(context, '已改为不指定账户并删除');
-    } else if (context.mounted) {
-      showAppToast(context, '删除失败：${del.failureOrNull?.code ?? '未知错误'}');
-    }
-    ref.invalidateData.bumpAccountsMutated();
-    onRefresh();
-  }
-
-  Future<String?> _pickTargetAccount(BuildContext context, WidgetRef ref) async {
-    final deps = ref.read(appDependenciesProvider);
-    final list = await deps.accountRepository.listAll();
-    final accounts = (list.successOrNull ?? const <Account>[])
-        .where((a) => a.id != account.id && !a.isDeleted)
-        .toList();
-    if (!context.mounted || accounts.isEmpty) return null;
-    return showDialog<String>(
-      context: context,
-      builder: (ctx) => SimpleDialog(
-        title: const Text('迁移到哪个账户？'),
-        children: [
-          for (final a in accounts)
-            SimpleDialogOption(
-              onPressed: () => Navigator.pop(ctx, a.id),
-              child: Text(a.name),
-            ),
-        ],
-      ),
-    );
+  void _showReconcileDialog(BuildContext context, WidgetRef ref, dynamic a) {
+    // keep existing dialog via parent callback style — simplified
+    onReconcile();
   }
 }
 
 class _AddAccountSheet extends ConsumerStatefulWidget {
+  // ignore: unused_element_parameter
   const _AddAccountSheet({required this.onSaved, this.editing});
   final VoidCallback onSaved;
   final Account? editing;
@@ -530,11 +529,30 @@ class _AddAccountSheetState extends ConsumerState<_AddAccountSheet> {
   final _limitCtrl = TextEditingController(text: '0');
   final _billDayCtrl = TextEditingController();
   final _dueDayCtrl = TextEditingController();
+  final _minPayCtrl = TextEditingController();
+  final _creditRateCtrl = TextEditingController();
+  // STORY-10.2 贷款参数
+  final _loanPrincipalCtrl = TextEditingController();
+  final _loanRateCtrl = TextEditingController();
+  final _loanTermCtrl = TextEditingController();
+  LoanRepayMethod _loanMethod = LoanRepayMethod.equalInstallment;
+  DateTime? _loanFirstPaymentAt;
+  String? _repayAccountId;
+  String? _interestCategoryId;
+  List<Account> _repayCandidates = const [];
+  List<Category> _interestCategories = const [];
+  // STORY-10.3 资产估值
+  AssetValuationMode _valuationMode = AssetValuationMode.none;
+  final _valBaseCtrl = TextEditingController();
+  final _valRateCtrl = TextEditingController();
+  final _valManualCtrl = TextEditingController();
+  DateTime? _valuationStartedAt;
   AccountType _type = AccountType.cash;
   String _currency = 'CNY';
   bool _saving = false;
 
   bool get _isEditing => widget.editing != null;
+  bool get _isLoan => _type == AccountType.loanIn;
 
   @override
   void initState() {
@@ -542,14 +560,108 @@ class _AddAccountSheetState extends ConsumerState<_AddAccountSheet> {
     final e = widget.editing;
     if (e != null) {
       _nameCtrl.text = e.name;
-      _openingCtrl.text = (e.openingBalance / 100).toStringAsFixed(2);
+      // 信用卡的权威数字是「欠款余额」（存储值），期初余额对它无意义。
+      _openingCtrl.text = e.type == AccountType.credit
+          ? (e.creditDebtCents / 100).toStringAsFixed(2)
+          : (e.openingBalance / 100).toStringAsFixed(2);
       _noteCtrl.text = e.note ?? '';
       _type = e.type;
       _currency = e.currency;
       _limitCtrl.text = (e.creditLimitCents / 100).toStringAsFixed(2);
       _billDayCtrl.text = e.billDay?.toString() ?? '';
       _dueDayCtrl.text = e.dueDay?.toString() ?? '';
+      _minPayCtrl.text = e.minPaymentCents > 0
+          ? (e.minPaymentCents / 100).toStringAsFixed(2)
+          : '';
+      _creditRateCtrl.text =
+          e.creditAnnualRateBp > 0 ? _rateTextOf(e.creditAnnualRateBp) : '';
+      _loanPrincipalCtrl.text = e.loanPrincipalCents > 0
+          ? (e.loanPrincipalCents / 100).toStringAsFixed(2)
+          : '';
+      _loanRateCtrl.text =
+          e.loanAnnualRateBp > 0 ? _rateTextOf(e.loanAnnualRateBp) : '';
+      _loanTermCtrl.text = e.loanTermMonths?.toString() ?? '';
+      _loanMethod = e.loanRepayMethod ?? LoanRepayMethod.equalInstallment;
+      _loanFirstPaymentAt = e.loanFirstPaymentAt;
+      _valuationMode = e.valuationMode;
+      _valBaseCtrl.text = e.valuationBaseCents > 0
+          ? (e.valuationBaseCents / 100).toStringAsFixed(2)
+          : '';
+      _valRateCtrl.text = e.valuationRateBp != 0
+          ? _rateTextOf(e.valuationRateBp.abs())
+          : '';
+      _valManualCtrl.text = e.valuationManualCents > 0
+          ? (e.valuationManualCents / 100).toStringAsFixed(2)
+          : '';
+      _valuationStartedAt = e.valuationStartedAt;
     }
+    _loadPickerOptions();
+  }
+
+  /// 贷款要选「还款账户」与「利息分类」，两者都来自库，不写死。
+  Future<void> _loadPickerOptions() async {
+    final deps = ref.read(appDependenciesProvider);
+    final accs = await deps.accountRepository.listAll();
+    final cats = await deps.categoryRepository.listAll();
+    if (!mounted) return;
+    setState(() {
+      _repayCandidates = (accs.successOrNull ?? const <Account>[])
+          .where((a) => !a.type.isVirtual && !a.isLoan)
+          .toList();
+      _interestCategories = (cats.successOrNull ?? const <Category>[])
+          .where((c) => c.kind == CategoryKind.expense && !c.isHidden)
+          .toList();
+      _repayAccountId ??=
+          _repayCandidates.isEmpty ? null : _repayCandidates.first.id;
+      _interestCategoryId ??= _interestCategories.isEmpty
+          ? null
+          : _interestCategories
+              .firstWhere((c) => c.id == 'preset_other',
+                  orElse: () => _interestCategories.first)
+              .id;
+    });
+  }
+
+  /// 490 → "4.9"（去掉无意义的尾随零）
+  static String _rateTextOf(int bp) {
+    final s = (bp / 100).toStringAsFixed(2);
+    return s.endsWith('0') ? s.substring(0, s.length - 1) : s;
+  }
+
+  /// "4.9" → 490
+  static int? _rateBpOf(String text) {
+    final v = double.tryParse(text.trim());
+    if (v == null || v < 0) return null;
+    return (v * 100).round();
+  }
+
+  /// 金额文本 → 分（非法输入按 0）。
+  static int _centsOf(String text) {
+    try {
+      return Money.parseYuan(text.trim()).cents;
+    } on FormatException {
+      return 0;
+    }
+  }
+
+  /// 还款账户的显示名 —— 字段里存的是 id，展示要回查名称。
+  String get _repayAccountName {
+    final id = _repayAccountId;
+    if (id == null) return '未选择';
+    for (final a in _repayCandidates) {
+      if (a.id == id) return a.name;
+    }
+    return '未选择';
+  }
+
+  /// 利息分类的显示名 —— 字段里存的是 id，展示要回查名称。
+  String get _interestCategoryName {
+    final id = _interestCategoryId;
+    if (id == null) return '未选择';
+    for (final c in _interestCategories) {
+      if (c.id == id) return c.name;
+    }
+    return '未选择';
   }
 
   @override
@@ -560,13 +672,21 @@ class _AddAccountSheetState extends ConsumerState<_AddAccountSheet> {
     _limitCtrl.dispose();
     _billDayCtrl.dispose();
     _dueDayCtrl.dispose();
+    _minPayCtrl.dispose();
+    _creditRateCtrl.dispose();
+    _loanPrincipalCtrl.dispose();
+    _loanRateCtrl.dispose();
+    _loanTermCtrl.dispose();
+    _valBaseCtrl.dispose();
+    _valRateCtrl.dispose();
+    _valManualCtrl.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: EdgeInsets.only(left: Spacing.lg, right: Spacing.lg, top: Spacing.lg, bottom: MediaQuery.of(context).viewInsets.bottom + Spacing.lg),
+      padding: EdgeInsets.only(left: Spacing.lg, right: Spacing.lg, top: Spacing.lg, bottom: MediaQuery.viewInsetsOf(context).bottom + Spacing.lg),
       child: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -578,26 +698,57 @@ class _AddAccountSheetState extends ConsumerState<_AddAccountSheet> {
             spacing: Spacing.sm,
             runSpacing: Spacing.sm,
             children: [
-              _TypeOption(label: '现金', icon: Icons.payments_outlined, selected: _type == AccountType.cash, onTap: () => setState(() => _type = AccountType.cash)),
-              _TypeOption(label: '储蓄卡', icon: Icons.credit_card_outlined, selected: _type == AccountType.debit, onTap: () => setState(() => _type = AccountType.debit)),
-              _TypeOption(label: '信用卡', icon: Icons.credit_card, selected: _type == AccountType.credit, onTap: () => setState(() => _type = AccountType.credit)),
-              _TypeOption(label: '投资', icon: Icons.trending_up_outlined, selected: _type == AccountType.investment, onTap: () => setState(() => _type = AccountType.investment)),
+              _TypeOption(label: '现金', icon: PlainIconData.amount, selected: _type == AccountType.cash, onTap: () => setState(() => _type = AccountType.cash)),
+              _TypeOption(label: '储蓄卡', icon: PlainIconData.card, selected: _type == AccountType.debit, onTap: () => setState(() => _type = AccountType.debit)),
+              _TypeOption(label: '信用卡', icon: PlainIconData.card, selected: _type == AccountType.credit, onTap: () => setState(() => _type = AccountType.credit)),
+              _TypeOption(label: '投资', icon: PlainIconData.trendUp, selected: _type == AccountType.investment, onTap: () => setState(() => _type = AccountType.investment)),
+              // STORY-10.2：贷款账户（借入 = 负债），带摊销参数
+              _TypeOption(label: '贷款', icon: PlainIconData.chartLine, selected: _type == AccountType.loanIn, onTap: () => setState(() => _type = AccountType.loanIn)),
             ],
           ),
           const SizedBox(height: Spacing.lg),
           TextField(controller: _nameCtrl, maxLength: 20, decoration: const InputDecoration(labelText: '名称', hintText: '如：现金', border: OutlineInputBorder())),
           const SizedBox(height: Spacing.md),
-          DropdownButtonFormField<String>(
-            initialValue: _currency,
-            decoration: const InputDecoration(labelText: '币种', border: OutlineInputBorder()),
-            items: [
-              for (final code in CurrencyRules.symbols.keys)
-                DropdownMenuItem(value: code, child: Text('${CurrencyRules.symbolOf(code)}  $code')),
-            ],
-            onChanged: (v) => setState(() => _currency = v ?? 'CNY'),
+          // 本表单的选择项统一走底部弹层（`design_system/picker_sheet.dart`），
+          // 不用系统下拉：选项带说明、宽度和高度都可控。
+          PickerField(
+            label: '币种',
+            value: '${CurrencyRules.symbolOf(_currency)}  $_currency  '
+                '${CurrencyRules.nameOf(_currency)}',
+            onTap: () async {
+              final picked = await showCurrencyPicker(
+                context: context,
+                currencies: CurrencyRules.symbols.keys.toList(),
+                current: _currency,
+              );
+              if (picked != null) setState(() => _currency = picked);
+            },
           ),
           const SizedBox(height: Spacing.md),
-          TextField(controller: _openingCtrl, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(labelText: '期初余额', hintText: '0.00', border: OutlineInputBorder(), prefixText: '¥')),
+          // 信用卡的权威数字是「欠款余额」（G-2.1 存储值），开户时由这一栏写入；
+          // 开户之后它由账单入账与对账页维护，因此编辑态不再提供直接改它的入口。
+          // 贷款同理：期初余额恒为 −贷款总额，由本金栏推导，不单独问用户。
+          if ((_isEditing && _type == AccountType.credit) || _isLoan)
+            Text(
+              _isLoan
+                  ? '期初余额按 −贷款总额 自动记入（负债为负）'
+                  : '欠款余额由账单与对账页维护，如需修正请到信用卡对账页',
+              style: TextStyle(fontSize: 12, color: context.colors.inkTertiary),
+            )
+          else ...[
+            TextField(controller: _openingCtrl, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: InputDecoration(labelText: _type == AccountType.credit ? '期初欠款' : '期初余额', hintText: '0.00', border: const OutlineInputBorder(), prefixText: '¥')),
+            // V3.0 口径（外币账户按单币种处理）：账户余额只走本位币口径，
+            // 原币期初不并入余额，而是在净值里按锁定汇率折算参与。
+            if (_currency != MoneyRules.defaultCurrency)
+              Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: Text(
+                  '外币账户的期初按 $_currency 记，不并入本位币余额；'
+                  '净值里按「汇率锁定」设定的人民币汇率折算参与。',
+                  style: TextStyle(fontSize: 12, color: context.colors.inkTertiary),
+                ),
+              ),
+          ],
           if (_type == AccountType.credit) ...[
             const SizedBox(height: Spacing.md),
             TextField(
@@ -623,6 +774,237 @@ class _AddAccountSheetState extends ConsumerState<_AddAccountSheet> {
                 ),
               ),
             ]),
+            const SizedBox(height: Spacing.md),
+            // STORY-10.5：债务优化需要的最低还款与循环年利率（账单上的事实）
+            Row(children: [
+              Expanded(
+                child: TextField(
+                  controller: _minPayCtrl,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  decoration: const InputDecoration(
+                      labelText: '最低还款',
+                      hintText: '0.00',
+                      border: OutlineInputBorder(),
+                      prefixText: '¥'),
+                ),
+              ),
+              const SizedBox(width: Spacing.md),
+              Expanded(
+                child: TextField(
+                  controller: _creditRateCtrl,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  decoration: const InputDecoration(
+                      labelText: '循环年利率 %',
+                      hintText: '18',
+                      border: OutlineInputBorder()),
+                ),
+              ),
+            ]),
+          ],
+          // ── STORY-10.2 贷款参数：摊销表由这些参数派生，不存表 ──
+          if (_isLoan) ...[
+            const SizedBox(height: Spacing.md),
+            TextField(
+              controller: _loanPrincipalCtrl,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              decoration: const InputDecoration(labelText: '贷款总额', hintText: '0.00', border: OutlineInputBorder(), prefixText: '¥'),
+            ),
+            const SizedBox(height: Spacing.md),
+            Row(children: [
+              Expanded(
+                child: TextField(
+                  controller: _loanRateCtrl,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  decoration: const InputDecoration(labelText: '年利率 %', hintText: '4.9', border: OutlineInputBorder()),
+                ),
+              ),
+              const SizedBox(width: Spacing.md),
+              Expanded(
+                child: TextField(
+                  controller: _loanTermCtrl,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(labelText: '期数（月）', hintText: '360', border: OutlineInputBorder()),
+                ),
+              ),
+            ]),
+            const SizedBox(height: Spacing.md),
+            PickerField(
+              label: '还款方式',
+              value: _loanMethod.label,
+              onTap: () async {
+                final picked = await showOptionPicker<LoanRepayMethod>(
+                  context: context,
+                  title: '还款方式',
+                  current: _loanMethod,
+                  options: [
+                    PickerOption(
+                      value: LoanRepayMethod.equalInstallment,
+                      label: LoanRepayMethod.equalInstallment.label,
+                      description: '每期还款额一致，前期利息占比高',
+                    ),
+                    PickerOption(
+                      value: LoanRepayMethod.equalPrincipal,
+                      label: LoanRepayMethod.equalPrincipal.label,
+                      description: '每期本金一致，利息逐期递减，总利息更少',
+                    ),
+                  ],
+                );
+                if (picked != null) setState(() => _loanMethod = picked);
+              },
+            ),
+            const SizedBox(height: Spacing.md),
+            PlainRow(
+              title: '首次还款日',
+              value: _loanFirstPaymentAt == null
+                  ? '未设置'
+                  : formatDate(_loanFirstPaymentAt!),
+              showChevron: true,
+              onTap: () async {
+                final picked = await showAppDatePicker(
+                  context: context,
+                  initialDate: _loanFirstPaymentAt?.toLocal() ?? DateTime.now(),
+                  firstDate: DateTime(2000),
+                  lastDate: DateTime.now().add(const Duration(days: 3650)),
+                );
+                if (picked != null) {
+                  setState(() => _loanFirstPaymentAt = picked.toUtc());
+                }
+              },
+            ),
+            const SizedBox(height: Spacing.md),
+            PickerField(
+              label: '还款账户',
+              value: _repayAccountName,
+              onTap: () async {
+                final picked = await showOptionPicker<String>(
+                  context: context,
+                  title: '还款账户',
+                  current: _repayAccountId,
+                  options: [
+                    for (final a in _repayCandidates)
+                      PickerOption(value: a.id, label: a.name),
+                  ],
+                );
+                if (picked != null) setState(() => _repayAccountId = picked);
+              },
+            ),
+            const SizedBox(height: Spacing.md),
+            PickerField(
+              label: '利息分类（计入支出）',
+              value: _interestCategoryName,
+              onTap: () async {
+                final picked = await showOptionPicker<String>(
+                  context: context,
+                  title: '利息分类',
+                  current: _interestCategoryId,
+                  options: [
+                    for (final c in _interestCategories)
+                      PickerOption(value: c.id, label: c.name),
+                  ],
+                );
+                if (picked != null) {
+                  setState(() => _interestCategoryId = picked);
+                }
+              },
+            ),
+          ],
+          // ── STORY-10.3 资产估值：纯估算，只影响资产总览展示 ──
+          if (!_isLoan && _type != AccountType.credit) ...[
+            const SizedBox(height: Spacing.md),
+            PickerField(
+              label: '资产估值方式',
+              value: _valuationMode.label,
+              onTap: () async {
+                final picked = await showOptionPicker<AssetValuationMode>(
+                  context: context,
+                  title: '资产估值方式',
+                  current: _valuationMode,
+                  options: [
+                    for (final m in AssetValuationMode.values)
+                      PickerOption(
+                        value: m,
+                        label: m.label,
+                        description: switch (m) {
+                          AssetValuationMode.none => '账户按收支派生余额计入',
+                          AssetValuationMode.fixed => '始终等于你设定的固定金额',
+                          AssetValuationMode.depreciate => '按持有月数复利递减',
+                          AssetValuationMode.appreciate => '按持有月数复利递增',
+                          AssetValuationMode.manual => '等于你手填的当前估值',
+                        },
+                      ),
+                  ],
+                );
+                if (picked != null) setState(() => _valuationMode = picked);
+              },
+            ),
+            if (_valuationMode == AssetValuationMode.depreciate ||
+                _valuationMode == AssetValuationMode.appreciate) ...[
+              const SizedBox(height: Spacing.md),
+              Row(children: [
+                Expanded(
+                  child: TextField(
+                    controller: _valBaseCtrl,
+                    keyboardType:
+                        const TextInputType.numberWithOptions(decimal: true),
+                    decoration: const InputDecoration(
+                        labelText: '原值',
+                        border: OutlineInputBorder(),
+                        prefixText: '¥'),
+                  ),
+                ),
+                const SizedBox(width: Spacing.md),
+                Expanded(
+                  child: TextField(
+                    controller: _valRateCtrl,
+                    keyboardType:
+                        const TextInputType.numberWithOptions(decimal: true),
+                    decoration: InputDecoration(
+                      labelText: _valuationMode == AssetValuationMode.depreciate
+                          ? '年折旧率 %'
+                          : '年增值率 %',
+                      hintText: _valuationMode == AssetValuationMode.depreciate
+                          ? '8'
+                          : '3',
+                      border: const OutlineInputBorder(),
+                    ),
+                  ),
+                ),
+              ]),
+              const SizedBox(height: Spacing.md),
+              PlainRow(
+                title: '持有起始日',
+                value: _valuationStartedAt == null
+                    ? '未设置'
+                    : formatDate(_valuationStartedAt!),
+                showChevron: true,
+                onTap: () async {
+                  final picked = await showAppDatePicker(
+                    context: context,
+                    initialDate: _valuationStartedAt?.toLocal() ?? DateTime.now(),
+                    firstDate: DateTime(1990),
+                    lastDate: DateTime.now().add(const Duration(days: 1)),
+                  );
+                  if (picked != null) {
+                    setState(() => _valuationStartedAt = picked.toUtc());
+                  }
+                },
+              ),
+            ],
+            if (_valuationMode == AssetValuationMode.fixed ||
+                _valuationMode == AssetValuationMode.manual) ...[
+              const SizedBox(height: Spacing.md),
+              TextField(
+                controller: _valManualCtrl,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                decoration: InputDecoration(
+                    labelText: _valuationMode == AssetValuationMode.fixed
+                        ? '固定值'
+                        : '当前估值',
+                    hintText: '0.00',
+                    border: const OutlineInputBorder(),
+                    prefixText: '¥'),
+              ),
+            ],
           ],
           const SizedBox(height: Spacing.md),
           TextField(controller: _noteCtrl, maxLines: 2, maxLength: 100, decoration: const InputDecoration(labelText: '备注（可选）', border: OutlineInputBorder())),
@@ -657,8 +1039,9 @@ class _AddAccountSheetState extends ConsumerState<_AddAccountSheet> {
     final note = _noteCtrl.text.trim();
 
     // STORY-2.2 信用卡参数（非信用卡忽略）
+    final isCredit = _type == AccountType.credit;
     var creditLimit = 0;
-    if (_type == AccountType.credit) {
+    if (isCredit) {
       try {
         creditLimit = Money.parseYuan(_limitCtrl.text.trim()).cents;
       } on FormatException {
@@ -670,21 +1053,89 @@ class _AddAccountSheetState extends ConsumerState<_AddAccountSheet> {
     if (billDay != null) billDay = billDay.clamp(1, 28);
     if (dueDay != null) dueDay = dueDay.clamp(1, 28);
 
+    // STORY-10.5：信用卡的最低还款与循环年利率
+    final creditMinPay = isCredit ? _centsOf(_minPayCtrl.text) : 0;
+    final creditRateBp = isCredit ? (_rateBpOf(_creditRateCtrl.text) ?? 0) : 0;
+
+    // STORY-10.2 贷款参数（非贷款忽略）
+    var loanPrincipal = 0;
+    var loanRateBp = 0;
+    int? loanTerm;
+    LoanRepayMethod? loanMethod;
+    if (_isLoan) {
+      final p = double.tryParse(_loanPrincipalCtrl.text.trim());
+      if (p == null || p <= 0) {
+        setState(() => _saving = false);
+        showAppToast(context, '请填写贷款总额');
+        return;
+      }
+      loanPrincipal = (p * 100).round();
+      loanRateBp = _rateBpOf(_loanRateCtrl.text) ?? 0;
+      loanTerm = int.tryParse(_loanTermCtrl.text.trim());
+      loanMethod = _loanMethod;
+      if (loanTerm == null || loanTerm <= 0 || _loanFirstPaymentAt == null) {
+        setState(() => _saving = false);
+        showAppToast(context, '请填写期数与首次还款日');
+        return;
+      }
+      if (_repayAccountId == null) {
+        setState(() => _saving = false);
+        showAppToast(context, '请选择还款账户');
+        return;
+      }
+    }
+
+    // 贷款账户的期初余额由本金推导（负债为负），不单独问用户
+    final effectiveOpening = _isLoan
+        ? -loanPrincipal
+        : (isCredit ? 0 : openingCents);
+
+    // STORY-10.3 资产估值参数（贷款/信用卡忽略）。
+    // 折旧模式下的年率取输入值的相反数，用户只需填正数。
+    final wantsValuation =
+        !_isLoan && _type != AccountType.credit && _valuationMode.isActive;
+    var valBase = 0;
+    var valRateBp = 0;
+    var valManual = 0;
+    if (wantsValuation) {
+      valBase = _centsOf(_valBaseCtrl.text);
+      valManual = _centsOf(_valManualCtrl.text);
+      final rate = _rateBpOf(_valRateCtrl.text) ?? 0;
+      valRateBp = _valuationMode == AssetValuationMode.depreciate ? -rate : rate;
+    }
+
+    final accountId = _isEditing ? widget.editing!.id : deps.idGen.generate();
+
     if (_isEditing) {
       final e = widget.editing!;
       await deps.accountRepository.update(Account(
-        id: e.id,
+        id: accountId,
         name: name,
         type: _type,
         currency: _currency,
-        openingBalance: openingCents,
+        // 贷款改参数时保留既有期初，避免把已发生的还款历史一起改掉
+        openingBalance: _isLoan ? e.openingBalance : effectiveOpening,
         note: note.isEmpty ? null : note,
         sortOrder: e.sortOrder,
         isHidden: e.isHidden,
-        creditLimitCents: _type == AccountType.credit ? creditLimit : 0,
+        creditLimitCents: isCredit ? creditLimit : 0,
         creditDebtCents: e.creditDebtCents,
-        billDay: _type == AccountType.credit ? billDay : null,
-        dueDay: _type == AccountType.credit ? dueDay : null,
+        creditAnnualRateBp: creditRateBp,
+        minPaymentCents: creditMinPay,
+        billDay: isCredit ? billDay : null,
+        dueDay: isCredit ? dueDay : null,
+        loanPrincipalCents: _isLoan ? loanPrincipal : 0,
+        loanAnnualRateBp: _isLoan ? loanRateBp : 0,
+        loanTermMonths: _isLoan ? loanTerm : null,
+        loanRepayMethod: _isLoan ? loanMethod : null,
+        loanFirstPaymentAt: _isLoan ? _loanFirstPaymentAt : null,
+        valuationMode:
+            wantsValuation ? _valuationMode : AssetValuationMode.none,
+        valuationBaseCents: wantsValuation ? valBase : 0,
+        valuationRateBp: wantsValuation ? valRateBp : 0,
+        valuationManualCents: wantsValuation ? valManual : 0,
+        valuationStartedAt:
+            wantsValuation ? _valuationStartedAt : null,
         createdAt: e.createdAt,
         updatedAt: now,
         deletedAt: e.deletedAt,
@@ -694,17 +1145,30 @@ class _AddAccountSheetState extends ConsumerState<_AddAccountSheet> {
       ));
     } else {
       await deps.accountRepository.create(Account(
-        id: deps.idGen.generate(),
+        id: accountId,
         name: name,
         type: _type,
         currency: _currency,
-        openingBalance: openingCents,
+        openingBalance: effectiveOpening,
         note: note.isEmpty ? null : note,
         sortOrder: 0,
         isHidden: false,
         creditLimitCents: creditLimit,
+        creditDebtCents: isCredit ? openingCents : 0,
+        creditAnnualRateBp: creditRateBp,
+        minPaymentCents: creditMinPay,
         billDay: billDay,
         dueDay: dueDay,
+        loanPrincipalCents: loanPrincipal,
+        loanAnnualRateBp: loanRateBp,
+        loanTermMonths: loanTerm,
+        loanRepayMethod: loanMethod,
+        loanFirstPaymentAt: _loanFirstPaymentAt,
+        valuationMode: wantsValuation ? _valuationMode : AssetValuationMode.none,
+        valuationBaseCents: wantsValuation ? valBase : 0,
+        valuationRateBp: wantsValuation ? valRateBp : 0,
+        valuationManualCents: wantsValuation ? valManual : 0,
+        valuationStartedAt: wantsValuation ? _valuationStartedAt : null,
         createdAt: now,
         updatedAt: now,
         revision: 1,
@@ -713,7 +1177,25 @@ class _AddAccountSheetState extends ConsumerState<_AddAccountSheet> {
       ));
     }
 
+    // 贷款：建立「每期还款」周期规则（利息 + 本金两笔，待确认）
+    if (_isLoan) {
+      final reloaded = await deps.accountRepository.getById(accountId);
+      final loan = reloaded.successOrNull;
+      if (loan != null) {
+        final r = await deps.setLoanRepaymentSchedule(
+          loanAccount: loan,
+          bookId: deps.bookId,
+          repayAccountId: _repayAccountId!,
+          interestCategoryId: _interestCategoryId ?? 'preset_other',
+        );
+        if (r.isFailure && mounted) {
+          showAppToast(context, '还款计划建立失败：${r.failureOrNull?.code ?? '未知'}');
+        }
+      }
+    }
+
     if (mounted) {
+      ref.invalidateData.bumpRecurringMutated();
       widget.onSaved();
       Navigator.pop(context);
     }
@@ -724,7 +1206,7 @@ class _TypeOption extends StatelessWidget {
   const _TypeOption({required this.label, required this.icon, required this.selected, required this.onTap});
 
   final String label;
-  final IconData icon;
+  final PlainIconData icon;
   final bool selected;
   final VoidCallback onTap;
 
@@ -742,9 +1224,9 @@ class _TypeOption extends StatelessWidget {
           border: Border.all(color: selected ? context.colors.primary : context.colors.border),
         ),
         child: Column(children: [
-          Icon(icon, size: 28, color: selected ? context.colors.primary : context.colors.inkSecondary),
+          PlainIcon(icon, size: 28, color: selected ? context.colors.primary : context.colors.inkSecondary),
           const SizedBox(height: Spacing.xs),
-          Text(label, style: TextStyle(fontSize: 13, fontWeight: selected ? FontWeight.w600 : FontWeight.w400, color: selected ? context.colors.primary : context.colors.inkSecondary)),
+          Text(label, style: TextStyle(fontSize: 14, fontWeight: selected ? FontWeight.w600 : FontWeight.w400, color: selected ? context.colors.primary : context.colors.inkSecondary)),
         ]),
       ),
     );

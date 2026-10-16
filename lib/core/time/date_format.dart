@@ -33,7 +33,11 @@ bool isSameLocalDay(DateTime at, DateTime now) {
   return a.year == now.year && a.month == now.month && a.day == now.day;
 }
 
-/// Group-header label for a `yyyy-MM-dd` day key: 今天 / 昨天 / `M/D 周X`.
+/// Group-header label for a `yyyy-MM-dd` day key: 今天 / 昨天 / `M月D日 周X`.
+///
+/// 日期形态照设计稿屏 2 的 `.eyebrow`：`9月28日 周日`（不补零、不带年）。
+/// 今天/昨天仍是特例 —— 设计稿的样例数据里没有「今天」那一行，而这两个词
+/// 在扫读时的价值远高于日期本身。
 String dayLabel(String dayKey, {DateTime? now}) {
   final ref = now ?? DateTime.now();
   final today = Clock.dayKeyOf(ref);
@@ -43,5 +47,5 @@ String dayLabel(String dayKey, {DateTime? now}) {
   final dt = DateTime.tryParse(dayKey);
   if (dt == null) return dayKey;
   const wd = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
-  return '${dt.month}/${dt.day} ${wd[dt.weekday % 7]}';
+  return '${dt.month}月${dt.day}日 ${wd[dt.weekday % 7]}';
 }

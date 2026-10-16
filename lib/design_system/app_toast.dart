@@ -1,16 +1,15 @@
 /// Android-native style toast (not Material SnackBar).
 ///
 /// Visual spec follows platform Toast:
-/// - dark pill `#323232`, white 14sp text
+/// - inverted-ink pill (`toastBg`), contrasting 14sp text
 /// - horizontally centered, near the bottom
 /// - fade in/out, auto-dismiss, non-interactive
 library;
 
 import 'package:flutter/material.dart';
+import 'package:plain/app/theme/app_colors.dart';
+import 'package:plain/app/theme/typography.dart';
 import 'package:plain/core/constants/app_constants.dart';
-
-/// Android toast background (framework `Toast` surface).
-const Color _toastBg = Color(0xFF323232);
 
 /// Fixed bottom inset for every toast — matches the post-save toast on
 /// the entry page (记一笔 → OK). All toasts share this anchor so they
@@ -183,9 +182,9 @@ class _ToastPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Android 12+ toast: dark rounded pill, 14sp white text, max 80% width.
+    // Android 12+ toast: inverted-ink pill, contrasting 14sp text, max 80% width.
     return Material(
-      color: _toastBg,
+      color: context.colors.toastBg,
       elevation: 0,
       borderRadius: BorderRadius.circular(28),
       clipBehavior: Clip.antiAlias,
@@ -206,10 +205,14 @@ class _ToastPill extends StatelessWidget {
                   textAlign: TextAlign.center,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: Colors.white,
+                  style: TextStyle(
+                    color: context.colors.surface,
                     fontSize: 14,
-                    height: 1.25,
+                    // 原值 `1.25`（= 17.5px）比 MiSans 的自然行高 1.326 还小，
+                    // 而 toast 是 `maxLines: 2` —— 两行中文会挤在一起。
+                    // 设计稿 14px 的最紧档是 1.5（`.dv.note` = 21），从没低于自然行高；
+                    // 这里取 `normal` 的 19/14，是本组件唯一有依据的档位。
+                    height: designLineHeight(14),
                     fontWeight: FontWeight.w400,
                     letterSpacing: 0.1,
                   ),

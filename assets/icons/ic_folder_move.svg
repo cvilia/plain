@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" role="img" aria-label="ic_folder_move">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M3.25 19.25V6.75a2 2 0 0 1 2-2h2.85a2 2 0 0 1 1.66.89l.48.72a2 2 0 0 0 1.66.89h6.85a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5.25a2 2 0 0 1-2-2z"/>
+  <path d="M9.25 12.5h6.5"/>
+  <path d="M12.75 9.75 15.5 12.5l-2.75 2.75"/>
+  </g>
+</svg>

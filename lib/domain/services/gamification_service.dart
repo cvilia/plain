@@ -105,6 +105,10 @@ class GamificationService {
       } else if (milestone == 0 && days == 100) {
         rewards.add('连续 100 天 · 终身卡抽奖资格');
       }
+      // 坚持类徽章：原先只发券**没点亮徽章** → 成就页三个坚持徽章永远灰着
+      if (GamificationRules.streakBadgeMilestones.contains(days)) {
+        await _addBadge(sp, 'streak_$days');
+      }
 
       // 累计笔数徽章
       if (GamificationRules.entryCountMilestones.contains(total)) {
@@ -161,6 +165,10 @@ class GamificationService {
   }
 
   /// 解锁探索类徽章（首次使用某功能时调用）。
+  ///
+  /// 调用点见：预算页新建预算、自动化规则页新建规则、备份页导出成功
+  /// —— 这些是「第一次用就点亮」的功能入口，徽章 id 与成就页的
+  /// `explore_*` 定义一一对应。
   static Future<void> unlockExplorationBadge(String featureId) async {
     try {
       final sp = await SharedPreferences.getInstance();

@@ -48,7 +48,7 @@ class ReconcileModeService {
   Future<Result<LedgerEntry>> uncheck(LedgerEntry entry) async {
     final now = _clock.now();
     final updated = entry.copyWith(
-      reconciledAt: null,
+      clearReconciledAt: true,
       updatedAt: now,
       revision: entry.revision + 1,
       baseRevision: entry.revision,

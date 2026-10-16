@@ -136,11 +136,12 @@ class SavingsGoalRepositoryImpl implements SavingsGoalRepository {
 
   void _insert(SavingsGoal g) {
     _db.raw.execute(
-      'INSERT INTO savings_goals (id,book_id,name,goal_type,target_cents,saved_cents,remaining_terms,due_at,account_id,auto_transfer,'
-      'created_at,updated_at,deleted_at,revision,device_id,base_revision) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
+      'INSERT INTO savings_goals (id,book_id,name,goal_type,target_cents,saved_cents,remaining_terms,goal_account_id,due_at,account_id,auto_transfer,'
+      'created_at,updated_at,deleted_at,revision,device_id,base_revision) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
       [
         g.id, g.bookId, g.name, g.goalType.wire, g.targetCents, g.savedCents,
-        g.remainingTerms, g.dueAt?.millisecondsSinceEpoch, g.accountId, g.autoTransfer ? 1 : 0,
+        g.remainingTerms, g.goalAccountId, g.dueAt?.millisecondsSinceEpoch,
+        g.accountId, g.autoTransfer ? 1 : 0,
         g.createdAt.millisecondsSinceEpoch, g.updatedAt.millisecondsSinceEpoch,
         g.deletedAt?.millisecondsSinceEpoch, g.revision, g.deviceId, g.baseRevision,
       ],
@@ -149,11 +150,12 @@ class SavingsGoalRepositoryImpl implements SavingsGoalRepository {
 
   void _updateRow(SavingsGoal g) {
     _db.raw.execute(
-      'UPDATE savings_goals SET name=?,goal_type=?,target_cents=?,saved_cents=?,remaining_terms=?,due_at=?,account_id=?,auto_transfer=?,'
+      'UPDATE savings_goals SET name=?,goal_type=?,target_cents=?,saved_cents=?,remaining_terms=?,goal_account_id=?,due_at=?,account_id=?,auto_transfer=?,'
       'updated_at=?,deleted_at=?,revision=?,base_revision=? WHERE id=?',
       [
         g.name, g.goalType.wire, g.targetCents, g.savedCents, g.remainingTerms,
-        g.dueAt?.millisecondsSinceEpoch, g.accountId, g.autoTransfer ? 1 : 0,
+        g.goalAccountId, g.dueAt?.millisecondsSinceEpoch, g.accountId,
+        g.autoTransfer ? 1 : 0,
         g.updatedAt.millisecondsSinceEpoch, g.deletedAt?.millisecondsSinceEpoch,
         g.revision, g.baseRevision, g.id,
       ],
@@ -168,6 +170,7 @@ class SavingsGoalRepositoryImpl implements SavingsGoalRepository {
         targetCents: row.intOr('target_cents', 0),
         savedCents: row.intOr('saved_cents', 0),
         remainingTerms: row['remaining_terms'] as int?,
+        goalAccountId: row['goal_account_id'] as String?,
         dueAt: row.nullableDateTime('due_at'),
         accountId: row['account_id'] as String?,
         autoTransfer: ((row['auto_transfer'] as int?) ?? 0) == 1,
@@ -183,7 +186,13 @@ class SavingsGoalRepositoryImpl implements SavingsGoalRepository {
         'id': g.id,
         'book_id': g.bookId,
         'name': g.name,
+        'goal_type': g.goalType.wire,
         'target_cents': g.targetCents,
         'saved_cents': g.savedCents,
+        'remaining_terms': g.remainingTerms,
+        'goal_account_id': g.goalAccountId,
+        'due_at': g.dueAt?.millisecondsSinceEpoch,
+        'account_id': g.accountId,
+        'auto_transfer': g.autoTransfer,
       };
 }

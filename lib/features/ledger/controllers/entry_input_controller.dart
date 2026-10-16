@@ -1,22 +1,26 @@
 /// Entry input controller. Tap-category-to-save. See PRD STORY-1.1.
 library;
 
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:plain/app/bootstrap.dart';
 import 'package:plain/app/settings/display_prefs.dart';
 import 'package:plain/app/settings/ledger_settings.dart';
+import 'package:plain/core/constants/app_constants.dart';
 import 'package:plain/core/format/amount_formatter.dart';
 import 'package:plain/core/money/expression_evaluator.dart';
 import 'package:plain/core/money/money.dart';
 import 'package:plain/core/refresh/data_invalidation.dart';
 import 'package:plain/core/time/clock.dart';
 import 'package:plain/data/platform/platform_bridge.dart';
+import 'package:plain/domain/entities/currency_rate.dart';
 import 'package:plain/domain/entities/enums.dart';
 import 'package:plain/domain/entities/ledger_entry.dart';
 import 'package:plain/domain/repositories/repositories.dart';
-import 'package:plain/domain/services/category_suggester.dart';
 import 'package:plain/domain/services/emotion_feedback_service.dart';
 import 'package:plain/domain/services/gamification_service.dart';
+import 'package:plain/domain/services/merchant_learner.dart';
 import 'package:plain/domain/usecases/entry_usecases.dart';
 import 'package:plain/features/ledger/controllers/draft_store.dart';
 import 'package:plain/features/ledger/controllers/flow_list_controller.dart';
@@ -40,6 +44,8 @@ class EntryInputState {
     this.wasIncompleteExpression = false,
     this.isSubmitting = false,
     this.errorMessage,
+    this.foreignCurrency,
+    this.foreignRate,
   });
 
   final String amountExpression;
@@ -63,6 +69,16 @@ class EntryInputState {
   final bool isSubmitting;
   final String? errorMessage;
 
+  /// STORY-9.3：当前账户是外币时，这里的金额框输入的是**原币**。
+  /// null = 本位币记账（不显示任何提示）。
+  final String? foreignCurrency;
+
+  /// 锁定汇率（原币 → 本位币）；null = 用户还没设定（保存会被拦）。
+  final double? foreignRate;
+
+  /// 是否在外币语境下（记账页据此显示「你输入的是外币」）。
+  bool get isForeign => foreignCurrency != null;
+
   bool get hasAmount => displayAmount.isNotEmpty && displayAmount != '0';
 
   EntryInputState copyWith({
@@ -82,12 +98,15 @@ class EntryInputState {
     bool? wasIncompleteExpression,
     bool? isSubmitting,
     String? errorMessage,
+    String? foreignCurrency,
+    double? foreignRate,
     bool clearCategory = false,
     bool clearAccount = false,
     bool clearNote = false,
     bool clearToast = false,
     bool clearError = false,
     bool clearEmotion = false,
+    bool clearForeignCurrency = false,
   }) {
     return EntryInputState(
       amountExpression: amountExpression ?? this.amountExpression,
@@ -106,6 +125,9 @@ class EntryInputState {
       wasIncompleteExpression: wasIncompleteExpression ?? this.wasIncompleteExpression,
       isSubmitting: isSubmitting ?? this.isSubmitting,
       errorMessage: clearError ? null : (errorMessage ?? this.errorMessage),
+      foreignCurrency:
+          clearForeignCurrency ? null : (foreignCurrency ?? this.foreignCurrency),
+      foreignRate: clearForeignCurrency ? null : (foreignRate ?? this.foreignRate),
     );
   }
 }
@@ -153,6 +175,39 @@ class EntryInputController extends Notifier<EntryInputState> {
     final res = await ref.read(appDependenciesProvider).accountRepository.listAll();
     final list = res.successOrNull;
     return (list != null && list.isNotEmpty) ? list.first.id : null;
+  }
+
+  /// STORY-9.3：账户币种上下文。账户就是本位币时返回 null。
+  ///
+  /// 返回原币代码与「原币 → 本位币」的锁定汇率；汇率为 null 表示用户还没设定，
+  /// 此时应当拦截并提示，而不是拿 0 当汇率用。
+  Future<({String currency, double? rate})?> foreignCurrencyContext(
+    String accountId, {
+    String? toAccountId,
+  }) async {
+    final deps = ref.read(appDependenciesProvider);
+    final acc = await deps.accountRepository.getById(accountId);
+    final account = acc.successOrNull;
+    if (account == null) return null;
+
+    // 转出端与本位币一致时，再看转入端（跨币种转账 AC3）
+    var currency = account.currency;
+    if (currency == MoneyRules.defaultCurrency && toAccountId != null) {
+      final other = await deps.accountRepository.getById(toAccountId);
+      final o = other.successOrNull;
+      if (o != null && o.currency != MoneyRules.defaultCurrency) {
+        currency = o.currency;
+      }
+    }
+    if (currency == MoneyRules.defaultCurrency) return null;
+
+    final rates = await deps.currencyRateRepository.listByBook(_bookId);
+    final want = '$currency/${MoneyRules.defaultCurrency}';
+    double? rate;
+    for (final r in rates.successOrNull ?? const <CurrencyRate>[]) {
+      if (r.pairKey == want) rate = r.rate;
+    }
+    return (currency: currency, rate: rate);
   }
 
   /// 编辑态时持有原实体，供 update 使用。
@@ -231,7 +286,11 @@ class EntryInputController extends Notifier<EntryInputState> {
     );
   }
 
-  void onTypeChanged(EntryType type) => state = state.copyWith(type: type, clearCategory: true);
+  void onTypeChanged(EntryType type) {
+    state = state.copyWith(type: type, clearCategory: true);
+    // 转账/借款的账户组合变了，外币语境可能跟着变
+    refreshCurrencyContext();
+  }
 
   /// Select category without saving (for picker page).
   void selectCategory(String categoryId) {
@@ -243,10 +302,39 @@ class EntryInputController extends Notifier<EntryInputState> {
     _saveDraft();
   }
 
-  void onAccountSelected(String? accountId) =>
-      state = state.copyWith(selectedAccountId: accountId, clearAccount: accountId == null);
+  void onAccountSelected(String? accountId) {
+    state = state.copyWith(selectedAccountId: accountId, clearAccount: accountId == null);
+    refreshCurrencyContext();
+  }
 
-  void onToAccountSelected(String? accountId) => state = state.copyWith(toAccountId: accountId);
+  void onToAccountSelected(String? accountId) {
+    state = state.copyWith(toAccountId: accountId);
+    refreshCurrencyContext();
+  }
+
+  /// STORY-9.3：把「当前账户是不是外币」放进 state，让记账页当场提示，
+  /// 而不是等用户点保存才报错（此前只有保存拦截，用户看不到自己输的是美元）。
+  ///
+  /// 保存路径（[_save]）仍会独立再算一次：提示只是提示，拦截以保存时为准。
+  Future<void> refreshCurrencyContext() async {
+    final accountId = await _resolveAccountId(state.selectedAccountId);
+    if (accountId == null) {
+      if (state.isForeign) {
+        state = state.copyWith(clearForeignCurrency: true);
+      }
+      return;
+    }
+    final ctx = await foreignCurrencyContext(
+      accountId,
+      toAccountId: state.type == EntryType.transfer ? state.toAccountId : null,
+    );
+    if (ctx == null) {
+      if (state.isForeign) state = state.copyWith(clearForeignCurrency: true);
+      return;
+    }
+    if (state.foreignCurrency == ctx.currency && state.foreignRate == ctx.rate) return;
+    state = state.copyWith(foreignCurrency: ctx.currency, foreignRate: ctx.rate);
+  }
 
   void onNoteChanged(String? note) {
     state = state.copyWith(note: note, clearNote: note == null || note.isEmpty);
@@ -254,43 +342,53 @@ class EntryInputController extends Notifier<EntryInputState> {
     _suggestCategoryFromNote(note);
   }
 
-  /// Rule-based category suggestion from note (PRD STORY-1.3 AC4).
-  void _suggestCategoryFromNote(String? note) {
-    if (note == null || note.trim().isEmpty) return;
-    // Skip if category already manually selected
+  /// STORY-1.6：从**已学到的**商户映射推荐分类。
+  ///
+  /// 这里不再有任何写死的关键词表——映射来自 `merchant_rules` 表，由用户
+  /// 每次「给带备注的账单选分类」累积而来。
+  Future<void> _suggestCategoryFromNote(String? note) async {
+    final text = note?.trim();
+    if (text == null || text.isEmpty) return;
+    // 已手选分类就别抢用户的选择
     if (state.selectedCategoryId != null) return;
 
-    // Historical keyword → category mapping
-    const keywordMap = {
-      '瑞幸': 'preset_food_drink',
-      'luckin': 'preset_food_drink',
-      '星巴克': 'preset_food_drink',
-      'starbucks': 'preset_food_drink',
-      '麦当劳': 'preset_food_lunch',
-      'mcdonald': 'preset_food_lunch',
-      '肯德基': 'preset_food_lunch',
-      'kfc': 'preset_food_lunch',
-      '滴滴': 'preset_transport_taxi',
-      '打车': 'preset_transport_taxi',
-      '地铁': 'preset_transport_bus',
-      '加油': 'preset_transport_fuel',
-      '房租': 'preset_housing_rent',
-      '话费': 'preset_telecom_phone',
-      '工资': 'preset_income_salary',
-    };
+    final deps = ref.read(appDependenciesProvider);
+    final res = await deps.merchantRuleRepository.listByBook(_bookId);
+    final rules = res.successOrNull ?? const <MerchantRule>[];
+    if (rules.isEmpty) return;
 
-    final suggestion = CategorySuggester.suggest(
-      note: note,
-      keywordToCategory: keywordMap,
+    final suggestion = MerchantLearner.suggest(
+      merchant: text,
+      rulesByMerchant: {for (final r in rules) r.merchant: r},
     );
+    if (suggestion == null || suggestion.confidence < 0.3) return;
+    // 异步期间用户可能已经选了分类
+    if (state.selectedCategoryId != null) return;
+    state = state.copyWith(selectedCategoryId: suggestion.categoryId);
+  }
 
-    if (suggestion != null && suggestion.confidence >= 0.3) {
-      state = state.copyWith(selectedCategoryId: suggestion.categoryId);
-    }
+  /// STORY-1.6：把用户这次的「备注 → 分类」记住。
+  ///
+  /// 只在收入/支出类型上学习——转账、借出借入、对账调整都没有分类。
+  Future<void> _learnMerchantFrom(LedgerEntry entry) async {
+    final note = entry.note?.trim();
+    final categoryId = entry.categoryId;
+    if (note == null || note.isEmpty) return;
+    if (categoryId == null || categoryId.isEmpty) return;
+    if (entry.type != EntryType.expense && entry.type != EntryType.income) return;
+    await ref.read(appDependenciesProvider).merchantRuleRepository.learn(
+          bookId: entry.bookId,
+          merchant: note,
+          categoryId: categoryId,
+          deviceId: entry.deviceId,
+        );
   }
 
   /// 日期变更：若跨出当前记账月，给出「该账单计入 X 月」提示（G-1 / AC11）。
   /// STORY-9.2：OCR 识别结果预填（不直接入库）。
+  ///
+  /// [categoryHint] 是分类 id；存在时**由这里选中**——此前只传不选，
+  /// 提示被静默丢弃了。
   void applyOcrPrefill({int? amountCents, String? merchant, DateTime? occurredAt, String? categoryHint}) {
     // 金额用整数分 → 字符串，不用 double（G-4 int64 分规则）
     String? amountStr;
@@ -306,7 +404,10 @@ class EntryInputController extends Notifier<EntryInputState> {
       note: (merchant != null && merchant.isNotEmpty) ? merchant : state.note,
       occurredAt: occurredAt ?? state.occurredAt,
     );
-    // categoryHint 由调用方在分类列表中匹配后走 onCategorySelected。
+    final hint = categoryHint;
+    if (hint != null && hint.isNotEmpty) {
+      selectCategory(hint);
+    }
   }
 
   void onDateSelected(DateTime date) {
@@ -337,6 +438,7 @@ class EntryInputController extends Notifier<EntryInputState> {
       isEditing: true,
       editingId: entry.id,
     );
+    refreshCurrencyContext();
   }
 
   /// Category tap only selects — save is an explicit OK action (PRD / UX fix).
@@ -354,6 +456,12 @@ class EntryInputController extends Notifier<EntryInputState> {
 
   Future<bool> _save() async {
     if (state.isSubmitting) return false;
+    // STORY-8.2 AC2：只读成员点保存时拦截（不写库、不消费任何额度）
+    final deps = ref.read(appDependenciesProvider);
+    if (!await deps.memberService.canWrite(deps.bookId)) {
+      state = state.copyWith(errorMessage: 'member_read_only', clearToast: true);
+      return false;
+    }
     final eval = _evaluator.eval(state.amountExpression);
     if (eval.error != null) {
       // AC8：除零等非法表达式不得入账
@@ -381,10 +489,42 @@ class EntryInputController extends Notifier<EntryInputState> {
     }
     state = state.copyWith(isSubmitting: true, clearError: true);
 
+    // STORY-9.3：账户（或跨币种转账的任一端）不是本位币时，必须能确定汇率。
+    // 拿不到汇率就拦截——不用 0 或 1 悄悄记错金额。
+    final resolvedAccountId = await _resolveAccountId(state.selectedAccountId);
+    double? fxRate;
+    String? fxCurrency;
+    if (resolvedAccountId != null) {
+      final ctx = await foreignCurrencyContext(
+        resolvedAccountId,
+        toAccountId: state.type == EntryType.transfer ? state.toAccountId : null,
+      );
+      if (ctx != null) {
+        if (ctx.rate == null || ctx.rate! <= 0) {
+          state = state.copyWith(
+              errorMessage: 'fx_rate_required', isSubmitting: false, clearToast: true);
+          return false;
+        }
+        fxRate = ctx.rate;
+        fxCurrency = ctx.currency;
+      }
+    }
+
     if (state.isEditing && _editingEntry != null) {
+      // 编辑一笔原币账单：沿用它自己锁定的汇率重算，不引入新汇率
+      final rate = _editingEntry!.exchangeRate ?? fxRate;
+      final currency = _editingEntry!.originalAmountCents != null
+          ? fxCurrency
+          : (fxRate == null ? null : fxCurrency);
       final result = await _updateEntry(
         existing: _editingEntry!,
-        amount: eval.money,
+        amount: rate != null && currency != null
+            ? Money((eval.money.cents * rate).round())
+            : eval.money,
+        originalAmountCents: rate != null && currency != null
+            ? eval.money.cents
+            : _editingEntry!.originalAmountCents,
+        exchangeRate: rate,
         categoryId: state.selectedCategoryId,
         clearCategoryId: state.selectedCategoryId == null,
         accountId: state.selectedAccountId,
@@ -404,6 +544,8 @@ class EntryInputController extends Notifier<EntryInputState> {
             clearError: true,
           );
           draftStore.clear();
+          // STORY-1.6：用户在这次编辑里确认了分类，也是一个学习信号
+          unawaited(_learnMerchantFrom(entry));
           _updateWidgetSnapshot();
           _notifyEntryChanged();
           return true;
@@ -419,13 +561,16 @@ class EntryInputController extends Notifier<EntryInputState> {
       amountExpression: state.amountExpression,
       type: state.type,
       categoryId: state.selectedCategoryId ?? '',
-      accountId: await _resolveAccountId(state.selectedAccountId),
+      accountId: resolvedAccountId,
       toAccountId: state.toAccountId,
       note: state.note,
       occurredAt: state.occurredAt,
       bookId: _bookId,
       deviceId: _deviceId,
       reimburseStatus: state.reimburseStatus,
+      // 原币记账：把输入金额当原币，用例折算出本位币
+      exchangeRate: fxRate,
+      originalCurrency: fxCurrency,
     ));
 
     return result.when(
@@ -445,6 +590,8 @@ class EntryInputController extends Notifier<EntryInputState> {
           clearEmotion: true,
         );
         draftStore.clear(); // Clear draft after successful save
+        // STORY-1.6：记住这次的「备注 → 分类」
+        unawaited(_learnMerchantFrom(entry));
         _updateWidgetSnapshot();
         _notifyEntryChanged();
         ref.read(recentCategoriesProvider.notifier).use(

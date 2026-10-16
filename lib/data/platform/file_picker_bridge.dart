@@ -14,11 +14,17 @@ class FilePickerBridge {
   /// Opens the system picker. Returns a local file path or null if cancelled.
   ///
   /// [mime] e.g. `*/*`, `application/octet-stream`, `application/vnd.sqlite3`.
-  static Future<String?> pickFile({String mime = '*/*', String? extension}) async {
+  /// [mimeTypes] 用于多类型白名单（STORY-1.5：jpg/png/heic/pdf 一起选）。
+  static Future<String?> pickFile({
+    String mime = '*/*',
+    String? extension,
+    List<String> mimeTypes = const [],
+  }) async {
     try {
       final result = await _channel.invokeMethod<String>('pickFile', {
         'mime': mime,
         'extension': extension,
+        'mimeTypes': mimeTypes,
       });
       if (result == null || result.isEmpty) return null;
       final file = File(result);

@@ -11,6 +11,8 @@ import 'package:plain/core/format/amount_formatter.dart';
 import 'package:plain/core/refresh/data_invalidation.dart';
 import 'package:plain/design_system/app_empty_state.dart';
 import 'package:plain/design_system/app_toast.dart';
+import 'package:plain/design_system/plain_icons_v3.dart';
+import 'package:plain/design_system/plain_ui.dart';
 import 'package:plain/domain/entities/category.dart' as domain;
 import 'package:plain/domain/entities/enums.dart';
 import 'package:plain/domain/entities/ledger_entry.dart';
@@ -81,17 +83,19 @@ class _ReconcileModePageState extends ConsumerState<ReconcileModePage> {
     final pending = _pendingCount;
     final done = _entries.length - pending;
     return Scaffold(
-      appBar: AppBar(
-        title: Text('对账 · ${widget.accountName}'),
+      appBar: PlainTopBar(
+        title: '对账 · ${widget.accountName}',
+        showBack: true,
         actions: [
           if (_entries.isNotEmpty)
-            Center(
+            ConstrainedBox(
+              constraints: const BoxConstraints(minHeight: 44),
               child: Padding(
                 padding: const EdgeInsets.only(right: Spacing.lg),
                 child: Text(
                   pending == 0 ? '已对账至 ${_lastReconciledLabel()}' : '待对账 $pending 笔',
                   style: TextStyle(
-                    fontSize: 13,
+                    fontSize: 14,
                     color: pending == 0 ? context.colors.income : context.colors.accent,
                     fontWeight: FontWeight.w500,
                   ),
@@ -104,7 +108,7 @@ class _ReconcileModePageState extends ConsumerState<ReconcileModePage> {
           ? const Center(child: CircularProgressIndicator())
           : _entries.isEmpty
               ? const AppEmptyState(
-                  icon: Icons.playlist_add_check_outlined,
+                  icon: PlainIconData.listCheck,
                   title: '没有账单',
                   subtitle: '先在流水页记几笔再回来对账',
                 )
@@ -140,7 +144,7 @@ class _ReconcileModePageState extends ConsumerState<ReconcileModePage> {
                       ),
                       subtitle: Text(
                         _dateLabel(entry.occurredAt),
-                        style: TextStyle(fontSize: 11, color: context.colors.inkTertiary),
+                        style: TextStyle(fontSize: 12, color: context.colors.inkTertiary),
                       ),
                       secondary: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
@@ -165,7 +169,7 @@ class _ReconcileModePageState extends ConsumerState<ReconcileModePage> {
                     Expanded(
                       child: Text(
                         '已核对 $done / ${_entries.length}',
-                        style: TextStyle(fontSize: 13, color: context.colors.inkSecondary),
+                        style: TextStyle(fontSize: 14, color: context.colors.inkSecondary),
                       ),
                     ),
                     if (pending > 0)

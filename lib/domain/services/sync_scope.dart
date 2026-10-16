@@ -11,7 +11,51 @@ const Set<String> kSyncedEntityTypes = {
   'recurring_rule',
   'rule',
   'savings_goal',
+  // STORY-8.1 同步范围表：成员是数据资产，要同步
+  'member',
+  'holding',
+  'saved_report',
+  'tax_filing',
+  'merchant_rule',
+  // STORY-9.3 锁定汇率：用户手填的「原币 → 本位币」汇率是**账本数据**
+  // （换了设备照样要按同一汇率折算），因此必须跨端。
+  'currency_rate',
+  // ⚠️ AC6 要求「另一端账单可见、附件标记为未同步（仅在原设备）」——
+  //    要做到这一点必须同步附件的**元数据**（哪笔账单挂了什么附件），
+  //    而**字节永远不出设备**（PRD 8.1 表：账单附件不同步）。
+  //    这也解释了为什么附件表现在写 change_log（v23 更正了 v21 的结论）。
+  'attachment',
+  // 可同步设置（月起始日 / 隐藏余额 / 字体大小 / 音效 / 保存后停留 / 提醒开关）。
+  // 具体键还要过 kSyncedSettingKeys 白名单——凭据、主题、布局都不在其中。
+  'setting',
+  // STORY-8.2 的 AA 参与人（audit 2026-10-15 前完全没进同步）
+  'entry_participant',
 };
+
+/// entity_type → 表名（同步落库用）。
+const Map<String, String> kEntityTables = {
+  'transaction': 'transactions',
+  'category': 'categories',
+  'account': 'accounts',
+  'budget': 'budgets',
+  'recurring_rule': 'recurring_rules',
+  'rule': 'rules',
+  'savings_goal': 'savings_goals',
+  'merchant_rule': 'merchant_rules',
+  'member': 'members',
+  'holding': 'holdings',
+  'saved_report': 'saved_reports',
+  'tax_filing': 'tax_filings',
+  'currency_rate': 'currency_rates',
+  'attachment': 'attachments',
+  // 可同步设置落 app_meta（主键是 key，落库走专门分支）
+  'setting': 'app_meta',
+  'entry_participant': 'entry_participants',
+};
+
+/// 这张表要不要参与增量同步（附件只同步元数据，见上）。
+bool isSyncableTable(String entityType) =>
+    kEntityTables.containsKey(entityType) && isSyncedEntityType(entityType);
 
 /// 可同步设置 key（app_meta / prefs）。
 const Set<String> kSyncedSettingKeys = {
@@ -20,7 +64,10 @@ const Set<String> kSyncedSettingKeys = {
   'pref.font_scale',
   'pref.sound_enabled',
   'pref.stay_after_save',
-  // 提醒开关
+  // 提醒开关（STORY-6.3 的逐项开关 + 「全部静音」总开关）。
+  // PRD 8.1 把「提醒开关」列为**可同步设置**：`ReminderPrefsStore` 保存时
+  // 同时写 `app_meta`（走 `registerMetaWriter` → 记一条 `setting` 变更），
+  // 启动/开局也从 `app_meta` 读回，因此这里登记后开关真的会跨端。
   'pref.reminder',
 };
 
