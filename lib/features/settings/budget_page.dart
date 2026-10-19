@@ -259,53 +259,56 @@ class _BudgetPageState extends ConsumerState<BudgetPage> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         PlainEyebrow(appS.envelopeEyebrow(envelopes.length, overs)),
-        PlainPanel(
-          children: [
-            for (var i = 0; i < envelopes.length; i++) ...[
-              if (i > 0)
-                Divider(
-                    height: 1,
-                    thickness: 1,
-                    indent: 16,
-                    color: context.colors.divider),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Text(envelopes[i].name,
-                          style: const TextStyle(
-                              fontSize: 15, fontWeight: FontWeight.w500)),
-                    ),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        Text(
-                          hide
-                              ? '✱✱✱✱'
-                              : appS.envelopeRemaining(formatAmountYuan(envelopes[i].remainingCents)),
-                          style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w600,
-                            color: envelopes[i].isOver
-                                ? context.colors.expense
-                                : context.colors.ink,
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: Spacing.lg),
+          child: PlainPanel(
+            children: [
+              for (var i = 0; i < envelopes.length; i++) ...[
+                if (i > 0)
+                  Divider(
+                      height: 1,
+                      thickness: 1,
+                      indent: 16,
+                      color: context.colors.divider),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(envelopes[i].name,
+                            style: const TextStyle(
+                                fontSize: 15, fontWeight: FontWeight.w500)),
+                      ),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Text(
+                            hide
+                                ? '✱✱✱✱'
+                                : appS.envelopeRemaining(formatAmountYuan(envelopes[i].remainingCents)),
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                              color: envelopes[i].isOver
+                                  ? context.colors.expense
+                                  : context.colors.ink,
+                            ),
                           ),
-                        ),
-                        Text(
-                          envelopes[i].isOver
-                              ? appS.envelopeOver(formatAmountYuan(envelopes[i].overdraftCents))
-                              : appS.envelopeSpent(formatAmountYuan(envelopes[i].spentCents)),
-                          style: TextStyle(
-                              fontSize: 12, color: context.colors.inkTertiary),
-                        ),
-                      ],
-                    ),
-                  ],
+                          Text(
+                            envelopes[i].isOver
+                                ? appS.envelopeOver(formatAmountYuan(envelopes[i].overdraftCents))
+                                : appS.envelopeSpent(formatAmountYuan(envelopes[i].spentCents)),
+                            style: TextStyle(
+                                fontSize: 12, color: context.colors.inkTertiary),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
-              ),
+              ],
             ],
-          ],
+          ),
         ),
         Padding(
           padding: const EdgeInsets.fromLTRB(Spacing.lg, Spacing.sm, Spacing.lg, 0),
@@ -366,16 +369,19 @@ class _BudgetPageState extends ConsumerState<BudgetPage> {
             ),
           ),
         PlainEyebrow(appS.allocationDetail),
-        PlainPanel(
-          children: [
-            _PlainKV(label: appS.currentIncome, value: formatAmountYuan(view.incomeCents)),
-            _PlainKV(label: appS.allocatedToCategories, value: formatAmountYuan(view.allocatedCents)),
-            _PlainKV(
-              label: appS.unallocatedLabel,
-              value: formatAmountYuan(view.unallocatedCents),
-              bold: true,
-            ),
-          ],
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: Spacing.lg),
+          child: PlainPanel(
+            children: [
+              _PlainKV(label: appS.currentIncome, value: formatAmountYuan(view.incomeCents)),
+              _PlainKV(label: appS.allocatedToCategories, value: formatAmountYuan(view.allocatedCents)),
+              _PlainKV(
+                label: appS.unallocatedLabel,
+                value: formatAmountYuan(view.unallocatedCents),
+                bold: true,
+              ),
+            ],
+          ),
         ),
         Padding(
           padding: const EdgeInsets.fromLTRB(Spacing.lg, Spacing.sm, Spacing.lg, 0),
@@ -422,50 +428,53 @@ class _BudgetPageState extends ConsumerState<BudgetPage> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         PlainEyebrow(s.ratioBucketsEyebrow),
-        PlainPanel(
-          children: [
-            for (final b in buckets)
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(children: [
-                      Expanded(
-                        child: Text(b.kind.label(AppStrings.of(context)),
-                            style: const TextStyle(
-                                fontSize: 15, fontWeight: FontWeight.w500)),
-                      ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: Spacing.lg),
+          child: PlainPanel(
+            children: [
+              for (final b in buckets)
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(children: [
+                        Expanded(
+                          child: Text(b.kind.label(AppStrings.of(context)),
+                              style: const TextStyle(
+                                  fontSize: 15, fontWeight: FontWeight.w500)),
+                        ),
+                        Text(
+                          s.ratioTargetLine(
+                            (b.actualRatio(incomeCents) * 100).toStringAsFixed(1),
+                            (b.targetRatio(incomeCents) * 100).toStringAsFixed(0),
+                          ),
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: context.colors.ink,
+                          ),
+                        ),
+                      ]),
+                      const SizedBox(height: 2),
                       Text(
-                        s.ratioTargetLine(
-                          (b.actualRatio(incomeCents) * 100).toStringAsFixed(1),
-                          (b.targetRatio(incomeCents) * 100).toStringAsFixed(0),
+                        s.ratioActualLine(
+                          formatAmountYuan(b.actualCents),
+                          formatAmountYuan(b.targetCents),
+                          b.deltaCents == 0
+                              ? ''
+                              : b.deltaCents > 0
+                                  ? s.ratioOver(formatAmountYuan(b.deltaCents))
+                                  : s.ratioUnder(formatAmountYuan(-b.deltaCents)),
                         ),
                         style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: context.colors.ink,
-                        ),
+                            fontSize: 12, color: context.colors.inkTertiary),
                       ),
-                    ]),
-                    const SizedBox(height: 2),
-                    Text(
-                      s.ratioActualLine(
-                        formatAmountYuan(b.actualCents),
-                        formatAmountYuan(b.targetCents),
-                        b.deltaCents == 0
-                            ? ''
-                            : b.deltaCents > 0
-                                ? s.ratioOver(formatAmountYuan(b.deltaCents))
-                                : s.ratioUnder(formatAmountYuan(-b.deltaCents)),
-                      ),
-                      style: TextStyle(
-                          fontSize: 12, color: context.colors.inkTertiary),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-          ],
+            ],
+          ),
         ),
         Padding(
           padding: const EdgeInsets.fromLTRB(Spacing.lg, Spacing.sm, Spacing.lg, 0),
