@@ -1,7 +1,8 @@
 /// 分类图标选择器的 **可选 ref 清单**（v3 图标集）。
 ///
 /// ref → `PlainIconData` 的映射在 `category_icon_v3.dart`（`plainIconForRef`）：
-/// v3 只有 12 枚一级分类图标，二级/常见 ref 一律归并到最近的一级。
+/// v3 图标集共 100 枚（12 枚一级 + 88 枚 cat 细分，见 04-ICON-SYSTEM/svg）。
+/// 近 300 个语义 ref 归并到最接近的一枚；同一枚图标可能对应多个 ref。
 /// 本文件只回答「选择器里列出哪些 ref」，不持有任何图标几何，也不依赖字体。
 library;
 
@@ -87,6 +88,40 @@ const List<String> kAllCategoryIconRefs = [
   // `wallet` / `trophy` 本来就在上面的清单里，这里只补缺的。
   'parttime', 'business', 'reimburse', 'subsidy',
   'resale', 'prize', 'family',
+  // 补：映射表里有、此前选择器里选不到的 ref
+  'bandage',
+  // 补：映射表里有、此前选择器里选不到的 ref
+  'bed',
+  // 补：映射表里有、此前选择器里选不到的 ref
+  'bill',
+  // 补：映射表里有、此前选择器里选不到的 ref
+  'card',
+  // 补：映射表里有、此前选择器里选不到的 ref
+  'coins',
+  // 补：映射表里有、此前选择器里选不到的 ref
+  'couple',
+  // 补：映射表里有、此前选择器里选不到的 ref
+  'fun',
+  // 补：映射表里有、此前选择器里选不到的 ref
+  'health',
+  // 补：映射表里有、此前选择器里选不到的 ref
+  'heart',
+  // 补：映射表里有、此前选择器里选不到的 ref
+  'home',
+  // 补：映射表里有、此前选择器里选不到的 ref
+  'household',
+  // 补：映射表里有、此前选择器里选不到的 ref
+  'learn',
+  // 补：映射表里有、此前选择器里选不到的 ref
+  'market',
+  // 补：映射表里有、此前选择器里选不到的 ref
+  'meal',
+  // 补：映射表里有、此前选择器里选不到的 ref
+  'misc',
+  // 补：映射表里有、此前选择器里选不到的 ref
+  'streaming_alt',
+  // 补：映射表里有、此前选择器里选不到的 ref
+  'tv',
 ];
 
 // 取图标请用 `category_icon_v3.dart` 的 `plainIconForRef(ref)`（或 `CategoryIcon`
