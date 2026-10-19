@@ -17,6 +17,8 @@ import 'package:plain/domain/entities/category.dart';
 import 'package:plain/domain/entities/ledger_entry.dart';
 import 'package:plain/domain/repositories/repositories.dart';
 import 'package:plain/domain/services/credit_card_service.dart';
+import 'package:plain/app/l10n/app_strings.dart';
+import 'package:plain/app/l10n/strings_accounts.dart';
 
 /// 对账页一次性快照，避免 build 里散落 FutureBuilder / dynamic。
 class _CreditSnapshot {
@@ -101,6 +103,7 @@ class _CreditReconcilePageState extends ConsumerState<CreditReconcilePage> {
   }
 
   Future<void> _reload() async {
+    final s = AppStrings.of(context);
     setState(() {
       _loading = true;
       _error = null;
@@ -122,7 +125,7 @@ class _CreditReconcilePageState extends ConsumerState<CreditReconcilePage> {
     if (account == null || bal == null) {
       setState(() {
         _loading = false;
-        _error = '账户加载失败';
+        _error = s.loadAccountFailed;
       });
       return;
     }
@@ -142,12 +145,13 @@ class _CreditReconcilePageState extends ConsumerState<CreditReconcilePage> {
 
   /// 消费明细行文案：`MM-DD 分类 · 备注`（全部来自该笔账单本身）。
   String _consumeLabel(LedgerEntry e) {
+    final s = AppStrings.of(context);
     final local = e.occurredAt.toLocal();
     final d = '${local.month.toString().padLeft(2, '0')}-'
         '${local.day.toString().padLeft(2, '0')}';
     final catName = e.categoryId == null
-        ? '未分类'
-        : (_snap?.categories[e.categoryId]?.name ?? '未分类');
+        ? s.uncategorized
+        : (_snap?.categories[e.categoryId]?.name ?? s.uncategorized);
     final note = e.note;
     return note == null || note.isEmpty
         ? '$d $catName'
@@ -156,13 +160,15 @@ class _CreditReconcilePageState extends ConsumerState<CreditReconcilePage> {
 
   @override
   Widget build(BuildContext context) {
+    final s = AppStrings.of(context);
     return Scaffold(
-      appBar: PlainTopBar(title: '信用卡账单', showBack: true),
+      appBar: PlainTopBar(title: s.creditBillTitle, showBack: true),
       body: _buildBody(context),
     );
   }
 
   Widget _buildBody(BuildContext context) {
+    final s = AppStrings.of(context);
     if (_loading) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -171,7 +177,7 @@ class _CreditReconcilePageState extends ConsumerState<CreditReconcilePage> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(_error ?? '加载失败'),
+            Text(_error ?? s.loadingError),
             const SizedBox(height: Spacing.md),
             Material(
               color: const Color(0x00000000),
@@ -185,7 +191,7 @@ class _CreditReconcilePageState extends ConsumerState<CreditReconcilePage> {
                     border: Border.all(color: context.colors.lineStrong),
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: const Text('重试'),
+                  child: Text(s.retry),
                 ),
               ),
             ),
@@ -205,7 +211,7 @@ class _CreditReconcilePageState extends ConsumerState<CreditReconcilePage> {
         const SizedBox(height: 16),
         Padding(
           padding: const EdgeInsets.only(left: 2),
-          child: Text('本期应还 · 还款日 10月8日',
+          child: Text(s.currentDueHero,
               style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600,
                   letterSpacing: 0.08 * 12, color: colors.inkTertiary)),
         ),
@@ -223,12 +229,12 @@ class _CreditReconcilePageState extends ConsumerState<CreditReconcilePage> {
           alignment: Alignment.centerLeft,
           child: Row(children: [
             // 三栏全部派生自账户参数，无写死值
-            _HeroSplit(label: '可用额度', amountCents: snap.account.creditAvailableCents),
+            _HeroSplit(label: s.availableLimit, amountCents: snap.account.creditAvailableCents),
             const SizedBox(width: 28),
-            _HeroSplit(label: '已用额度', amountCents: snap.usedLimitCents),
+            _HeroSplit(label: s.usedLimit, amountCents: snap.usedLimitCents),
             const SizedBox(width: 28),
             _HeroSplit(
-              label: '已用',
+              label: s.usedLabel,
               text: '${(snap.usedRatio * 100).toStringAsFixed(1)}%',
             ),
           ]),
@@ -240,7 +246,7 @@ class _CreditReconcilePageState extends ConsumerState<CreditReconcilePage> {
         // ── 账户参数 ──
         Padding(
           padding: const EdgeInsets.only(left: 2),
-          child: Text('账户参数',
+          child: Text(s.accountParams,
               style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600,
                   letterSpacing: 0.08 * 12, color: colors.inkTertiary)),
         ),
@@ -258,10 +264,10 @@ class _CreditReconcilePageState extends ConsumerState<CreditReconcilePage> {
           ),
           child: Column(children: [
             // `.kvr{padding:4px 16px;min-height:44px}`；`.kvr + .kvr{border-top:1px solid var(--line-soft)}`
-            const _KvRow(label: '账单日', value: '每月 25 日', topLine: false),
-            const _KvRow(label: '还款日', value: '次月 8 日'),
-            const _KvRow(label: '总额度', value: '¥20,000.00'),
-            const _KvRow(label: '循环利息', value: '无（全额还款）'),
+            _KvRow(label: s.billDay, value: s.monthlyBillDay, topLine: false),
+            _KvRow(label: s.dueDay, value: s.nextMonthDueDay),
+            _KvRow(label: s.creditLimit, value: '¥20,000.00'),
+            _KvRow(label: s.cycleInterest, value: s.noCycleInterest),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               child: Column(
@@ -282,7 +288,7 @@ class _CreditReconcilePageState extends ConsumerState<CreditReconcilePage> {
                   ),
                   // `.prowfoot{margin-top:7px;font-size:12;font-weight:600}`
                   const SizedBox(height: 7),
-                  Text('已用 25.0%，额度使用健康',
+                  Text(s.usedHealthy,
                       style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600,
                           color: colors.inkSecondary)),
                 ],
@@ -292,7 +298,7 @@ class _CreditReconcilePageState extends ConsumerState<CreditReconcilePage> {
         ),
         const SizedBox(height: 32),
         // ── 本期未出账消费 ──
-        Text('本期未出账消费 · ¥1,899.50',
+        Text(s.unbilledLabel,
             style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600,
                 letterSpacing: 0.08 * 12, color: colors.inkTertiary)),
         const SizedBox(height: 8),
@@ -312,7 +318,7 @@ class _CreditReconcilePageState extends ConsumerState<CreditReconcilePage> {
               Padding(
                 padding: const EdgeInsets.all(Spacing.lg),
                 child: Text(
-                  '该信用卡还没有账单',
+                  s.noCreditEntries,
                   style: TextStyle(fontSize: 14, color: colors.inkTertiary),
                 ),
               )
@@ -341,33 +347,33 @@ class _CreditReconcilePageState extends ConsumerState<CreditReconcilePage> {
             children: [
               // 直接口径文案（含粗体混排 —— 门禁比连续字面量）
               Text.rich(TextSpan(children: [
-                TextSpan(text: '「欠款余额」是可写的唯一权威量；「可用额度」由总额度派生，', style: TextStyle(fontSize: 12, height: 1.72, color: colors.inkTertiary)),
-                TextSpan(text: '双数模型：', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: colors.inkSecondary)),
+                TextSpan(text: s.creditAuthNote, style: TextStyle(fontSize: 12, height: 1.72, color: colors.inkTertiary)),
+                TextSpan(text: s.dualModelLabel, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: colors.inkSecondary)),
               ])),
               Text('「欠款余额」是可写的唯一权威量；「可用额度」由总额度派生，。',
                   style: TextStyle(fontSize: 0, height: 0, color: colors.surface)),
               Text.rich(TextSpan(children: [
-                TextSpan(text: '只读', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: colors.inkSecondary)),
+                TextSpan(text: s.readOnlyLabel, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: colors.inkSecondary)),
                 TextSpan(text: '。', style: TextStyle(fontSize: 12, color: colors.inkTertiary)),
               ])),
               const SizedBox(height: 3),
               Text(
-                '本期应还 ¥5,000.00 与未出账 ¥1,899.50 是两个口径： 前者是上一账单周期的结算结果，后者是本期新增。',
+                s.reconcileScopeNote,
                 style: TextStyle(fontSize: 12, height: 1.72, color: colors.inkTertiary),
               ),
               const SizedBox(height: 3),
               Text('信用卡消费（钱确实花了）； 还信用卡（只减少欠款）。',
                   style: TextStyle(fontSize: 0, height: 0, color: colors.surface)),
               Text.rich(TextSpan(children: [
-                TextSpan(text: '信用卡消费（钱确实花了）', style: TextStyle(fontSize: 12, color: colors.inkTertiary)),
+                TextSpan(text: s.creditSpendSpent, style: TextStyle(fontSize: 12, color: colors.inkTertiary)),
                 TextSpan(text: '；', style: TextStyle(fontSize: 12, color: colors.inkTertiary)),
-                TextSpan(text: ' 还信用卡（只减少欠款）', style: TextStyle(fontSize: 12, color: colors.inkTertiary)),
+                TextSpan(text: s.creditSpendRepay, style: TextStyle(fontSize: 12, color: colors.inkTertiary)),
                 TextSpan(text: '。', style: TextStyle(fontSize: 12, color: colors.inkTertiary)),
               ])),
               Text.rich(TextSpan(children: [
-                TextSpan(text: '计入支出统计', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: colors.inkSecondary)),
+                TextSpan(text: s.countedInExpense, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: colors.inkSecondary)),
                 TextSpan(text: ' / ', style: TextStyle(fontSize: 12, color: colors.inkTertiary)),
-                TextSpan(text: '不计入收支', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: colors.inkSecondary)),
+                TextSpan(text: s.notInStats, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: colors.inkSecondary)),
               ])),
             ],
           ),
@@ -383,9 +389,10 @@ class _CreditReconcilePageState extends ConsumerState<CreditReconcilePage> {
   }
 
   Future<void> _submit(Account account) async {
+    final s = AppStrings.of(context);
     final v = double.tryParse(_actualCtrl.text.trim());
     if (v == null || v < 0) {
-      showAppToast(context, '请输入有效欠款金额');
+      showAppToast(context, s.invalidDebtAmount);
       return;
     }
     final actual = (v * 100).round();
@@ -415,8 +422,8 @@ class _CreditReconcilePageState extends ConsumerState<CreditReconcilePage> {
         showAppToast(
           context,
           res.adjustmentCents == 0
-              ? '欠款已更新'
-              : '已写入欠款，生成调整 ${formatAmountYuan(res.adjustmentCents.abs())}',
+              ? s.debtUpdated
+              : s.debtWrittenWithAdjustment(formatAmountYuan(res.adjustmentCents.abs())),
         );
         _reload();
       },
@@ -562,6 +569,7 @@ class _WriteDebtCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final s = AppStrings.of(context);
     return Container(
       decoration: BoxDecoration(
         color: context.colors.surfaceCard,
@@ -573,13 +581,13 @@ class _WriteDebtCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text('银行 App 显示欠款', style: Theme.of(context).textTheme.titleSmall),
+            Text(s.bankAppDebt, style: Theme.of(context).textTheme.titleSmall),
             const SizedBox(height: Spacing.md),
             TextField(
               controller: actualCtrl,
               keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              decoration: const InputDecoration(
-                labelText: '实际欠款',
+              decoration: InputDecoration(
+                labelText: s.actualDebt,
                 prefixText: '¥',
                 border: OutlineInputBorder(),
               ),
@@ -593,7 +601,7 @@ class _WriteDebtCard extends StatelessWidget {
                       width: 20,
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
-                  : const Text('写入欠款并生成调整凭证'),
+                  : Text(s.writeDebtAction),
             ),
           ],
         ),

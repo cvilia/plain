@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" role="img" aria-label="ic_cat_watch">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <circle cx="12" cy="12" r="4.25"/>
+  <path d="M9.75 8.5 9.25 4.75h5.5L14.25 8.5"/>
+  <path d="M9.75 15.5 9.25 19.25h5.5l-.5-3.75"/>
+  </g>
+</svg>

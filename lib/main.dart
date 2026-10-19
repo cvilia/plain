@@ -17,6 +17,7 @@ import 'package:plain/app/theme/theme_resolver.dart';
 import 'package:plain/core/id/uuid_v7.dart';
 import 'package:plain/core/refresh/data_invalidation.dart';
 import 'package:plain/data/db/database.dart';
+import 'package:plain/data/platform/legacy_dir_cleanup.dart';
 import 'package:plain/data/platform/platform_bridge.dart';
 import 'package:plain/data/sync/sync_scheduler.dart';
 import 'package:plain/data/seed/default_account.dart';
@@ -57,9 +58,15 @@ Future<void> main() async {
     }
   }
 
+  // 用具名 container（而不是 ProviderScope）：首帧后的补种子/补预设要能自己
+  // 抬一下版本号 —— 否则已经加载完的读模型（记账页的分类宫格就是第一个）
+  // 看不到新写进去的分类，得等下次启动。
+  final container = ProviderContainer(
+    overrides: [appDependenciesProvider.overrideWithValue(deps)],
+  );
   runApp(
-    ProviderScope(
-      overrides: [appDependenciesProvider.overrideWithValue(deps)],
+    UncontrolledProviderScope(
+      container: container,
       child: PlainApp(showOnboarding: onboardPending, appLockInitiallyEnabled: appLock.isConfigured),
     ),
   );
@@ -72,6 +79,10 @@ Future<void> main() async {
       // ignore: unnecessary_null_comparison
       if (dbRef != null && depsRef != null) {
         await seedPresetCategories(dbRef, depsRef.clock);
+        // 后加的预设分类（老库按主键补插，幂等）
+        await backfillPresetCategories(dbRef, depsRef.clock);
+        // 上面两步都可能写入分类 → 抬版本，让宫格/选择器立刻刷新
+        container.read(dataInvalidationProvider.notifier).bumpCategoriesMutated();
         await seedDefaultAccount(dbRef, depsRef.clock);
         // STORY-8.2：首次登记「我」（所有者），幂等
         await depsRef.memberService
@@ -79,7 +90,10 @@ Future<void> main() async {
         unawaited(runDailyStatsIntegrityCheck(depsRef));
         unawaited(runChangeLogGc(depsRef));
         unawaited(runWeeklyReportPush(depsRef));
-        unawaited(runAttachmentOrphanSweep(depsRef));
+        // 已下线功能的历史目录清理：附件（表在 DB 迁移里 DROP）
+        // + 自定义分类图标（`icon_asset` 在迁移里清空）
+        unawaited(purgeAttachmentDirectory());
+        unawaited(purgeCustomIconDirectory());
         // 目标「已存」计数按账本重算（撤销/生成中途失败留下的漂移）
         unawaited(runGoalCounterReconcile(depsRef));
         // STORY-6.3：启动扫一次九类提醒（含夜间降级的次日 08:00 汇总）
@@ -140,7 +154,7 @@ class _PlainAppState extends ConsumerState<PlainApp> with WidgetsBindingObserver
     });
     // Fire-and-forget: generate any due recurring entries + purge expired trash after first frame.
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(generateDueRecurringProvider)().ignore();
+      ref.read(generateDueRecurringProvider)(s: AppStrings.of(context)).ignore();
       ref.read(purgeTrashProvider)().ignore();
     });
     // 本地写入 → 安排一次推送（唯一触发点，见 DataInvalidation.bump）

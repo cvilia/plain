@@ -31,6 +31,8 @@ import 'package:plain/features/accounts/credit_reconcile_page.dart';
 import 'package:plain/features/assets/debt_optimize_page.dart';
 import 'package:plain/features/assets/investment_page.dart';
 import 'package:plain/features/assets/loan_page.dart';
+import 'package:plain/app/l10n/app_strings.dart';
+import 'package:plain/app/l10n/strings_accounts.dart';
 
 const _svc = NetWorthService();
 
@@ -116,6 +118,7 @@ class _NetWorthPageState extends ConsumerState<NetWorthPage> {
 
     final now = deps.clock.now();
     final snapshot = _svc.snapshot(
+      s: AppStrings.of(context),
       accounts: valued,
       balances: balances,
       holdingsMarketByAccount: marketByAccount,
@@ -149,10 +152,11 @@ class _NetWorthPageState extends ConsumerState<NetWorthPage> {
 
   @override
   Widget build(BuildContext context) {
+    final s = AppStrings.of(context);
     final colors = context.colors;
     return Scaffold(
       appBar: PlainTopBar(
-        title: '净值追踪',
+        title: s.netWorthTracking,
         showBack: true,
         actions: [
           // STORY-10.5：债务优化入口
@@ -169,7 +173,7 @@ class _NetWorthPageState extends ConsumerState<NetWorthPage> {
                 width: 64,
                 height: 44,
                 child: Center(
-                  child: Text('债务优化',
+                  child: Text(s.debtOptimize,
                       style: TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w500,
@@ -189,9 +193,9 @@ class _NetWorthPageState extends ConsumerState<NetWorthPage> {
                 children: [
                   if (_snapshot != null) ...[
                     _Hero(snapshot: _snapshot!),
-                    const PlainEyebrow('资产'),
+                    PlainEyebrow(s.accounts),
                     if (_snapshot!.assets.isEmpty)
-                      const _EmptyRow(text: '还没有资产账户')
+                      _EmptyRow(text: s.noAssetAccounts)
                     else
                       PlainPanel(
                         children: [
@@ -210,9 +214,9 @@ class _NetWorthPageState extends ConsumerState<NetWorthPage> {
                           ],
                         ],
                       ),
-                    const PlainEyebrow('负债'),
+                    PlainEyebrow(s.liabilities),
                     if (_snapshot!.liabilities.isEmpty)
-                      const _EmptyRow(text: '没有负债账户')
+                      _EmptyRow(text: s.noLiabilityAccounts)
                     else
                       PlainPanel(
                         children: [
@@ -233,11 +237,11 @@ class _NetWorthPageState extends ConsumerState<NetWorthPage> {
                           ],
                         ],
                       ),
-                    const PlainEyebrow('净值走势 · 近 12 个月'),
+                    PlainEyebrow(s.netWorthTrend),
                     PlainPanel(
                       children: [
                         if (_points.isEmpty)
-                          const _EmptyRow(text: '暂无数据')
+                          _EmptyRow(text: s.noData)
                         else
                           _TrendPanel(points: _points),
                       ],
@@ -251,10 +255,10 @@ class _NetWorthPageState extends ConsumerState<NetWorthPage> {
                       skippedForeignDebts: _snapshot!.skippedForeignDebts,
                     ),
                   ] else
-                    const AppEmptyState(
+                    AppEmptyState(
                       icon: PlainIconData.chartLine,
-                      title: '还没有数据',
-                      subtitle: '添加账户后这里会显示资产、负债与净值',
+                      title: s.noDataYet,
+                      subtitle: s.netWorthEmptyHint,
                     ),
                 ],
               ),
@@ -295,6 +299,7 @@ class _NetWorthPageState extends ConsumerState<NetWorthPage> {
 
   /// 普通账户的下钻明细：列出该账户真实流水。
   Future<void> _showEntriesSheet(Account account) async {
+    final s = AppStrings.of(context);
     final mine = _entries
         .where((e) => e.accountId == account.id || e.toAccountId == account.id)
         .toList();
@@ -310,19 +315,19 @@ class _NetWorthPageState extends ConsumerState<NetWorthPage> {
                 padding: const EdgeInsets.all(Spacing.lg),
                 child: Row(children: [
                   Expanded(
-                    child: Text('${account.name} · ${mine.length} 笔',
+                    child: Text(s.accountEntriesCount(account.name, mine.length),
                         style: const TextStyle(
                             fontSize: 15, fontWeight: FontWeight.w600)),
                   ),
                   TextButton(
                       onPressed: () => Navigator.pop(ctx),
-                      child: const Text('关闭')),
+                      child: Text(s.close)),
                 ]),
               ),
               const Divider(height: 1),
               Expanded(
                 child: mine.isEmpty
-                    ? const _EmptyRow(text: '该账户还没有流水')
+                    ? _EmptyRow(text: s.noAccountEntries)
                     : ListView.builder(
                         itemCount: mine.length,
                         itemBuilder: (ctx, i) {
@@ -356,6 +361,7 @@ class _Hero extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final s = AppStrings.of(context);
     final colors = context.colors;
     return Padding(
       padding: const EdgeInsets.only(top: Spacing.sm, bottom: Spacing.sm),
@@ -366,7 +372,7 @@ class _Hero extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.fromLTRB(2, Spacing.lg, 2, Spacing.sm),
             child: Text(
-              '当前净值（资产 − 负债）',
+              s.currentNetWorth,
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
@@ -386,12 +392,12 @@ class _Hero extends StatelessWidget {
           Row(children: [
             Expanded(
               child: _Split(
-                  label: '资产合计', cents: snapshot.totalAssetsCents),
+                  label: s.totalAssets, cents: snapshot.totalAssetsCents),
             ),
             const SizedBox(width: Spacing.lg),
             Expanded(
               child: _Split(
-                  label: '负债合计', cents: snapshot.totalLiabilitiesCents),
+                  label: s.totalLiabilities, cents: snapshot.totalLiabilitiesCents),
             ),
           ]),
           Padding(
@@ -443,6 +449,7 @@ class _EntryRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final s = AppStrings.of(context);
     final e = entry;
     return InkWell(
       onTap: onTap,
@@ -470,7 +477,7 @@ class _EntryRow extends StatelessWidget {
                 if (e.detail != null) e.detail!,
                 // 固定资产并列展示原始成本（AC1）
                 if (e.costCents != null)
-                  '原值 ${formatAmountYuan(e.costCents!)}',
+                  s.originalValue(formatAmountYuan(e.costCents!)),
               ].join(' · '),
               style: TextStyle(fontSize: 12, color: colors.inkTertiary),
             ),
@@ -573,12 +580,13 @@ class _NotePanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final s = AppStrings.of(context);
     final colors = context.colors;
     final lines = <String>[
-      '走势的账户余额按交易日历回算，历史每个点都是可追溯的真实值。',
+      s.netWorthTrendNote,
     ];
     if (unpricedHoldings > 0) {
-      lines.add('有 $unpricedHoldings 个投资账户的持仓未录入价格，市值暂按 0 计。');
+      lines.add(s.unpricedHoldingsNote(unpricedHoldings));
     }
     if (unconvertedRates.isNotEmpty) {
       // 口径：外币账户按锁定汇率折算参与净值；没汇率就不参与（不混加原币）
@@ -594,9 +602,9 @@ class _NotePanel extends StatelessWidget {
           '这部分请手动核对维护。');
     }
     if (hasValuation) {
-      lines.add('固定资产使用估值估算值（原始成本并列展示），估值是纯估算，不改动任何账单。');
+      lines.add(s.valuationNote);
     }
-    lines.add('持仓没有历史价格，近 12 个月走势中持仓一律按当前市值计入，不代表当时市值。');
+    lines.add(s.holdingHistoryNote);
     return PlainPanel(
       padding: const EdgeInsets.all(Spacing.lg),
       children: [

@@ -2,6 +2,7 @@
 library;
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:plain/app/l10n/strings_core.dart';
 import 'package:plain/core/constants/app_constants.dart';
 import 'package:plain/domain/services/gamification_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -14,7 +15,8 @@ void main() {
     final day = DateTime(2026, 6, 1, 10);
     // 连续 7 天记账
     for (var i = 0; i < 7; i++) {
-      await GamificationService.recordEntry(day.add(Duration(days: i)));
+      await GamificationService.recordEntry(
+          day.add(Duration(days: i)), kDefaultAppStrings);
     }
     final badges = await GamificationService.getBadges();
     expect(badges.contains('streak_7'), isTrue, reason: '连续 7 天要点亮徽章，不只是发券');

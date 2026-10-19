@@ -6,6 +6,7 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:plain/app/l10n/app_strings.dart';
 import 'package:plain/design_system/app_empty_state.dart';
 import 'package:plain/design_system/plain_icons_v3.dart';
 
@@ -14,8 +15,8 @@ class AppErrorState extends StatelessWidget {
     super.key,
     required this.error,
     this.onRetry,
-    this.title = '加载失败',
-    this.subtitle = '数据还在本机，重试一下就好。',
+    this.title,
+    this.subtitle,
   });
 
   /// 原始异常只用于日志排查，**不上屏**。
@@ -23,31 +24,33 @@ class AppErrorState extends StatelessWidget {
 
   /// 为空则不显示重试按钮（调用方拿不到 refresh 时）。
   final VoidCallback? onRetry;
-  final String title;
-  final String subtitle;
+  final String? title;
+  final String? subtitle;
 
   @override
   Widget build(BuildContext context) {
+    final s = AppStrings.of(context);
     return AppEmptyState(
       icon: PlainIconData.cloudDownload,
-      title: title,
-      subtitle: subtitle,
+      title: title ?? s.loadingError,
+      subtitle: subtitle ?? s.loadingErrorSubtitle,
       action: onRetry == null
           ? null
           : FilledButton.icon(
               onPressed: onRetry,
               icon: const PlainIcon(PlainIconData.cloudDownload),
-              label: const Text('重试'),
+              label: Text(s.retry),
             ),
     );
   }
 
   /// 需要排查时用：出错时把异常打到调试日志，但界面只显示友好文案。
   static AppErrorState of(
+    BuildContext context,
     Object error, {
     VoidCallback? onRetry,
-    String title = '加载失败',
-    String subtitle = '数据还在本机，重试一下就好。',
+    String? title,
+    String? subtitle,
   }) {
     assert(() {
       debugPrint('[AppErrorState] $error');

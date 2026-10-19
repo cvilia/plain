@@ -4,7 +4,9 @@ library;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:plain/app/l10n/app_strings.dart';
 import 'package:plain/core/constants/app_constants.dart';
+import 'package:plain/app/l10n/strings_domain.dart';
 
 /// 情绪反馈开关（Riverpod，UI 绑定用）。
 class _EmotionEnabledNotifier extends Notifier<bool> {
@@ -100,6 +102,7 @@ class EmotionFeedbackPrefs {
   /// [amountCents] 该笔金额；[categoryAmountsCents] 同分类近 90 天已入账支出金额列表；
   /// [isMonthFirstEntry] 是否本月首笔；[isOverBudget] 本月是否已超预算。
   static Future<EmotionFeedback?> evaluate({
+    required AppStrings s,
     required int amountCents,
     required List<int> categoryAmountsCents,
     required bool isMonthFirstEntry,
@@ -113,13 +116,13 @@ class EmotionFeedbackPrefs {
     // 目标达成优先（不受样本量限制）
     if (isGoalAchieved) {
       final ok = await _checkAndCount(now);
-      return ok ? const EmotionFeedback(EmotionKind.goalAchieved, '目标达成！') : null;
+      return ok ? EmotionFeedback(EmotionKind.goalAchieved, s.emotionGoalAchieved) : null;
     }
 
     // 本月首次记账
     if (isMonthFirstEntry) {
       final ok = await _checkAndCount(now);
-      return ok ? const EmotionFeedback(EmotionKind.monthFirst, '新的一月，从这一笔开始') : null;
+      return ok ? EmotionFeedback(EmotionKind.monthFirst, s.emotionMonthFirst) : null;
     }
 
     // 样本不足不触发阈值反馈
@@ -132,13 +135,13 @@ class EmotionFeedbackPrefs {
     // 正面肯定：≤ 中位数
     if (amountCents <= median) {
       final ok = await _checkAndCount(now);
-      return ok ? const EmotionFeedback(EmotionKind.positive, '这笔记得很稳') : null;
+      return ok ? EmotionFeedback(EmotionKind.positive, s.emotionPositive) : null;
     }
 
     // 中性陈述：> P90 × 2
     if (amountCents > (p90 * StatsWindowRules.highAmountMultiplier)) {
       final ok = await _checkAndCount(now);
-      return ok ? const EmotionFeedback(EmotionKind.large, '这笔比平时大一些') : null;
+      return ok ? EmotionFeedback(EmotionKind.large, s.emotionLarge) : null;
     }
 
     return null;

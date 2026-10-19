@@ -1,14 +1,15 @@
 /// 底部选择弹层（通用）。
 ///
 /// 全站「从一列选项里挑一个」的场景都走这里：币种、还款方式、还款账户、
-/// 利息分类、资产估值方式…… 它们共用同一套外壳 —— 整屏宽、高度夹在
-/// 屏高 1/3 ~ 2/3、圆角 24、顶部拖拽条 + 标题；只有行内布局不同。
+/// 利息分类、资产估值方式…… 它们共用同一套外壳 —— 整屏宽、高度随内容自适应
+/// （最多屏高 2/3，超出内部滚动）、圆角 24、顶部拖拽条 + 标题；只有行内布局不同。
 ///
 /// 各页面不要再各写一套 `DropdownButtonFormField`：系统下拉又窄又要滚动，
 /// 多选项时尤其难用。
 library;
 
 import 'package:flutter/material.dart';
+import 'package:plain/app/l10n/app_strings.dart';
 import 'package:plain/app/theme/app_colors.dart';
 import 'package:plain/app/theme/design_tokens.dart';
 import 'package:plain/core/constants/app_constants.dart';
@@ -33,17 +34,18 @@ Future<T?> showOptionPicker<T>({
   required BuildContext context,
   required List<PickerOption<T>> options,
   required T? current,
-  String title = '请选择',
+  String? title,
 }) {
+  final s = AppStrings.of(context);
   return _showPickerSheet<T>(
     context: context,
-    title: title,
+    title: title ?? s.pleaseSelect,
     buildRows: (ctx) => options.isEmpty
         ? [
             Padding(
               padding: const EdgeInsets.all(Spacing.xl),
               child: Text(
-                '暂无可选项',
+                s.noOptionsAvailable,
                 style: TextStyle(fontSize: 14, color: ctx.colors.inkTertiary),
               ),
             ),
@@ -67,11 +69,12 @@ Future<String?> showCurrencyPicker({
   required BuildContext context,
   required List<String> currencies,
   required String current,
-  String title = '选择币种',
+  String? title,
 }) {
+  final s = AppStrings.of(context);
   return _showPickerSheet<String>(
     context: context,
-    title: title,
+    title: title ?? s.selectCurrency,
     buildRows: (ctx) => [
       for (final c in currencies)
         _CurrencyRow(
@@ -83,8 +86,8 @@ Future<String?> showCurrencyPicker({
   );
 }
 
-/// 外壳：整屏宽；高度夹在「屏高 1/3 ~ 2/3」——
-/// 内容不足 1/3 屏则撑到 1/3，超过 2/3 屏则停在 2/3 并内部滚动。
+/// 外壳：整屏宽；高度随内容自适应，超过屏高 2/3 则停在 2/3 并内部滚动。
+/// 不设 minHeight —— 选项少时（如报销两态）弹层贴内容收拢，不留空板。
 Future<T?> _showPickerSheet<T>({
   required BuildContext context,
   required String title,
@@ -102,41 +105,38 @@ Future<T?> _showPickerSheet<T>({
       borderRadius: BorderRadius.vertical(top: Radius.circular(Radii.r4)),
     ),
     constraints: BoxConstraints(maxHeight: h * 2 / 3),
-    builder: (ctx) => ConstrainedBox(
-      constraints: BoxConstraints(minHeight: h / 3),
-      child: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Center(
-              child: Container(
-                margin:
-                    const EdgeInsets.only(top: Spacing.sm, bottom: Spacing.md),
-                width: 36,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: ctx.colors.divider,
-                  borderRadius: BorderRadius.circular(Radii.pill),
-                ),
+    builder: (ctx) => SingleChildScrollView(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Center(
+            child: Container(
+              margin:
+                  const EdgeInsets.only(top: Spacing.sm, bottom: Spacing.md),
+              width: 36,
+              height: 4,
+              decoration: BoxDecoration(
+                color: ctx.colors.divider,
+                borderRadius: BorderRadius.circular(Radii.pill),
               ),
             ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(
-                  Spacing.lg, 0, Spacing.lg, Spacing.sm),
-              child: Text(
-                title,
-                style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w600,
-                  color: ctx.colors.ink,
-                ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+                Spacing.lg, 0, Spacing.lg, Spacing.sm),
+            child: Text(
+              title,
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+                color: ctx.colors.ink,
               ),
             ),
-            ...buildRows(ctx),
-            SizedBox(height: MediaQuery.paddingOf(ctx).bottom + Spacing.sm),
-          ],
-        ),
+          ),
+          ...buildRows(ctx),
+          SizedBox(height: MediaQuery.paddingOf(ctx).bottom + Spacing.sm),
+        ],
       ),
     ),
   );

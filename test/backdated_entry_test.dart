@@ -1,6 +1,7 @@
 /// 回归：今天之前的账单写入后，列表与月报必须能读到（刷新问题）。
 library;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:plain/app/l10n/strings_core.dart';
 import 'package:plain/core/id/uuid_v7.dart';
 import 'package:plain/core/time/clock.dart';
 import 'package:plain/data/db/database.dart';
@@ -38,7 +39,7 @@ void main() {
       bookId: 'book-1',
       deviceId: 'dev-1',
       occurredAt: past,
-    ));
+    ), s: kDefaultAppStrings);
     expect(r.isSuccess, true);
 
     // 1) listPage 必须能查到（不管排序位置）
@@ -71,7 +72,7 @@ void main() {
       bookId: 'book-1',
       deviceId: 'dev-1',
       occurredAt: past,
-    ));
+    ), s: kDefaultAppStrings);
     // 9 月 20 日分区
     final summary = await ledgerRepo.monthSummary(
       bookId: 'book-1',

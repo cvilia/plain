@@ -3,7 +3,9 @@ library;
 
 import 'dart:convert';
 
+import 'package:plain/app/l10n/app_strings.dart';
 import 'package:plain/core/constants/app_constants.dart';
+import 'package:plain/app/l10n/strings_domain.dart';
 
 /// 九类提醒（PRD STORY-6.3 表，顺序即表内顺序）。
 enum ReminderKind {
@@ -34,16 +36,16 @@ enum ReminderKind {
 
   bool get rings => level == ReminderLevel.ring;
 
-  String get label => switch (this) {
-        ReminderKind.creditDue => '信用卡还款',
-        ReminderKind.subscription => '订阅到期',
-        ReminderKind.budgetWarn => '预算预警',
-        ReminderKind.lowBalance => '余额不足',
-        ReminderKind.anomalySpend => '异常支出',
-        ReminderKind.recurringPosted => '周期账单',
-        ReminderKind.reconcile => '对账提醒',
-        ReminderKind.savingsGoal => '储蓄目标',
-        ReminderKind.backup => '备份提醒',
+  String label(AppStrings s) => switch (this) {
+        ReminderKind.creditDue => s.reminderCreditDue,
+        ReminderKind.subscription => s.reminderSubscription,
+        ReminderKind.budgetWarn => s.reminderBudgetWarn,
+        ReminderKind.lowBalance => s.reminderLowBalance,
+        ReminderKind.anomalySpend => s.reminderAnomalySpend,
+        ReminderKind.recurringPosted => s.reminderRecurringPosted,
+        ReminderKind.reconcile => s.reminderReconcile,
+        ReminderKind.savingsGoal => s.reminderSavingsGoal,
+        ReminderKind.backup => s.reminderBackup,
       };
 }
 
@@ -91,8 +93,8 @@ class AppReminder {
   final String? actionRef;
 
   /// 动作按钮文案（null = 不给按钮）。
-  String? get actionLabel =>
-      actionRef == null ? null : (kind == ReminderKind.subscription ? '不再需要' : null);
+  String? actionLabel(AppStrings s) =>
+      actionRef == null ? null : (kind == ReminderKind.subscription ? s.reminderNotNeeded : null);
 
   /// 被请求的级别（没降级时等于 [level]）。
   ReminderLevel get effectiveRequestedLevel => requestedLevel ?? level;
@@ -217,18 +219,18 @@ class ReminderDigest {
   /// 其中「响铃被降级为静默」的条数。
   final int downgradedCount;
 
-  String get title => '夜间提醒汇总';
+  String title(AppStrings s) => s.reminderDigestTitle;
 
   /// G-3：汇总里含预算跨阈值则升级为响铃，否则静默。
   ReminderLevel get level =>
       budgetWarnCount > 0 ? ReminderLevel.ring : ReminderLevel.silent;
 
-  String get body {
+  String body(AppStrings s) {
     final parts = <String>[];
-    if (postedCount > 0) parts.add('已入账 $postedCount 笔');
-    if (budgetWarnCount > 0) parts.add('预算预警 $budgetWarnCount 条');
-    if (downgradedCount > 0) parts.add('响铃降级 $downgradedCount 条');
-    if (parts.isEmpty) parts.add('夜间免打扰期间产生的提醒已进提醒中心');
-    return '夜间 $total 条提醒：${parts.join(' · ')}';
+    if (postedCount > 0) parts.add(s.reminderDigestPosted(postedCount));
+    if (budgetWarnCount > 0) parts.add(s.reminderDigestBudgetWarn(budgetWarnCount));
+    if (downgradedCount > 0) parts.add(s.reminderDigestDowngraded(downgradedCount));
+    if (parts.isEmpty) parts.add(s.reminderDigestEmpty);
+    return s.reminderDigestBody(total, parts.join(' · '));
   }
 }

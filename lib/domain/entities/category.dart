@@ -7,7 +7,7 @@ import 'package:plain/domain/entities/enums.dart';
 class Category {
   const Category({
     required this.id, this.parentId, required this.name,
-    required this.kind, required this.iconRef, this.iconAsset,
+    required this.kind, required this.iconRef,
     this.note,
     required this.sortOrder, this.isHidden = false, this.isPreset = false,
     this.isRigid = false,
@@ -22,7 +22,6 @@ class Category {
   final String name;
   final CategoryKind kind;
   final String iconRef;
-  final String? iconAsset;
 
   /// Category boundary note (≤30 chars). Distinct from transactions.note.
   final String? note;
@@ -51,7 +50,7 @@ class Category {
   /// Use this when the user empties the note field.
   Category withNote(String? note) => Category(
         id: id, parentId: parentId, name: name, kind: kind,
-        iconRef: iconRef, iconAsset: iconAsset, note: note,
+        iconRef: iconRef, note: note,
         sortOrder: sortOrder, isHidden: isHidden, isPreset: isPreset, isRigid: isRigid,
         isDeductible: isDeductible,
         createdAt: createdAt, updatedAt: updatedAt, deletedAt: deletedAt,
@@ -61,7 +60,7 @@ class Category {
   /// Reparent this category (used by 移动二级分类).
   Category withParent(String? parentId) => Category(
         id: id, parentId: parentId, name: name, kind: kind,
-        iconRef: iconRef, iconAsset: iconAsset, note: note,
+        iconRef: iconRef, note: note,
         sortOrder: sortOrder, isHidden: isHidden, isPreset: isPreset, isRigid: isRigid,
         isDeductible: isDeductible,
         createdAt: createdAt, updatedAt: updatedAt, deletedAt: deletedAt,
@@ -69,15 +68,14 @@ class Category {
       );
 
   Category copyWith({
-    String? name, String? iconRef, String? iconAsset, int? sortOrder,
+    String? name, String? iconRef, int? sortOrder,
     bool? isHidden, bool? isRigid, bool? isDeductible,
     DateTime? updatedAt, DateTime? deletedAt,
-    int? revision, int? baseRevision, bool clearIconAsset = false,
+    int? revision, int? baseRevision,
   }) {
     return Category(
       id: id, parentId: parentId, name: name ?? this.name, kind: kind,
       iconRef: iconRef ?? this.iconRef,
-      iconAsset: clearIconAsset ? null : (iconAsset ?? this.iconAsset),
       note: note,
       sortOrder: sortOrder ?? this.sortOrder, isHidden: isHidden ?? this.isHidden,
       isPreset: isPreset, isRigid: isRigid ?? this.isRigid,

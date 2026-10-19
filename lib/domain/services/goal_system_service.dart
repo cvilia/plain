@@ -9,6 +9,7 @@
 /// 因为呈现方式切换不影响这份数据本身。
 library;
 
+import 'package:plain/app/l10n/app_strings.dart';
 import 'package:plain/core/money/money.dart';
 import 'package:plain/core/result/result.dart';
 import 'package:plain/core/id/uuid_v7.dart';
@@ -16,6 +17,7 @@ import 'package:plain/core/time/clock.dart';
 import 'package:plain/domain/entities/budget.dart';
 import 'package:plain/domain/entities/enums.dart';
 import 'package:plain/domain/repositories/repositories.dart';
+import 'package:plain/app/l10n/strings_domain.dart';
 
 /// 一个限额目标的展示视图（全部派生，不落库）。
 class LimitGoalView {
@@ -112,6 +114,7 @@ class GoalSystemService {
   /// [spentByCategory] 由调用方按记账月取（走 `BudgetRepository.spentCents`，
   /// 含子分类），这里不重新发明口径。
   static List<LimitGoalView> buildViews({
+    required AppStrings s,
     required List<Budget> budgets,
     required Map<String, int> spentByCategory,
     required Map<String, String> categoryNames,
@@ -123,7 +126,7 @@ class GoalSystemService {
       if (catId == null) continue;
       views.add(LimitGoalView(
         budget: b,
-        categoryName: categoryNames[catId] ?? '未命名分类',
+        categoryName: categoryNames[catId] ?? s.unnamedCategory,
         spentCents: spentByCategory[catId] ?? 0,
       ));
     }
@@ -133,6 +136,7 @@ class GoalSystemService {
 
   /// 读取限额目标（AC4 的展示侧）：分类预算 + 当期实际支出。
   Future<Result<List<LimitGoalView>>> limitGoals({
+    required AppStrings s,
     required String bookId,
     required DateTime from,
     required DateTime to,
@@ -160,6 +164,7 @@ class GoalSystemService {
     }
 
     return ok(buildViews(
+      s: s,
       budgets: budgets,
       spentByCategory: spent,
       categoryNames: categoryNames,

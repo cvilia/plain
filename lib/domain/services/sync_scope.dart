@@ -20,11 +20,7 @@ const Set<String> kSyncedEntityTypes = {
   // STORY-9.3 锁定汇率：用户手填的「原币 → 本位币」汇率是**账本数据**
   // （换了设备照样要按同一汇率折算），因此必须跨端。
   'currency_rate',
-  // ⚠️ AC6 要求「另一端账单可见、附件标记为未同步（仅在原设备）」——
-  //    要做到这一点必须同步附件的**元数据**（哪笔账单挂了什么附件），
-  //    而**字节永远不出设备**（PRD 8.1 表：账单附件不同步）。
-  //    这也解释了为什么附件表现在写 change_log（v23 更正了 v21 的结论）。
-  'attachment',
+  // 原 `attachment`（STORY-1.5）已随附件功能移除，不再同步。
   // 可同步设置（月起始日 / 隐藏余额 / 字体大小 / 音效 / 保存后停留 / 提醒开关）。
   // 具体键还要过 kSyncedSettingKeys 白名单——凭据、主题、布局都不在其中。
   'setting',
@@ -47,7 +43,6 @@ const Map<String, String> kEntityTables = {
   'saved_report': 'saved_reports',
   'tax_filing': 'tax_filings',
   'currency_rate': 'currency_rates',
-  'attachment': 'attachments',
   // 可同步设置落 app_meta（主键是 key，落库走专门分支）
   'setting': 'app_meta',
   'entry_participant': 'entry_participants',

@@ -2,6 +2,7 @@
 library;
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:plain/app/l10n/strings_core.dart';
 import 'package:plain/core/constants/app_constants.dart';
 import 'package:plain/core/id/uuid_v7.dart';
 import 'package:plain/core/time/clock.dart';
@@ -77,7 +78,7 @@ void main() {
       bookId: bookId,
       deviceId: deviceId,
       memberId: memberId,
-    ));
+    ), s: kDefaultAppStrings);
     expect(res.isSuccess, isTrue, reason: '${res.failureOrNull}');
     return res.requireValue.id;
   }
@@ -154,7 +155,7 @@ void main() {
       final selectable = (await service.activeMembers(bookId)).requireValue;
       expect(selectable.any((m) => m.id == leaver.id), isFalse);
       // 归属显示为「已退出成员」
-      expect(all.firstWhere((m) => m.id == leaver.id).attributionLabel,
+      expect(all.firstWhere((m) => m.id == leaver.id).attributionLabel(kDefaultAppStrings),
           contains('已退出成员'));
       expect(me.isMe, isTrue);
     });
@@ -258,7 +259,7 @@ void main() {
         amountExpression: '50', type: EntryType.transfer, categoryId: '',
         accountId: 'acc-cash', toAccountId: 'acc-bank', bookId: bookId,
         deviceId: deviceId,
-      ));
+      ), s: kDefaultAppStrings);
       expect(transfer.isSuccess, isTrue, reason: '${transfer.failureOrNull}');
 
       final from = clock.now().subtract(const Duration(days: 1));

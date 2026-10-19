@@ -20,6 +20,11 @@ import 'package:plain/data/platform/notification_bridge.dart';
 import 'package:plain/domain/entities/enums.dart';
 import 'package:plain/domain/entities/recurring_rule.dart';
 import 'package:plain/domain/usecases/recurring_usecases.dart';
+import 'package:plain/app/l10n/app_strings.dart';
+import 'package:plain/app/l10n/strings_accounts.dart';
+import 'package:plain/app/l10n/strings_domain.dart';
+import 'package:plain/app/l10n/strings_settings_a.dart';
+import 'package:plain/app/l10n/strings_ledger.dart';
 
 
 final _rulesProvider = FutureProvider<List<RecurringRule>>((ref) async {
@@ -58,37 +63,38 @@ class RecurringPage extends ConsumerStatefulWidget {
 class _RecurringPageState extends ConsumerState<RecurringPage> {
 
   Future<void> _runDueNow() async {
+    final s = AppStrings.of(context);
     await NotificationBridge.requestPermission();
     final deps = ref.read(appDependenciesProvider);
-    final res = await deps.generateDueRecurring();
+    final res = await deps.generateDueRecurring(s: s);
     if (!mounted) return;
     final data = res.successOrNull;
     final count = data?.created.length ?? 0;
     final pending = data?.needConfirm.length ?? 0;
     if (count == 0 && pending == 0) {
       if (!mounted) return;
-      showAppToast(context, '当前没有到期的周期记账');
+      showAppToast(context, s.recurringNoDue);
     } else {
       if (count > 0) {
         await NotificationBridge.show(
           id: 9001,
-          title: '周期记账已入账',
-          body: '已自动生成 $count 笔账单',
+          title: s.recurringPostedTitle,
+          body: s.recurringPostedBody(count),
         );
       }
       if (pending > 0) {
         await NotificationBridge.show(
           id: 9002,
-          title: '周期记账待确认',
-          body: '有 $pending 笔到期账单需要你确认入账',
+          title: s.recurringPendingTitle,
+          body: s.recurringPendingBody(pending),
         );
       }
       if (!mounted) return;
       showAppToast(
         context,
         [
-          if (count > 0) '已生成 $count 笔',
-          if (pending > 0) '$pending 笔待确认',
+          if (count > 0) s.recurringToastGenerated(count),
+          if (pending > 0) s.recurringToastPending(pending),
         ].join('，'),
       );
     }
@@ -99,7 +105,8 @@ class _RecurringPageState extends ConsumerState<RecurringPage> {
 
   Future<void> _confirmRule(RecurringRule rule, {bool skip = false}) async {
     final deps = ref.read(appDependenciesProvider);
-    final res = await deps.confirmRecurringRule(rule, skip: skip);
+    final res = await deps.confirmRecurringRule(rule,
+        skip: skip, s: AppStrings.of(context));
     if (!mounted) return;
     if (res.isSuccess) {
       ref.invalidateData.bumpEntryMutated();
@@ -112,13 +119,14 @@ class _RecurringPageState extends ConsumerState<RecurringPage> {
   }
 
   Future<void> _undoLastBatch(RecurringRule rule) async {
+    final s = AppStrings.of(context);
     final batchId = rule.lastBatchId;
     if (batchId == null) return;
     final deps = ref.read(appDependenciesProvider);
     final res = await deps.undoRecurringBatch(batchId);
     if (!mounted) return;
     final n = res.successOrNull ?? 0;
-    showAppToast(context, n == 0 ? '没有可撤销的账单' : '已撤销 $n 笔账单');
+    showAppToast(context, n == 0 ? s.recurringNothingToUndo : s.recurringUndone(n));
     ref.invalidateData.bumpEntryMutated();
     ref.invalidateData.bumpRecurringMutated();
   }
@@ -132,21 +140,22 @@ class _RecurringPageState extends ConsumerState<RecurringPage> {
 
   @override
   Widget build(BuildContext context) {
+    final s = AppStrings.of(context);
     final hide = ref.watch(hideAmountsProvider);
     final async = ref.watch(_rulesProvider);
     return Scaffold(
       appBar: PlainTopBar(
-        title: '周期记账',
+        title: s.actionLogEntityRecurring,
         showBack: true,
         actions: [
           PlainTopBarAction(
             icon: PlainIconData.plus,
-            tooltip: '新建规则',
+            tooltip: s.newRuleLabel,
             onTap: _create,
           ),
           PlainTopBarAction(
             icon: PlainIconData.play,
-            tooltip: '立即执行到期规则',
+            tooltip: s.recurringRunDueTooltip,
             onTap: _runDueNow,
           ),
         ],
@@ -154,18 +163,18 @@ class _RecurringPageState extends ConsumerState<RecurringPage> {
       body: ContentWidthConstraint(
         child: async.when(
           loading: () => const Center(child: CircularProgressIndicator()),
-          error: (e, _) => AppErrorState.of(e, onRetry: () => ref.invalidateData.bumpEverything()),
+          error: (e, _) => AppErrorState.of(context, e, onRetry: () => ref.invalidateData.bumpEverything()),
           data: (rules) {
             if (rules.isEmpty) {
               return Center(
                 child: AppEmptyState(
                   icon: PlainIconData.recurring,
-                  title: '还没有周期记账',
-                  subtitle: '房租、订阅、工资都可以自动入账',
+                  title: s.recurringEmptyTitle,
+                  subtitle: s.recurringEmptySubtitle,
                   action: FilledButton.icon(
                     onPressed: _create,
                     icon: const PlainIcon(PlainIconData.plus),
-                    label: const Text('新建周期记账'),
+                    label: Text(s.recurringNewTitle),
                   ),
                 ),
               );
@@ -215,7 +224,8 @@ class _PendingConfirmTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final title = rule.name?.isNotEmpty == true ? rule.name! : '周期记账';
+    final s = AppStrings.of(context);
+    final title = rule.name?.isNotEmpty == true ? rule.name! : s.actionLogEntityRecurring;
     return Card(
       margin: const EdgeInsets.only(bottom: Spacing.sm),
       color: context.colors.primary.withValues(alpha: 0.06),
@@ -227,15 +237,15 @@ class _PendingConfirmTile extends StatelessWidget {
             Text(title, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
             const SizedBox(height: 4),
             Text(
-              '${formatAmountYuan(rule.amount.cents, hide: hide)} · 待确认入账',
+              s.recurringPendingSuffix(formatAmountYuan(rule.amount.cents, hide: hide)),
               style: TextStyle(fontSize: 14, color: context.colors.inkSecondary),
             ),
             const SizedBox(height: Spacing.sm),
             Row(
               children: [
-                FilledButton(onPressed: onConfirm, child: const Text('确认入账')),
+                FilledButton(onPressed: onConfirm, child: Text(s.recurringConfirmAction)),
                 const SizedBox(width: Spacing.sm),
-                TextButton(onPressed: onSkip, child: const Text('跳过本期')),
+                TextButton(onPressed: onSkip, child: Text(s.recurringSkipAction)),
               ],
             ),
           ],
@@ -253,14 +263,15 @@ class _RuleTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final s = AppStrings.of(context);
     final freqLabel = switch (rule.frequency) {
-      RecurringFrequency.daily => rule.intervalN == 1 ? '每天' : '每 ${rule.intervalN} 天',
-      RecurringFrequency.weekly => rule.intervalN == 1 ? '每周' : '每 ${rule.intervalN} 周',
+      RecurringFrequency.daily => rule.intervalN == 1 ? s.recurringFreqDaily : s.recurringEveryDays(rule.intervalN),
+      RecurringFrequency.weekly => rule.intervalN == 1 ? s.recurringFreqWeekly : s.recurringEveryWeeks(rule.intervalN),
       RecurringFrequency.monthly =>
-        rule.anchorDay == null ? '每月' : '每月 ${rule.anchorDay} 日',
-      RecurringFrequency.yearly => '每年',
-      RecurringFrequency.interval => '每 ${rule.intervalN} 天',
-      RecurringFrequency.unknown => '未知',
+        rule.anchorDay == null ? s.recurringFreqMonthly : s.recurringMonthlyOnDay(rule.anchorDay!),
+      RecurringFrequency.yearly => s.recurringFreqYearly,
+      RecurringFrequency.interval => s.recurringEveryDays(rule.intervalN),
+      RecurringFrequency.unknown => s.entryUnknown,
     };
     return Card(
       margin: const EdgeInsets.only(bottom: Spacing.sm),
@@ -277,7 +288,7 @@ class _RuleTile extends StatelessWidget {
         trailing: onUndo == null
             ? null
             : IconButton(
-                tooltip: '撤销上次生成',
+                tooltip: s.recurringUndoTooltip,
                 onPressed: onUndo,
                 icon: const PlainIcon(PlainIconData.undo),
               ),
@@ -316,6 +327,7 @@ class _RecurringEditPageState extends ConsumerState<RecurringEditPage> {
   }
 
   Future<void> _save() async {
+    final s = AppStrings.of(context);
     if (!(_formKey.currentState?.validate() ?? false)) return;
     setState(() => _saving = true);
     final deps = ref.read(appDependenciesProvider);
@@ -337,7 +349,7 @@ class _RecurringEditPageState extends ConsumerState<RecurringEditPage> {
     if (!mounted) return;
     setState(() => _saving = false);
     if (res.isFailure) {
-      showAppToast(context, '保存失败，请检查金额与规则');
+      showAppToast(context, s.recurringSaveFailed);
       return;
     }
     ref.invalidateData.bumpRecurringMutated();
@@ -346,8 +358,9 @@ class _RecurringEditPageState extends ConsumerState<RecurringEditPage> {
 
   @override
   Widget build(BuildContext context) {
+    final s = AppStrings.of(context);
     return Scaffold(
-      appBar: const PlainTopBar(title: '新建周期记账', showBack: true),
+      appBar: PlainTopBar(title: s.recurringNewTitle, showBack: true),
       body: ContentWidthConstraint(
         child: Form(
           key: _formKey,
@@ -356,32 +369,32 @@ class _RecurringEditPageState extends ConsumerState<RecurringEditPage> {
             children: [
               TextFormField(
                 controller: _nameCtrl,
-                decoration: const InputDecoration(labelText: '名称（可选）', hintText: '如：房租'),
+                decoration: InputDecoration(labelText: s.recurringNameLabel, hintText: s.recurringNameHint),
                 maxLength: 20,
               ),
               TextFormField(
                 controller: _amountCtrl,
                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                decoration: const InputDecoration(labelText: '金额', prefixText: '¥ '),
+                decoration: InputDecoration(labelText: s.amountFieldLabel, prefixText: '¥ '),
                 validator: (v) {
                   final text = (v ?? '').trim();
-                  if (text.isEmpty) return '请输入有效金额';
+                  if (text.isEmpty) return s.recurringInvalidAmount;
                   try {
-                    if (Money.parseYuan(text).cents <= 0) return '请输入有效金额';
+                    if (Money.parseYuan(text).cents <= 0) return s.recurringInvalidAmount;
                   } on FormatException {
-                    return '请输入有效金额';
+                    return s.recurringInvalidAmount;
                   }
                   return null;
                 },
               ),
               const SizedBox(height: Spacing.md),
               PickerField(
-                label: '类型',
-                value: _kEntryTypeLabels[_entryType] ?? '支出',
+                label: s.typeLabel,
+                value: _kEntryTypeLabels[_entryType] ?? s.expense,
                 onTap: () async {
                   final picked = await showOptionPicker<EntryType>(
                     context: context,
-                    title: '类型',
+                    title: s.typeLabel,
                     current: _entryType,
                     options: [
                       for (final e in _kEntryTypeLabels.entries)
@@ -393,12 +406,12 @@ class _RecurringEditPageState extends ConsumerState<RecurringEditPage> {
               ),
               const SizedBox(height: Spacing.md),
               PickerField(
-                label: '频率',
-                value: _kFrequencyLabels[_frequency] ?? '每月',
+                label: s.recurringFrequencyLabel,
+                value: _kFrequencyLabels[_frequency] ?? s.recurringFreqMonthly,
                 onTap: () async {
                   final picked = await showOptionPicker<RecurringFrequency>(
                     context: context,
-                    title: '频率',
+                    title: s.recurringFrequencyLabel,
                     current: _frequency,
                     options: [
                       for (final e in _kFrequencyLabels.entries)
@@ -413,13 +426,13 @@ class _RecurringEditPageState extends ConsumerState<RecurringEditPage> {
                 TextFormField(
                   controller: _anchorCtrl,
                   keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(
-                    labelText: '锚定日（1–31）',
-                    helperText: '短月自动顺延到月末，如 31 日 → 2 月 28 日',
+                  decoration: InputDecoration(
+                    labelText: s.recurringAnchorLabel,
+                    helperText: s.recurringAnchorHelper,
                   ),
                   validator: (v) {
                     final n = int.tryParse((v ?? '').trim());
-                    if (n == null || n < 1 || n > 31) return '请输入 1–31';
+                    if (n == null || n < 1 || n > 31) return s.recurringAnchorInvalid;
                     return null;
                   },
                 ),
@@ -427,22 +440,22 @@ class _RecurringEditPageState extends ConsumerState<RecurringEditPage> {
                 TextFormField(
                   controller: _intervalCtrl,
                   keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(labelText: '间隔天数'),
+                  decoration: InputDecoration(labelText: s.recurringIntervalLabel),
                 ),
               SwitchListTile(
                 contentPadding: EdgeInsets.zero,
-                title: const Text('免确认直接入账'),
-                subtitle: const Text('关闭后生成的账单可在列表中手动确认'),
+                title: Text(s.recurringAutoConfirmTitle),
+                subtitle: Text(s.recurringAutoConfirmSubtitle),
                 value: _autoConfirm,
                 onChanged: (v) => setState(() => _autoConfirm = v),
               ),
               PickerField(
-                label: '结束条件',
-                value: _kEndLabels[_endType] ?? '不结束',
+                label: s.recurringEndLabel,
+                value: _kEndLabels[_endType] ?? s.recurringEndNever,
                 onTap: () async {
                   final picked = await showOptionPicker<RecurringEndType>(
                     context: context,
-                    title: '结束条件',
+                    title: s.recurringEndLabel,
                     current: _endType,
                     options: [
                       for (final e in _kEndLabels.entries)
@@ -455,12 +468,12 @@ class _RecurringEditPageState extends ConsumerState<RecurringEditPage> {
               if (_endType == RecurringEndType.count)
                 TextFormField(
                   keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(labelText: '次数'),
+                  decoration: InputDecoration(labelText: s.recurringCountLabel),
                   onChanged: (v) => _endCount = int.tryParse(v.trim()),
                   validator: (v) {
                     if (_endType != RecurringEndType.count) return null;
                     final n = int.tryParse((v ?? '').trim());
-                    if (n == null || n <= 0) return '请输入正整数';
+                    if (n == null || n <= 0) return s.recurringCountInvalid;
                     return null;
                   },
                 ),
@@ -471,7 +484,7 @@ class _RecurringEditPageState extends ConsumerState<RecurringEditPage> {
                   backgroundColor: context.colors.primary,
                   minimumSize: const Size.fromHeight(48),
                 ),
-                child: Text(_saving ? '保存中…' : '保存'),
+                child: Text(_saving ? s.recurringSaving : s.save),
               ),
             ],
           ),

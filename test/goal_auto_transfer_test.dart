@@ -1,6 +1,7 @@
 /// STORY-7.1 AC6 + STORY-7.3：储蓄目标自动按月划拨走统一周期引擎。
 library;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:plain/app/l10n/strings_core.dart';
 import 'package:plain/core/id/uuid_v7.dart';
 import 'package:plain/core/time/clock.dart';
 import 'package:plain/data/db/database.dart';
@@ -114,7 +115,7 @@ void main() {
     ));
     clock.set(DateTime.utc(2026, 2, 5, 9));
 
-    final gen = await generateDue();
+    final gen = await generateDue(s: kDefaultAppStrings);
     expect(gen.isSuccess, true, reason: gen.failureOrNull?.toString() ?? '');
     expect(gen.successOrNull!.created, hasLength(1));
 

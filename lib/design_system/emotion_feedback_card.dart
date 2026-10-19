@@ -2,6 +2,7 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:plain/app/l10n/app_strings.dart';
 import 'package:plain/app/theme/app_colors.dart';
 import 'package:plain/app/theme/design_tokens.dart';
 import 'package:plain/app/theme/typography.dart';
@@ -16,6 +17,7 @@ class EmotionFeedbackCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final s = AppStrings.of(context);
     final colors = context.colors;
     final (bg, icon, iconColor) = switch (feedback.kind) {
       EmotionKind.positive => (colors.surface, PlainIconData.mood, colors.income),
@@ -64,7 +66,7 @@ class EmotionFeedbackCard extends StatelessWidget {
                   ),
                   TextButton(
                     onPressed: onDismiss,
-                    child: Text('关闭', style: TextStyle(fontSize: 12, color: colors.inkTertiary)),
+                    child: Text(s.close, style: TextStyle(fontSize: 12, color: colors.inkTertiary)),
                   ),
                 ],
               ),

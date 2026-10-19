@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" role="img" aria-label="ic_cat_sports">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <circle cx="12" cy="12" r="8.25"/>
+  <path d="M12 3.75c-2.5 3.5-2.5 12.5 0 16.5"/>
+  <path d="M12 3.75c2.5 3.5 2.5 12.5 0 16.5"/>
+  <path d="M5 9.75h14"/>
+  </g>
+</svg>

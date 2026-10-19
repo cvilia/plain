@@ -1,6 +1,9 @@
 /// Domain enums. See 08-4.4, 7.7.
 library;
 
+import 'package:plain/app/l10n/app_strings.dart';
+import 'package:plain/app/l10n/strings_domain.dart';
+
 /// Shared `fromWire` lookup for wire-serialized enums.
 T wireEnumFrom<T>(String? v, List<T> values, T fallback, String Function(T) wireOf) {
   for (final e in values) {
@@ -18,6 +21,16 @@ enum EntryType {
   final String wire;
   static EntryType fromWire(String? v) =>
       wireEnumFrom(v, values, EntryType.unknown, (e) => e.wire);
+
+  String label(AppStrings s) => switch (this) {
+        EntryType.expense => s.expense,
+        EntryType.income => s.income,
+        EntryType.transfer => s.transfer,
+        EntryType.borrowOut => s.entryBorrowOut,
+        EntryType.borrowIn => s.entryBorrowIn,
+        EntryType.repayCredit => s.entryRepayCredit,
+        EntryType.unknown => s.entryUnknown,
+      };
 
   bool get countsInOutflow => this == EntryType.expense || this == EntryType.income;
   bool get enabledInV1 =>
@@ -50,6 +63,12 @@ enum SplitRole {
   final String wire;
   static SplitRole fromWire(String? v) =>
       wireEnumFrom(v, values, SplitRole.normal, (e) => e.wire);
+
+  String label(AppStrings s) => switch (this) {
+        SplitRole.normal => s.splitNormal,
+        SplitRole.parent => s.splitParent,
+        SplitRole.child => s.splitChild,
+      };
 }
 
 /// STORY-1.8 报销状态机。
@@ -66,6 +85,15 @@ enum ReimburseStatus {
   static ReimburseStatus fromWire(String? v) =>
       wireEnumFrom(v, values, ReimburseStatus.none, (e) => e.wire);
 
+  String label(AppStrings s) => switch (this) {
+        ReimburseStatus.none => s.reimburseNone,
+        ReimburseStatus.pending => s.reimbursePending,
+        ReimburseStatus.submitted => s.reimburseSubmitted,
+        ReimburseStatus.partial => s.reimbursePartial,
+        ReimburseStatus.reimbursed => s.reimburseDone,
+        ReimburseStatus.abandoned => s.reimburseAbandoned,
+      };
+
   bool get inFlow => this != ReimburseStatus.none && this != ReimburseStatus.abandoned;
 }
 
@@ -81,6 +109,17 @@ enum AccountType {
   final String wire;
   static AccountType fromWire(String? v) =>
       wireEnumFrom(v, values, AccountType.unknown, (e) => e.wire);
+
+  String label(AppStrings s) => switch (this) {
+        AccountType.cash => s.cash,
+        AccountType.debit => s.debitCard,
+        AccountType.credit => s.accountTypeCredit,
+        AccountType.loanOut => s.accountTypeLend,
+        AccountType.loanIn => s.accountTypeLoan,
+        AccountType.investment => s.accountTypeInvestment,
+        AccountType.goal => s.accountTypeGoal,
+        AccountType.unknown => s.entryUnknown,
+      };
 
   bool get enabledInV1 =>
     this == AccountType.cash ||
@@ -99,6 +138,13 @@ enum CategoryKind {
   final String wire;
   static CategoryKind fromWire(String? v) =>
       wireEnumFrom(v, values, CategoryKind.unknown, (e) => e.wire);
+
+  String label(AppStrings s) => switch (this) {
+        CategoryKind.expense => s.expense,
+        CategoryKind.income => s.income,
+        CategoryKind.transfer => s.transfer,
+        CategoryKind.unknown => s.entryUnknown,
+      };
 }
 
 enum ChangeOp {
@@ -119,9 +165,6 @@ enum EntityType {
   /// STORY-9.3：用户手填的锁定汇率（`currency_rates`）。它是账本数据
   /// （换设备要按同一汇率折算），所以进同步范围。
   currencyRate('currency_rate'),
-  /// STORY-1.5 / 8.1 AC6：附件只同步**元数据**（字节不出设备），
-  /// 对端据此把附件标为「未同步（仅在原设备）」。
-  attachment('attachment'),
   /// STORY-8.1：可同步设置（月起始日等）。键在 `sync_scope.kSyncedSettingKeys` 白名单内。
   setting('setting'),
   /// STORY-8.2：AA 分摊参与人。**整组替换**语义（先删旧再插新），
@@ -215,12 +258,12 @@ enum AssetValuationMode {
 
   bool get isActive => this != AssetValuationMode.none;
 
-  String get label => switch (this) {
-        AssetValuationMode.none => '不估值',
-        AssetValuationMode.fixed => '固定值',
-        AssetValuationMode.depreciate => '年折旧率',
-        AssetValuationMode.appreciate => '年增值率',
-        AssetValuationMode.manual => '手动调整',
+  String label(AppStrings s) => switch (this) {
+        AssetValuationMode.none => s.valuationNone,
+        AssetValuationMode.fixed => s.valuationFixed,
+        AssetValuationMode.depreciate => s.valuationDepreciate,
+        AssetValuationMode.appreciate => s.valuationAppreciate,
+        AssetValuationMode.manual => s.valuationManual,
       };
 }
 
@@ -234,12 +277,12 @@ enum AssetType {
   static AssetType fromWire(String? v) =>
       wireEnumFrom(v, values, AssetType.other, (e) => e.wire);
 
-  String get label => switch (this) {
-        AssetType.stock => '股票',
-        AssetType.fund => '基金',
-        AssetType.bond => '债券',
-        AssetType.crypto => '加密',
-        AssetType.other => '其他',
+  String label(AppStrings s) => switch (this) {
+        AssetType.stock => s.assetStock,
+        AssetType.fund => s.assetFund,
+        AssetType.bond => s.assetBond,
+        AssetType.crypto => s.assetCrypto,
+        AssetType.other => s.assetOther,
       };
 }
 
@@ -249,59 +292,79 @@ enum AssetType {
 /// 只改变预算页的呈现与校验规则；底层的分类预算（= 限额目标）四套下都继续生效。
 enum BudgetMethodology {
   /// 当前的总预算 + 分类预算（默认）。
-  custom('custom', '分类限额'),
+  custom('custom'),
 
   /// 每类一个信封，独立滚存，超支不许跨类挪用。
-  envelope('envelope', '信封预算'),
+  envelope('envelope'),
 
   /// 收入逐项分配至「归零」，未分配金额必须为 0。
-  zeroBased('zero_based', '零基预算'),
+  zeroBased('zero_based'),
 
   /// 按需 / 想要 / 储蓄三档比例。
-  fiftyThirtyTwenty('fifty_thirty_twenty', '50-30-20');
+  fiftyThirtyTwenty('fifty_thirty_twenty');
 
-  const BudgetMethodology(this.wire, this.label);
+  const BudgetMethodology(this.wire);
   final String wire;
-  final String label;
 
   static BudgetMethodology fromWire(String? v) =>
       wireEnumFrom(v, values, BudgetMethodology.custom, (e) => e.wire);
+
+  String label(AppStrings s) => switch (this) {
+        BudgetMethodology.custom => s.budgetMethodCustom,
+        BudgetMethodology.envelope => s.budgetMethodEnvelope,
+        BudgetMethodology.zeroBased => s.budgetMethodZeroBased,
+        BudgetMethodology.fiftyThirtyTwenty => s.budgetMethodFiftyThirtyTwenty,
+      };
 }
 
 /// 50/30/20 的三档。
 enum RatioBucketKind {
-  needs('needs', '需要'),
-  wants('wants', '想要'),
-  savings('savings', '储蓄');
+  needs('needs'),
+  wants('wants'),
+  savings('savings');
 
-  const RatioBucketKind(this.wire, this.label);
+  const RatioBucketKind(this.wire);
   final String wire;
-  final String label;
+
+  String label(AppStrings s) => switch (this) {
+        RatioBucketKind.needs => s.ratioNeeds,
+        RatioBucketKind.wants => s.ratioWants,
+        RatioBucketKind.savings => s.ratioSavings,
+      };
 }
 
 /// STORY-11.5 申报周期的粒度。
 enum TaxPeriodKind {
-  month('month', '记账月'),
-  year('year', '年度');
+  month('month'),
+  year('year');
 
-  const TaxPeriodKind(this.wire, this.label);
+  const TaxPeriodKind(this.wire);
   final String wire;
-  final String label;
   static TaxPeriodKind fromWire(String? v) =>
       wireEnumFrom(v, values, TaxPeriodKind.month, (e) => e.wire);
+
+  String label(AppStrings s) => switch (this) {
+        TaxPeriodKind.month => s.taxPeriodMonth,
+        TaxPeriodKind.year => s.taxPeriodYear,
+      };
 }
 
 /// STORY-11.3 保存的报表里，账单类型的过滤口径。
 enum ReportEntryFilter {
-  all('all', '全部'),
-  expense('expense', '只看支出'),
-  income('income', '只看收入');
+  all('all'),
+  expense('expense'),
+  income('income');
 
-  const ReportEntryFilter(this.wire, this.label);
+  const ReportEntryFilter(this.wire);
   final String wire;
-  final String label;
   static ReportEntryFilter fromWire(String? v) =>
       wireEnumFrom(v, values, ReportEntryFilter.expense, (e) => e.wire);
+
+  String label(AppStrings s) => switch (this) {
+        ReportEntryFilter.all => s.reportFilterAll,
+        ReportEntryFilter.expense => s.reportFilterExpense,
+        ReportEntryFilter.income => s.reportFilterIncome,
+      };
 }
 
 /// STORY-11.3 交叉分析的可选维度。
@@ -310,17 +373,24 @@ enum ReportEntryFilter {
 /// （无 tags / members 表），不列出以免做出空壳。「商户」沿用既有口径
 /// ——用备注承载（见 `rule_engine.dart` 的 `RuleField.merchant`）。
 enum CrossDimension {
-  category('category', '分类'),
-  account('account', '账户'),
-  month('month', '月份'),
-  merchant('merchant', '商户'),
-  amountRange('amount_range', '金额区间');
+  category('category'),
+  account('account'),
+  month('month'),
+  merchant('merchant'),
+  amountRange('amount_range');
 
-  const CrossDimension(this.wire, this.label);
+  const CrossDimension(this.wire);
   final String wire;
-  final String label;
   static CrossDimension fromWire(String? v) =>
       wireEnumFrom(v, values, CrossDimension.category, (e) => e.wire);
+
+  String label(AppStrings s) => switch (this) {
+        CrossDimension.category => s.category,
+        CrossDimension.account => s.account,
+        CrossDimension.month => s.crossMonth,
+        CrossDimension.merchant => s.crossMerchant,
+        CrossDimension.amountRange => s.crossAmountRange,
+      };
 }
 
 /// STORY-10.2 贷款还款方式。
@@ -338,10 +408,10 @@ enum LoanRepayMethod {
   static LoanRepayMethod fromWire(String? v) =>
       wireEnumFrom(v, values, LoanRepayMethod.unknown, (e) => e.wire);
 
-  String get label => switch (this) {
-        LoanRepayMethod.equalInstallment => '等额本息',
-        LoanRepayMethod.equalPrincipal => '等额本金',
-        LoanRepayMethod.unknown => '未设置',
+  String label(AppStrings s) => switch (this) {
+        LoanRepayMethod.equalInstallment => s.repayEqualInstallment,
+        LoanRepayMethod.equalPrincipal => s.repayEqualPrincipal,
+        LoanRepayMethod.unknown => s.repayNotSet,
       };
 }
 
@@ -370,10 +440,10 @@ enum MemberRole {
   static MemberRole fromWire(String? v) =>
       wireEnumFrom(v, values, MemberRole.member, (e) => e.wire);
 
-  String get label => switch (this) {
-        MemberRole.owner => '所有者',
-        MemberRole.member => '成员',
-        MemberRole.viewer => '只读',
+  String label(AppStrings s) => switch (this) {
+        MemberRole.owner => s.memberRoleOwner,
+        MemberRole.member => s.memberRoleMember,
+        MemberRole.viewer => s.memberRoleViewer,
       };
 
   /// 能否记账（AC2：只读成员保存时被拦）。
@@ -394,8 +464,8 @@ enum MemberStatus {
   static MemberStatus fromWire(String? v) =>
       wireEnumFrom(v, values, MemberStatus.active, (e) => e.wire);
 
-  String get label => switch (this) {
-        MemberStatus.active => '在册',
-        MemberStatus.left => '已退出',
+  String label(AppStrings s) => switch (this) {
+        MemberStatus.active => s.memberStatusActive,
+        MemberStatus.left => s.memberStatusLeft,
       };
 }

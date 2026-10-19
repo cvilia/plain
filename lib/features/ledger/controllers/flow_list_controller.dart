@@ -162,12 +162,8 @@ class FlowListController extends Notifier<FlowListState> {
     result.when(
       success: (page) {
         _cursor = page.nextCursor;
-        final allEntries = [
-          for (final g in state.groups) ...g.entries,
-          ...page.items,
-        ];
         state = state.copyWith(
-          groups: _groupByDay(allEntries),
+          groups: _appendGroups(state.groups, page.items),
           isLoading: false,
           hasMore: page.hasMore,
         );
@@ -176,6 +172,39 @@ class FlowListController extends Notifier<FlowListState> {
         state = state.copyWith(isLoading: false, errorMessage: f.code);
       },
     );
+  }
+
+  /// 把新一页**增量**追加到已有分组尾部，而不是整表重排。
+  ///
+  /// 之前的写法是把「已加载全部条目 + 新一页」拉平后重新 `_groupByDay`——
+  /// 每翻一页都要把截至目前的所有行再遍历一遍，翻到第 N 页就是 O(N²)。
+  /// 数据量上万时，末尾那几次翻页会明显卡顿（每页都要重排上万条）。
+  ///
+  /// 之所以能安全增量：列表严格按 `dayKey` **降序**（新的在前），
+  /// 新一页的日期一定不晚于已有最后一组的日期。所以只需处理两种情形：
+  ///   · 新页首组与已有最后一组**同一天** → 并入那一组（同一天不能被切成两块）；
+  ///   · 否则 → 追加为新组。
+  ///
+  /// ⚠️ 代价：本方法**不重排**已有分组。所以只有在「后续页日期不早于已有」
+  /// 这个前提成立时结果才正确。该前提由 `listPage` 的 keyset 游标保证
+  /// （`occurred_at` 降序 + id 兜底），若将来排序口径变了，这里必须同步改。
+  List<DayGroup> _appendGroups(
+    List<DayGroup> current,
+    List<LedgerEntry> incoming,
+  ) {
+    if (incoming.isEmpty) return current;
+    // 只对这一页（50 条）做分组，开销与已加载总量无关。
+    final incomingGroups = _groupByDay(incoming);
+    final merged = List<DayGroup>.of(current);
+    for (final g in incomingGroups) {
+      if (merged.isNotEmpty && merged.last.dayKey == g.dayKey) {
+        final last = merged.removeLast();
+        merged.add(DayGroup(dayKey: last.dayKey, entries: [...last.entries, ...g.entries]));
+      } else {
+        merged.add(g);
+      }
+    }
+    return merged;
   }
 
   Future<void> refresh() => loadInitial();

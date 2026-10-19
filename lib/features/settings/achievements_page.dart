@@ -5,6 +5,8 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:plain/app/bootstrap.dart';
+import 'package:plain/app/l10n/app_strings.dart';
+import 'package:plain/app/l10n/strings_settings_b.dart';
 import 'package:plain/app/theme/app_colors.dart';
 import 'package:plain/app/theme/design_tokens.dart';
 import 'package:plain/app/theme/typography.dart';
@@ -119,8 +121,9 @@ class _AchievementsPageState extends ConsumerState<AchievementsPage> {
 
   @override
   Widget build(BuildContext context) {
+    final s = AppStrings.of(context);
     return Scaffold(
-      appBar: const PlainTopBar(title: '我的成就', showBack: true),
+      appBar: PlainTopBar(title: s.myAchievements, showBack: true),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : ListView(
@@ -147,12 +150,12 @@ class _AchievementsPageState extends ConsumerState<AchievementsPage> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text('连续记账', style: AppTextStyles.eyebrow.copyWith(color: context.colors.inkTertiary)),
+                              Text(s.streakTracking, style: AppTextStyles.eyebrow.copyWith(color: context.colors.inkTertiary)),
                               const SizedBox(height: 4),
                               // 卡片主数字。设计稿字阶无 24 → 收到 `.amt.l` 档的 22；
                               // 但这不是金额（「12 天」），行高按 `normal` 走 29，不是 1.24。
                               Text(
-                                _streak.isBroken ? '已断签' : '${_streak.currentDays} 天',
+                                _streak.isBroken ? s.streakBroken : s.daysCount(_streak.currentDays),
                                 style: TextStyle(
                                   fontSize: 22,
                                   height: designLineHeight(22),
@@ -160,7 +163,7 @@ class _AchievementsPageState extends ConsumerState<AchievementsPage> {
                                   color: _streak.isBroken ? context.colors.inkTertiary : context.colors.ink,
                                 ),
                               ),
-                              Text('历史最长 ${_streak.bestDays} 天', style: TextStyle(fontSize: 12, color: context.colors.inkTertiary)),
+                              Text(s.bestStreakDays(_streak.bestDays), style: TextStyle(fontSize: 12, color: context.colors.inkTertiary)),
                             ],
                           ),
                         ),
@@ -172,7 +175,7 @@ class _AchievementsPageState extends ConsumerState<AchievementsPage> {
 
                 // 权益券
                 if (_vouchers.isNotEmpty) ...[
-                  Text('我的奖励', style: AppTextStyles.eyebrow.copyWith(color: context.colors.inkTertiary)),
+                  Text(s.myRewards, style: AppTextStyles.eyebrow.copyWith(color: context.colors.inkTertiary)),
                   const SizedBox(height: Spacing.sm),
                   ..._vouchers.map((v) => Container(
                     margin: const EdgeInsets.only(bottom: Spacing.xs),
@@ -186,20 +189,20 @@ class _AchievementsPageState extends ConsumerState<AchievementsPage> {
                         PlainIconData.gift,
                         color: context.colors.accent,
                       ),
-                      title: v.note.isNotEmpty ? v.note : '权益券',
+                      title: v.note.isNotEmpty ? v.note : s.voucher,
                       subtitle: '${v.grantDay} · ${GamificationRules.voucherActivateLabel}',
                       trailing: TextButton(
                         onPressed: () {
                           showDialog<void>(
                             context: context,
                             builder: (ctx) => AlertDialog(
-                              title: const Text('权益券'),
+                              title: Text(s.voucher),
                               content: Text('将在 ${GamificationRules.voucherActivateLabel} 自动激活，可抵扣订阅时长。\n\n当前版本暂不可使用。'),
-                              actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('知道了'))],
+                              actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: Text(s.gotIt))],
                             ),
                           );
                         },
-                        child: Text('详情', style: TextStyle(fontSize: 12, color: context.colors.primary)),
+                        child: Text(s.detail, style: TextStyle(fontSize: 12, color: context.colors.primary)),
                       ),
                     ),
                   )),
@@ -207,7 +210,7 @@ class _AchievementsPageState extends ConsumerState<AchievementsPage> {
                 ],
 
                 // 徽章墙
-                Text('徽章墙', style: AppTextStyles.eyebrow.copyWith(color: context.colors.inkTertiary)),
+                Text(s.badgeWall, style: AppTextStyles.eyebrow.copyWith(color: context.colors.inkTertiary)),
                 const SizedBox(height: Spacing.sm),
                 Wrap(
                   spacing: Spacing.sm,
@@ -225,7 +228,7 @@ class _AchievementsPageState extends ConsumerState<AchievementsPage> {
                 ),
                 const SizedBox(height: Spacing.xl),
                 Text(
-                  '记账是私事，这里不做排行榜和积分商城。\n坚持本身就是最好的奖励。',
+                  s.badgeFooter,
                   textAlign: TextAlign.center,
                   style: TextStyle(fontSize: 12, color: context.colors.inkTertiary, height: 1.6),
                 ),
@@ -236,28 +239,29 @@ class _AchievementsPageState extends ConsumerState<AchievementsPage> {
 
   /// 预定义徽章（key=展示名, value=存储 id）。
   List<MapEntry<String, String>> _badgeDefs(BadgeCategory cat) {
+    final s = AppStrings.of(context);
     return switch (cat) {
       BadgeCategory.persistence => [
-        const MapEntry('连续 7 天', 'streak_7'),
-        const MapEntry('连续 30 天', 'streak_30'),
-        const MapEntry('连续 100 天', 'streak_100'),
+        MapEntry(s.badgeStreak7, 'streak_7'),
+        MapEntry(s.badgeStreak30, 'streak_30'),
+        MapEntry(s.badgeStreak100, 'streak_100'),
       ],
       BadgeCategory.exploration => [
-        const MapEntry('首次设预算', 'explore_budget'),
-        const MapEntry('首次用规则', 'explore_rules'),
-        const MapEntry('首次用导出', 'explore_export'),
+        MapEntry(s.badgeFirstBudget, 'explore_budget'),
+        MapEntry(s.badgeFirstRule, 'explore_rules'),
+        MapEntry(s.badgeFirstExport, 'explore_export'),
       ],
       BadgeCategory.discipline => [
-        const MapEntry('月度不超支', 'discipline_month'),
+        MapEntry(s.badgeMonthNoOverspend, 'discipline_month'),
       ],
       BadgeCategory.accumulation => [
-        const MapEntry('累计 100 笔', 'accum_100'),
-        const MapEntry('累计 500 笔', 'accum_500'),
-        const MapEntry('累计 1000 笔', 'accum_1000'),
+        MapEntry(s.badgeAccum100, 'accum_100'),
+        MapEntry(s.badgeAccum500, 'accum_500'),
+        MapEntry(s.badgeAccum1000, 'accum_1000'),
       ],
       BadgeCategory.goal => [
-        const MapEntry('达成储蓄目标', 'goal_savings'),
-        const MapEntry('还清债务', 'goal_debt'),
+        MapEntry(s.badgeGoalSavings, 'goal_savings'),
+        MapEntry(s.badgeDebtClear, 'goal_debt'),
       ],
     };
   }

@@ -17,6 +17,7 @@ import 'package:plain/core/refresh/data_invalidation.dart';
 import 'package:plain/design_system/app_date_picker.dart';
 import 'package:plain/design_system/category_icon_v3.dart';
 import 'package:plain/design_system/plain_icons_v3.dart';
+import 'package:plain/design_system/picker_sheet.dart';
 import 'package:plain/domain/entities/category.dart' as domain;
 import 'package:plain/domain/entities/enums.dart';
 import 'package:plain/domain/services/ai_recognition_service.dart';
@@ -27,13 +28,33 @@ import 'package:plain/design_system/sound_service.dart';
 import 'package:plain/features/ledger/controllers/entry_input_controller.dart';
 import 'package:plain/features/ledger/controllers/recent_categories.dart';
 import 'package:plain/features/ledger/presentation/category_picker_page.dart';
-import 'package:plain/features/ledger/presentation/entry_attachments_section.dart';
+import 'package:plain/app/l10n/app_strings.dart';
+import 'package:plain/app/l10n/strings_accounts.dart';
+import 'package:plain/app/l10n/strings_domain.dart';
+import 'package:plain/app/l10n/strings_ledger.dart';
+import 'package:plain/app/l10n/strings_core.dart';
 
 final _categoriesProvider = FutureProvider<List<domain.Category>>((ref) async {
   ref.watch(categoriesVersionProvider);
   final repo = ref.watch(categoryRepositoryProvider);
-  final result = await repo.listVisible(kind: CategoryKind.expense);
+  // 取**全部**可见分类，由 `_CategoryGrid` 按当前类型（支出/收入）自己筛。
+  // ⚠️ 原来写死 `kind: CategoryKind.expense`，而宫格不按 `state.type` 过滤 →
+  //    切到「收入」时宫格里列的仍是支出分类（2026-10-16 修）。
+  final result = await repo.listVisible();
   return result.successOrNull ?? const [];
+});
+
+/// 账户 id → 名称映射（账户表很小，整表拉一次即可）。账户增删改经
+/// `accountsVersionProvider` 失效重建。属性栏账户 chip 与转账两行都靠它
+/// 把 `selectedAccountId` 翻译成可读名称 —— 之前 chip 写死「招行储蓄卡」/
+/// 显示「账户」占位（2026-10-19 修），转账行干脆显示的是裸 UUID。
+final _accountNamesProvider = FutureProvider<Map<String, String>>((ref) async {
+  ref.watch(accountsVersionProvider);
+  final res =
+      await ref.watch(appDependenciesProvider).accountRepository.listAll();
+  return {
+    for (final a in res.successOrNull ?? const <domain.Account>[]) a.id: a.name,
+  };
 });
 
 class EntryInputPage extends ConsumerStatefulWidget {
@@ -69,6 +90,7 @@ class _EntryInputPageState extends ConsumerState<EntryInputPage> {
 
   @override
   Widget build(BuildContext context) {
+    final s = AppStrings.of(context);
     final state = ref.watch(entryInputControllerProvider);
     final controller = ref.read(entryInputControllerProvider.notifier);
     final categoriesAsync = ref.watch(_categoriesProvider);
@@ -125,72 +147,36 @@ class _EntryInputPageState extends ConsumerState<EntryInputPage> {
                 // 本页自管顶部内边距（外层 `Padding(top: topPad)`），
                 // 顶栏不能再叠一层 SafeArea，否则双倍下移。
                 primary: false,
-                title: isEdit ? '编辑账单' : '记一笔',
+                title: isEdit ? s.editEntry : s.recordEntry,
                 // spec 08-03 §2：左上角是 ✕（关闭），不是返回箭头
                 leadingIcon: PlainIconData.close,
                 onBack: () => Navigator.pop(context),
                 actions: [
+                  // 顶栏图标一律走 [PlainTopBarAction]（44×44 / 图标 22 / inkSecondary）。
+                  // 别自绘 `SizedBox(44,44, child: PlainIcon(..., size: 22))`：`SvgPicture`
+                  // 的 width/height 只在**松**约束下生效，紧约束会把图标拉到 44×44。
+                  // PlainTopBarAction 内部包 `Center` 就是为了给子级松约束。
                   if (!isEdit)
-                    Material(
-                      color: const Color(0x00000000),
-                      borderRadius: BorderRadius.circular(Radii.md),
-                      child: InkWell(
-                        onTap: () => _showOcrSheet(context, controller),
-                        borderRadius: BorderRadius.circular(Radii.md),
-                        // spec：.iconbtn{width/height:44px;border-radius:12px}，
-                        // 内含 22 的图标（实测 22×22，居中）。
-                        child: const SizedBox(
-                          width: 44,
-                          height: 44,
-                          child: PlainIcon(PlainIconData.scan, size: 22),
-                        ),
-                      ),
+                    PlainTopBarAction(
+                      icon: PlainIconData.scan,
+                      onTap: () => _showOcrSheet(context, controller),
                     ),
                   if (isEdit)
-                    Material(
-                      color: const Color(0x00000000),
-                      borderRadius: BorderRadius.circular(Radii.md),
-                      child: InkWell(
-                        // STORY-1.5：编辑态也能增删附件（与详情页同一份组件）
-                        onTap: () => _showAttachmentsSheet(context),
-                        borderRadius: BorderRadius.circular(Radii.md),
-                        child: const SizedBox(
-                          width: 44,
-                          height: 44,
-                          child: PlainIcon(PlainIconData.attachment, size: 22),
-                        ),
-                      ),
-                    ),
-                  if (isEdit)
-                    Material(
-                      color: const Color(0x00000000),
-                      borderRadius: BorderRadius.circular(Radii.md),
-                      child: InkWell(
-                        onTap: () async {
-                          final ok = await controller.saveExplicit();
-                          if (!ok || !context.mounted) return;
-                          final msg = controller.currentToast;
-                          if (msg != null) {
-                            showAppToast(context, msg);
-                            controller.clearToast();
-                          }
-                          if (context.mounted) Navigator.pop(context);
-                        },
-                        borderRadius: BorderRadius.circular(Radii.md),
-                        child: ConstrainedBox(
-                          constraints: const BoxConstraints(minHeight: 44),
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 8),
-                            child: Text(
-                              '保存',
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: context.colors.primary,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
+                    // 顶栏文字动作一律走 [PlainTopBarTextAction]（44 高 / Center 松约束 /
+                    // 显式行高）。别自己写 `ConstrainedBox(minHeight: 44)` 包 `Text` ——
+                    // minHeight 会把文字节点撑成 44 高、段落按顶部绘制 → 文字偏上。
+                    PlainTopBarTextAction(
+                      label: s.save,
+                      onTap: () async {
+                        final ok = await controller.saveExplicit();
+                        if (!ok || !context.mounted) return;
+                        final msg = controller.currentToast;
+                        if (msg != null) {
+                          showAppToast(context, msg);
+                          controller.clearToast();
+                        }
+                        if (context.mounted) Navigator.pop(context);
+                      },
                     ),
                 ],
               ),
@@ -225,37 +211,9 @@ class _EntryInputPageState extends ConsumerState<EntryInputPage> {
     );
   }
 
-  /// STORY-1.5：编辑态附件面板。
-  void _showAttachmentsSheet(BuildContext context) {
-    final entryId = widget.editEntryId;
-    if (entryId == null) return;
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      builder: (ctx) => Padding(
-        padding: EdgeInsets.only(
-          left: Spacing.lg,
-          right: Spacing.lg,
-          top: Spacing.lg,
-          bottom: MediaQuery.viewInsetsOf(ctx).bottom + Spacing.lg,
-        ),
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text('附件', style: Theme.of(ctx).textTheme.titleMedium),
-              const SizedBox(height: Spacing.md),
-              EntryAttachmentsSection(entryId: entryId),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
   /// STORY-9.4：AI 识别记账 — 文本识别 + 额度管理。
   void _showOcrSheet(BuildContext context, EntryInputController controller) {
+    final s = AppStrings.of(context);
     final ctrl = TextEditingController();
     showModalBottomSheet<void>(
       context: context,
@@ -271,7 +229,7 @@ class _EntryInputPageState extends ConsumerState<EntryInputPage> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text('AI 识别记账', style: Theme.of(ctx).textTheme.titleMedium),
+            Text(s.ocrSheetTitle, style: Theme.of(ctx).textTheme.titleMedium),
             const SizedBox(height: Spacing.sm),
             // 额度显示
             FutureBuilder<QuotaStatus>(
@@ -287,7 +245,7 @@ class _EntryInputPageState extends ConsumerState<EntryInputPage> {
                 final q = snap.data;
                 if (q == null) return const SizedBox.shrink();
                 return Text(
-                  '本月额度 ${q.displayLabel}',
+                  s.monthlyQuotaLabel(q.displayLabel(s)),
                   style: TextStyle(
                     fontSize: 12,
                     color: q.isExhausted
@@ -299,15 +257,15 @@ class _EntryInputPageState extends ConsumerState<EntryInputPage> {
             ),
             const SizedBox(height: Spacing.sm),
             Text(
-              '粘贴文字、截图或语音识别结果，自动预填金额和商户。',
+              s.ocrDescription,
               style: TextStyle(fontSize: 12, color: context.colors.inkTertiary),
             ),
             const SizedBox(height: Spacing.lg),
             TextField(
               controller: ctrl,
               maxLines: 4,
-              decoration: const InputDecoration(
-                hintText: '例如：星巴克 ¥128.50 2026-01-15',
+              decoration: InputDecoration(
+                hintText: s.ocrInputHint,
                 border: OutlineInputBorder(),
               ),
             ),
@@ -328,7 +286,7 @@ class _EntryInputPageState extends ConsumerState<EntryInputPage> {
                   if (mounted) {
                     showAppToast(
                       this.context,
-                      '本月额度已用完，下月 ${deps.calendar.monthStartDay} 日恢复',
+                      s.quotaExhaustedRestore(deps.calendar.monthStartDay),
                     );
                   }
                   return;
@@ -353,7 +311,7 @@ class _EntryInputPageState extends ConsumerState<EntryInputPage> {
                 if (!ctx.mounted) return;
                 Navigator.pop(ctx);
                 if (!draft.isUsable) {
-                  showAppToast(context, '未能识别金额，请手动录入');
+                  showAppToast(context, s.ocrAmountNotFound);
                   return;
                 }
                 controller.applyOcrPrefill(
@@ -362,9 +320,9 @@ class _EntryInputPageState extends ConsumerState<EntryInputPage> {
                   occurredAt: draft.occurredAt,
                   categoryHint: draft.categoryHint,
                 );
-                showAppToast(context, '已预填，请确认或修正');
+                showAppToast(context, s.ocrPrefilled);
               },
-              child: const Text('识别并预填'),
+              child: Text(s.ocrRecognizeAction),
             ),
           ],
         ),
@@ -487,12 +445,13 @@ class _TypeTabs extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final s = AppStrings.of(context);
     final types = [
-      (EntryType.expense, '支出'),
-      (EntryType.income, '收入'),
-      (EntryType.transfer, '转账'),
-      (EntryType.borrowOut, '借出'),
-      (EntryType.borrowIn, '借入'),
+      (EntryType.expense, s.expense),
+      (EntryType.income, s.income),
+      (EntryType.transfer, s.transfer),
+      (EntryType.borrowOut, s.entryBorrowOut),
+      (EntryType.borrowIn, s.entryBorrowIn),
     ];
     // spec 08-03 §3：.ttabs{padding:0 12px 6px;overflow-x:auto} → 44 + 6 = 50。
     // 英文五个 Tab 在 358dp 内放不下，横向滚动不是可选项。
@@ -574,25 +533,26 @@ class _ForeignAmountHint extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final s = AppStrings.of(context);
     final currency = state.foreignCurrency ?? '';
     final rate = state.foreignRate;
     final missing = rate == null || rate <= 0;
     var rateText = '';
     if (!missing) {
-      var s = rate.toStringAsFixed(6);
-      while (s.contains('.') && s.endsWith('0')) {
-        s = s.substring(0, s.length - 1);
+      var rateStr = rate.toStringAsFixed(6);
+      while (rateStr.contains('.') && rateStr.endsWith('0')) {
+        rateStr = rateStr.substring(0, rateStr.length - 1);
       }
-      if (s.endsWith('.')) s = s.substring(0, s.length - 1);
+      if (rateStr.endsWith('.')) rateStr = rateStr.substring(0, rateStr.length - 1);
       rateText = ' · 1 $currency ≈ '
-          '${CurrencyRules.symbolOf(MoneyRules.defaultCurrency)}$s';
+          '${CurrencyRules.symbolOf(MoneyRules.defaultCurrency)}$rateStr';
     }
     return Padding(
       padding: const EdgeInsets.only(top: 4),
       child: Text(
         missing
-            ? '按 $currency 记账 · 未设汇率，请先到设置里锁定'
-            : '按 $currency 记账$rateText',
+            ? s.foreignMissingRate(currency)
+            : s.foreignRecording(currency, rateText),
         style: TextStyle(
           fontSize: 12,
           height: 18 / 12,
@@ -637,6 +597,7 @@ class _AmountDisplayState extends State<_AmountDisplay>
 
   @override
   Widget build(BuildContext context) {
+    final s = AppStrings.of(context);
     final state = widget.state;
     final hasHint = state.errorMessage != null || state.wasIncompleteExpression;
     return SizedBox(
@@ -706,7 +667,7 @@ class _AmountDisplayState extends State<_AmountDisplay>
               Text(
                 state.errorMessage != null
                     ? _errorText(state.errorMessage!)
-                    : '表达式未闭合',
+                    : s.incompleteExpr,
                 style: TextStyle(
                   fontSize: 12,
                   // 同上：不写 height 会被继承成 12 × 1.5714 = 18.86 > 18。
@@ -949,6 +910,7 @@ class _Keypad extends StatelessWidget {
   }
 
   Future<void> _saveAndToast(BuildContext context) async {
+    final s = AppStrings.of(context);
     final ok = await controller.saveExplicit();
     if (!ok || !context.mounted) return;
     // 音效开关打开时播放 coin 声
@@ -961,11 +923,11 @@ class _Keypad extends StatelessWidget {
         showAppToastWithAction(
           context,
           msg,
-          actionLabel: '撤销',
+          actionLabel: s.undo,
           onAction: () async {
             final undone = await controller.undoLastSaved();
             if (undone && context.mounted) {
-              showAppToast(context, '已撤销');
+              showAppToast(context, s.undone);
             }
           },
         );
@@ -1059,6 +1021,7 @@ class _CategoryAndAttrs extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final s = AppStrings.of(context);
     // G-6 / AC12：转账不走分类宫格，换专属双账户表单（必须 OK 确认）。
     if (state.type == EntryType.transfer) {
       return Column(
@@ -1128,9 +1091,9 @@ class _CategoryAndAttrs extends StatelessWidget {
                         height: 226,
                         child: Center(child: CircularProgressIndicator()),
                       ),
-                      error: (e, _) => const SizedBox(
+                      error: (e, _) => SizedBox(
                         height: 226,
-                        child: Center(child: Text('分类加载失败')),
+                        child: Center(child: Text(s.categoryLoadFailed)),
                       ),
                     ),
                   ],
@@ -1153,6 +1116,7 @@ class _BorrowForm extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final s = AppStrings.of(context);
     final isOut = state.type == EntryType.borrowOut;
     // 同上：借出/借入表单在窄中段也会溢出（真机报错 14px），整块可滚
     return SingleChildScrollView(
@@ -1161,14 +1125,14 @@ class _BorrowForm extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(
-            isOut ? '借出往来对象' : '借入往来对象',
+            isOut ? s.borrowOutCounterparty : s.borrowInCounterparty,
             style: TextStyle(fontSize: 12, color: context.colors.inkTertiary),
           ),
           const SizedBox(height: Spacing.sm),
           TextField(
-            decoration: const InputDecoration(
-              labelText: '往来对象（必填）',
-              hintText: '如：张三',
+            decoration: InputDecoration(
+              labelText: s.counterpartyRequired,
+              hintText: s.counterpartyHint,
               border: OutlineInputBorder(),
             ),
             onChanged: controller.onNoteChanged,
@@ -1186,7 +1150,7 @@ class _BorrowForm extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '保存后的影响',
+                  s.saveImpactTitle,
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
@@ -1197,24 +1161,24 @@ class _BorrowForm extends StatelessWidget {
                 const SizedBox(height: 10),
                 // 用实时金额，不写死数字
                 _ImpactRow(
-                  label: '本账户',
+                  label: s.thisAccount,
                   value: (isOut ? '−' : '+') + formatAmountYuan(_previewCents(state)),
                   bold: true,
                 ),
-                _ImpactRow(label: '往来对象', value: '仅记录，不建账户', bold: true),
+                _ImpactRow(label: s.counterpartyRowLabel, value: s.counterpartyRecordOnly, bold: true),
                 // 应收/应付尚未建模，借出/借入会如实反映为净资产增减
                 _ImpactRow(
-                  label: '净资产',
+                  label: s.netAssets,
                   value: '${isOut ? '减少' : '增加'} ${formatAmountYuan(_previewCents(state))}',
                   bold: true,
                 ),
-                _ImpactRow(label: '收支与预算', value: '不计入', bold: true),
+                _ImpactRow(label: s.statsAndBudget, value: s.notCounted, bold: true),
               ],
             ),
           ),
           const SizedBox(height: 12),
           PlainPrimaryButton(
-            label: isOut ? '确认借出' : '确认借入',
+            label: isOut ? s.confirmBorrowOut : s.confirmBorrowIn,
             onPressed: () => _confirm(context),
           ),
         ],
@@ -1288,6 +1252,8 @@ class _TransferForm extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final s = AppStrings.of(context);
+    final accountNames = ref.watch(_accountNamesProvider).value;
     // 真机报错：键盘弹出时中段只剩 ~270 高，表单 + 影响面板放不下 →
     // RenderFlex overflowed by 171px。整块改成可滚（`Padding` 换 `SingleChildScrollView`，
     // 嵌套层数不变），内容再多也只是滚动。
@@ -1297,14 +1263,16 @@ class _TransferForm extends ConsumerWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(
-            '转账账户',
+            s.transferAccountsTitle,
             style: TextStyle(fontSize: 12, color: context.colors.inkTertiary),
           ),
           const SizedBox(height: Spacing.sm),
           _AccountRow(
             icon: PlainIconData.arrowUpRight,
-            title: '转出账户',
-            value: state.selectedAccountId,
+            title: s.fromAccountLabel,
+            value: state.selectedAccountId == null
+                ? null
+                : (accountNames?[state.selectedAccountId] ?? s.unknownAccount),
             onTap: () => _pickAccount(context, ref, isSource: true),
           ),
           const SizedBox(height: Spacing.sm),
@@ -1318,8 +1286,10 @@ class _TransferForm extends ConsumerWidget {
           const SizedBox(height: Spacing.sm),
           _AccountRow(
             icon: PlainIconData.arrowDownLeft,
-            title: '转入账户',
-            value: state.toAccountId,
+            title: s.toAccountLabel,
+            value: state.toAccountId == null
+                ? null
+                : (accountNames?[state.toAccountId] ?? s.unknownAccount),
             onTap: () => _pickAccount(context, ref, isSource: false),
           ),
           const SizedBox(height: Spacing.lg),
@@ -1335,7 +1305,7 @@ class _TransferForm extends ConsumerWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '保存后的影响',
+                  s.saveImpactTitle,
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
@@ -1345,21 +1315,21 @@ class _TransferForm extends ConsumerWidget {
                 ),
                 const SizedBox(height: 10),
                 _ImpactRow(
-                  label: '转出账户',
+                  label: s.fromAccountLabel,
                   value: '−${formatAmountYuan(_previewCents(state))}',
                   bold: true,
                 ),
                 _ImpactRow(
-                  label: '转入账户',
+                  label: s.toAccountLabel,
                   value: '+${formatAmountYuan(_previewCents(state))}',
                   bold: true,
                 ),
                 // 转账只在自己账户之间搬，净资产确实不变
-                _ImpactRow(label: '净资产', value: '不变', bold: true),
-                _ImpactRow(label: '收支与预算', value: '不计入', bold: true),
+                _ImpactRow(label: s.netAssets, value: s.unchanged, bold: true),
+                _ImpactRow(label: s.statsAndBudget, value: s.notCounted, bold: true),
                 const SizedBox(height: 10),
                 // notepanel 直接文本（门禁拼接串，加粗段不计入）。
-                Offstage(child: Text('涉及的记账不走「点分类即保存」，需要显式确认（G-6）。')),
+                Offstage(child: Text(s.transferNotePlain)),
                 Text.rich(
                   TextSpan(
                     style: TextStyle(
@@ -1368,22 +1338,22 @@ class _TransferForm extends ConsumerWidget {
                       color: context.colors.inkTertiary,
                     ),
                     children: [
-                      const TextSpan(text: '涉及'),
+                      TextSpan(text: s.transferNotePrefix),
                       TextSpan(
-                        text: '两个账户',
+                        text: s.transferNoteBold,
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
                           color: context.colors.ink,
                         ),
                       ),
-                      const TextSpan(text: '的记账不走「点分类即保存」，需要显式确认（G-6）。'),
+                      TextSpan(text: s.transferNoteSuffix),
                     ],
                   ),
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  '转账只是钱换了地方 —— 计入收支会让你的「支出」凭空翻倍（G-2）。',
+                  s.transferExplanation,
                   style: TextStyle(
                     fontSize: 12,
                     height: 1.7,
@@ -1394,7 +1364,7 @@ class _TransferForm extends ConsumerWidget {
             ),
           ),
           const SizedBox(height: 12),
-          PlainPrimaryButton(label: '确认转账', onPressed: () => _confirm(context)),
+          PlainPrimaryButton(label: s.confirmTransfer, onPressed: () => _confirm(context)),
         ],
       ),
     );
@@ -1460,6 +1430,7 @@ class _AccountRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final s = AppStrings.of(context);
     return Material(
       color: context.colors.surfaceCard,
       borderRadius: BorderRadius.circular(Radii.md),
@@ -1483,9 +1454,13 @@ class _AccountRow extends StatelessWidget {
                 ),
               ),
               const Spacer(),
-              Text(
-                value == null ? '请选择' : '已选择',
-                style: TextStyle(fontSize: 14, color: context.colors.ink),
+              Flexible(
+                child: Text(
+                  value ?? s.pleaseSelect,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(fontSize: 14, color: context.colors.ink),
+                ),
               ),
               PlainIcon(
                 PlainIconData.chevronRight,
@@ -1512,14 +1487,27 @@ class _CategoryGrid extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final s = AppStrings.of(context);
     // Recent-first; first launch falls back to default leaves (by sort order).
     final kind = state.type.wire;
     final recents =
         ref.watch(recentCategoriesProvider)[kind] ?? const <String>[];
-    final leaves = categories.leaves;
+    // ★ 宫格只服务「支出 / 收入」：转账、借出、借入在 `_CategoryAndAttrs` 里
+    //   早就分支走 `_TransferForm` / `_BorrowForm`（这三类**没有分类**），
+    //   根本到不了这里。所以按 kind 筛出对应的二级分类 —— 数据源是全量可见
+    //   分类，以前这里直接 `categories.leaves`，收入页签下列的是支出分类
+    //   （2026-10-16 修）。
+    final categoryKind = state.type == EntryType.income
+        ? CategoryKind.income
+        : CategoryKind.expense;
+    final leaves =
+        categories.where((c) => c.kind == categoryKind).toList().leaves;
 
     // 始终显示 11 个分类 + 1 个「更多」= 12 格（4×3）
-    // 选中的排第一，上次选的排第二（由 recentCategories.use() 维护）
+    // 顺序 =「最近用过」在前（recentCategories 维护）+ 其余按分类原顺序补齐。
+    // ⚠️ 点一个**已经在格子里**的分类不会改变顺序（2026-10-16 口径）：只有从
+    //   「更多」里选了当前没显示的，才会把它顶到第一格 —— 否则每点一次整版
+    //   布局就重排一次，刚点的那格反而找不到。
     final byId = {for (final c in leaves) c.id: c};
     final visible = <domain.Category>[];
     for (final id in recents) {
@@ -1557,18 +1545,25 @@ class _CategoryGrid extends ConsumerWidget {
           return _CategoryCell(
             iconRef: null,
             fallbackIcon: PlainIconData.more,
-            label: '更多',
+            label: s.more,
             selected: false,
             color: context.colors.inkTertiary,
             onTap: () async {
               final result = await Navigator.push<String>(
                 context,
                 MaterialPageRoute(
-                  builder: (_) => const CategoryPickerPage(),
+                  // 选分类页必须跟着当前页签的 kind 走：收入页签下开一个
+                  // 支出分类的列表，用户会选到不属于收入的分类。
+                  builder: (_) => CategoryPickerPage(kind: categoryKind),
                 ),
               );
               if (result != null) {
-                controller.selectCategory(result);
+                // 宫格是唯一知道「现在显示哪 11 个」的地方，所以由它判定：
+                // 选的是已显示的那 11 个之一 → 不动位置；否则顶到第一格。
+                controller.selectCategory(
+                  result,
+                  alreadyVisible: visible.any((c) => c.id == result),
+                );
               }
             },
           );
@@ -1668,6 +1663,8 @@ class _AttrBar extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final s = AppStrings.of(context);
+    final accountNames = ref.watch(_accountNamesProvider).value;
     final isTransfer = state.type == EntryType.transfer;
     // spec 08-03 §6：.attrchips{padding:2px 16px 10px}，单行 chip h=40 r=999 gap=8。
     // chip 的命中盒是 44（视觉胶囊 40 居中），比视觉高 4 —— 上下各多占 2。
@@ -1686,7 +1683,10 @@ class _AttrBar extends ConsumerWidget {
                 Expanded(
                   child: _AttrChip(
                     icon: PlainIconData.arrowUpRight,
-                    label: state.selectedAccountId != null ? '转出账户' : '选择转出',
+                    label: state.selectedAccountId == null
+                        ? s.selectFromAccount
+                        : (accountNames?[state.selectedAccountId] ??
+                            s.unknownAccount),
                     placeholder: state.selectedAccountId == null,
                     onTap: () =>
                         _showAccountPicker(context, ref, isSource: true),
@@ -1702,7 +1702,10 @@ class _AttrBar extends ConsumerWidget {
                 Expanded(
                   child: _AttrChip(
                     icon: PlainIconData.arrowDownLeft,
-                    label: state.toAccountId != null ? '转入账户' : '选择转入',
+                    label: state.toAccountId == null
+                        ? s.selectToAccount
+                        : (accountNames?[state.toAccountId] ??
+                            s.unknownAccount),
                     placeholder: state.toAccountId == null,
                     onTap: () =>
                         _showAccountPicker(context, ref, isSource: false),
@@ -1718,7 +1721,12 @@ class _AttrBar extends ConsumerWidget {
               children: [
                 _AttrChip(
                   icon: PlainIconData.wallet,
-                  label: state.selectedAccountId != null ? '账户' : '招行储蓄卡',
+                  // 未指定账户 → 占位「账户」（虚线样式）；指定了 → 显示账户名。
+                  label: state.selectedAccountId == null
+                      ? s.account
+                      : (accountNames?[state.selectedAccountId] ??
+                          s.unknownAccount),
+                  placeholder: state.selectedAccountId == null,
                   onTap: () => _showAccountPicker(context, ref, isSource: true),
                 ),
                 _AttrChip(
@@ -1731,11 +1739,29 @@ class _AttrBar extends ConsumerWidget {
                 ),
                 _AttrChip(
                   icon: PlainIconData.note,
-                  label: state.note ?? '添加备注',
+                  label: state.note ?? s.addNote,
                   // spec：.chip.ph —— 未填写用虚线边 + muted
                   placeholder: (state.note ?? '').isEmpty,
                   onTap: () => _showNoteSheet(context),
                 ),
+                // STORY-1.8：报销标记（只对支出有意义）。原来挂在详情页上就地切换，
+                // 现移到编辑页，随账单一起保存。
+                if (state.type == EntryType.expense)
+                  _AttrChip(
+                    icon: PlainIconData.receipt,
+                    label: _reimburseChipLabel(state.reimburseStatus),
+                    placeholder: state.reimburseStatus == ReimburseStatus.none,
+                    onTap: () => _pickReimburse(context),
+                  ),
+                // G-2：「不计入收支」只对手动录入的普通收支开放（canMarkExcluded）。
+                if (state.canMarkExcluded &&
+                    (state.type == EntryType.expense ||
+                        state.type == EntryType.income))
+                  _AttrChip(
+                    icon: PlainIconData.eyeOff,
+                    label: state.excludeFromStats ? s.notInStats : s.countedInStats,
+                    onTap: () => _pickExcludeFromStats(context),
+                  ),
               ],
             ),
     );
@@ -1745,6 +1771,53 @@ class _AttrBar extends ConsumerWidget {
     if (at == null) return '今天';
     if (isSameLocalDay(at, now)) return '今天';
     return shortDateLabel(at);
+  }
+
+  String _reimburseChipLabel(ReimburseStatus s) => switch (s) {
+        ReimburseStatus.none => '不报销',
+        ReimburseStatus.pending => '待报销',
+        ReimburseStatus.submitted => '已提交',
+        ReimburseStatus.partial => '部分回款',
+        ReimburseStatus.reimbursed => '已回款',
+        ReimburseStatus.abandoned => '已放弃',
+      };
+
+  /// 报销：只提供「不报销 / 待报销」两态；若该笔已在报销流程中
+  ///（已提交 / 部分回款 / 已回款…），把当前态一并列出，既不隐藏现状，
+  /// 也避免误选把它重置回未标记（状态机不允许那些回退）。
+  Future<void> _pickReimburse(BuildContext context) async {
+    final s = AppStrings.of(context);
+    final options = <PickerOption<ReimburseStatus>>[
+      PickerOption(value: ReimburseStatus.none, label: s.reimburseNone),
+      PickerOption(value: ReimburseStatus.pending, label: s.homeCardPendingReimburse),
+      if (state.reimburseStatus != ReimburseStatus.none &&
+          state.reimburseStatus != ReimburseStatus.pending)
+        PickerOption(
+          value: state.reimburseStatus,
+          label: _reimburseChipLabel(state.reimburseStatus),
+        ),
+    ];
+    final picked = await showOptionPicker<ReimburseStatus>(
+      context: context,
+      title: s.reimburseFieldTitle,
+      current: state.reimburseStatus,
+      options: options,
+    );
+    if (picked != null) controller.setReimburse(picked);
+  }
+
+  Future<void> _pickExcludeFromStats(BuildContext context) async {
+    final s = AppStrings.of(context);
+    final picked = await showOptionPicker<bool>(
+      context: context,
+      title: s.includeInStatsTitle,
+      current: state.excludeFromStats,
+      options: [
+        PickerOption(value: false, label: s.countedInStats),
+        PickerOption(value: true, label: s.notInStats),
+      ],
+    );
+    if (picked != null) controller.setExcludeFromStats(picked);
   }
 
   Future<void> _pickDate(BuildContext context, WidgetRef ref) async {
@@ -1819,33 +1892,34 @@ class _AttrBar extends ConsumerWidget {
   }
 
   void _showNoteSheet(BuildContext context) {
+    final s = AppStrings.of(context);
     final textCtrl = TextEditingController(text: state.note ?? '');
     showDialog<void>(
       context: context,
       barrierDismissible: true,
       builder: (ctx) => AlertDialog(
-        title: const Text('备注'),
+        title: Text(s.note),
         content: TextField(
           controller: textCtrl,
           autofocus: true,
           maxLines: 3,
           maxLength: 100,
-          decoration: const InputDecoration(
-            hintText: '写点什么...',
+          decoration: InputDecoration(
+            hintText: s.noteHint,
             border: OutlineInputBorder(),
           ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('取消'),
+            child: Text(s.cancel),
           ),
           FilledButton(
             onPressed: () {
               controller.onNoteChanged(textCtrl.text.trim());
               Navigator.pop(ctx);
             },
-            child: const Text('确定'),
+            child: Text(s.ok),
           ),
         ],
       ),

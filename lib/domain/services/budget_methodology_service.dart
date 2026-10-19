@@ -8,8 +8,10 @@
 /// 「储蓄」= 收入 − 总支出，是派生量而不是第三类支出。
 library;
 
+import 'package:plain/app/l10n/app_strings.dart';
 import 'package:plain/core/result/result.dart';
 import 'package:plain/domain/entities/enums.dart';
+import 'package:plain/app/l10n/strings_domain.dart';
 
 /// 参与测算的一条分类预算（含其实花金额与刚性标记）。
 class CategorySpendInput {
@@ -167,6 +169,7 @@ class BudgetMethodologyService {
   /// 具体判定（对「从别的信封挪钱来补」的可执行翻译）：**不能把某个信封的额度
   /// 调到低于它已经花掉的金额**——那必然意味着动用了别处的钱。其它方法论不限制。
   Result<void> validateEnvelopeLimitChange({
+    required AppStrings s,
     required BudgetMethodology methodology,
     required String categoryName,
     required int newLimitCents,
@@ -176,8 +179,8 @@ class BudgetMethodologyService {
     if (newLimitCents < spentCents) {
       return err(ValidationFailure(
         'budget.envelope_no_borrow',
-        '信封法下不可跨类挪用：「$categoryName」已花 '
-            '${(spentCents / 100).toStringAsFixed(2)} 元，额度不能低于该值',
+        s.bmEnvelopeNoBorrow(
+            categoryName, (spentCents / 100).toStringAsFixed(2)),
       ));
     }
     return ok(null);
@@ -187,20 +190,20 @@ class BudgetMethodologyService {
   ///
   /// 返回「呈现方式」的变化描述，用于在切换确认里说明**数据不变、只是看法变了**。
   String switchPreview({
+    required AppStrings s,
     required BudgetMethodology from,
     required BudgetMethodology to,
     required int categoryBudgetCount,
   }) {
     String shape(BudgetMethodology m) => switch (m) {
-          BudgetMethodology.custom => '总预算 + $categoryBudgetCount 条分类限额',
-          BudgetMethodology.envelope => '$categoryBudgetCount 个信封（各自滚存）',
-          BudgetMethodology.zeroBased => '$categoryBudgetCount 项已分配 + 待分配余额',
+          BudgetMethodology.custom => s.bmShapeCustom(categoryBudgetCount),
+          BudgetMethodology.envelope => s.bmShapeEnvelope(categoryBudgetCount),
+          BudgetMethodology.zeroBased => s.bmShapeZeroBased(categoryBudgetCount),
           BudgetMethodology.fiftyThirtyTwenty =>
-            '需要 / 想要 / 储蓄三档（$categoryBudgetCount 条限额按刚性标记归入前两档）',
+            s.bmShapeFTT(categoryBudgetCount),
         };
-    return '从「${from.label}」切到「${to.label}」：'
-        '同样的数据由「${shape(from)}」呈现为「${shape(to)}」。'
-        '账单与报表不受影响。';
+    return s.bmSwitchPreview(
+        from.label(s), to.label(s), shape(from), shape(to));
   }
 
   /// 分类在 50/30/20 里落在哪一档（用于呈现分组）。

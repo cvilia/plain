@@ -1,6 +1,7 @@
 /// STORY-11.4 资金年龄（FIFO 加权）。
 library;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:plain/app/l10n/strings_core.dart';
 import 'package:plain/domain/services/money_age_service.dart';
 
 void main() {
@@ -90,7 +91,7 @@ void main() {
         months: const [],
       );
       expect(r.hasEnoughData, false);
-      expect(r.interpretation, '数据积累中');
+      expect(r.interpretation(kDefaultAppStrings), '数据积累中');
     });
 
     test('跨度不足两个月 → 数据积累中', () {
@@ -174,23 +175,23 @@ void main() {
         );
 
     test('43 天 vs 上月 35 天 → 正向表述', () {
-      final text = result(cur: 43, prev: 35).interpretation;
+      final text = result(cur: 43, prev: 35).interpretation(kDefaultAppStrings);
       expect(text, contains('更从容'));
       expect(text, contains('35'));
       expect(text, contains('43'));
     });
 
     test('变小则提示吃紧', () {
-      final text = result(cur: 28, prev: 40).interpretation;
+      final text = result(cur: 28, prev: 40).interpretation(kDefaultAppStrings);
       expect(text, contains('吃紧'));
     });
 
     test('基本持平给出中性表述', () {
-      expect(result(cur: 40, prev: 40).interpretation, contains('持平'));
+      expect(result(cur: 40, prev: 40).interpretation(kDefaultAppStrings), contains('持平'));
     });
 
     test('数据不足时统一显示数据积累中', () {
-      expect(result(cur: 43, prev: 35, enough: false).interpretation, '数据积累中');
+      expect(result(cur: 43, prev: 35, enough: false).interpretation(kDefaultAppStrings), '数据积累中');
     });
   });
 }

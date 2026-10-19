@@ -17,6 +17,7 @@
 /// 「进消费/分类统计 = 是」的账单（G-2.0）。
 library;
 
+import 'package:plain/app/l10n/app_strings.dart';
 import 'package:plain/core/constants/app_constants.dart';
 import 'package:plain/core/id/uuid_v7.dart';
 import 'package:plain/core/time/clock.dart';
@@ -33,6 +34,7 @@ import 'package:plain/domain/repositories/repositories.dart';
 import 'package:plain/domain/services/accounting_calendar.dart';
 import 'package:plain/domain/services/goal_progress_service.dart';
 import 'package:plain/domain/services/safe_to_spend_service.dart';
+import 'package:plain/app/l10n/strings_domain.dart';
 
 /// 候选提醒 + 它的去重窗口（[sinceMs]）。
 class _Candidate {
@@ -125,6 +127,7 @@ class ReminderService {
   ///
   /// [persist] 为 false 时只算不落历史（纯查询用）。
   Future<List<AppReminder>> collect({
+    required AppStrings s,
     required String bookId,
     required ReminderPrefs prefs,
     bool persist = true,
@@ -137,15 +140,15 @@ class ReminderService {
     final cats = await _categoryIndex();
 
     // 按 PRD 表内顺序收集，便于阅读与断言
-    await _creditDue(c, today);
-    await _subscriptions(c, bookId, today);
-    await _budgets(c, bookId, today, cats);
-    await _lowBalance(c, bookId, local);
-    await _anomalySpend(c, bookId, now, today, cats);
-    await _recurringPosted(c, now);
-    await _reconcile(c);
-    await _savingsGoals(c, bookId, now);
-    await _backup(c, now);
+    await _creditDue(c, today, s);
+    await _subscriptions(c, bookId, today, s);
+    await _budgets(c, bookId, today, cats, s);
+    await _lowBalance(c, bookId, local, s);
+    await _anomalySpend(c, bookId, now, today, cats, s);
+    await _recurringPosted(c, now, s);
+    await _reconcile(c, s);
+    await _savingsGoals(c, bookId, now, s);
+    await _backup(c, now, s);
 
     final out = <AppReminder>[];
     for (final candidate in c.candidates) {
@@ -169,7 +172,7 @@ class ReminderService {
   }
 
   // ── 1) 信用卡还款日：到期前 3 天、当天各一次（响铃） ──
-  Future<void> _creditDue(_Collector c, DateTime today) async {
+  Future<void> _creditDue(_Collector c, DateTime today, AppStrings s) async {
     final accounts =
         (await _accounts.listAll()).successOrNull ?? const <Account>[];
     for (final a in accounts) {
@@ -183,15 +186,15 @@ class ReminderService {
       if (days == ReminderRules.creditDueAheadDays) {
         c.add(
           ReminderKind.creditDue,
-          '信用卡还款日临近',
-          '「${a.name}」$dueKey 到期，欠款 ${_yuan(a.creditDebtCents)}',
+          s.remCreditDueSoonTitle,
+          s.remCreditDueSoonBody(a.name, dueKey, _yuan(a.creditDebtCents)),
           dedupKey: 'credit_due:${a.id}:$dueKey:ahead',
         );
       } else if (days == 0) {
         c.add(
           ReminderKind.creditDue,
-          '今天信用卡还款日',
-          '「${a.name}」$dueKey 今天到期，欠款 ${_yuan(a.creditDebtCents)}',
+          s.remCreditDueTodayTitle,
+          s.remCreditDueTodayBody(a.name, dueKey, _yuan(a.creditDebtCents)),
           dedupKey: 'credit_due:${a.id}:$dueKey:today',
         );
       }
@@ -199,7 +202,8 @@ class ReminderService {
   }
 
   // ── 2) 订阅到期前取消：连续扣款的订阅，下次扣款前 3 天（响铃） ──
-  Future<void> _subscriptions(_Collector c, String bookId, DateTime today) async {
+  Future<void> _subscriptions(
+      _Collector c, String bookId, DateTime today, AppStrings s) async {
     final rules = (await _recurring.listByBook(bookId)).successOrNull ??
         const <RecurringRule>[];
     for (final r in rules) {
@@ -220,11 +224,10 @@ class ReminderService {
       final name = (r.name ?? '').trim();
       c.add(
         ReminderKind.subscription,
-        '订阅即将扣款',
+        s.remSubscriptionTitle,
         // PRD：给「取消路径指引」——扣款渠道要用户自己去关，我们只能关这条周期规则
-        '「${name.isEmpty ? '周期扣款' : name}」$key 将扣款 '
-        '${_yuan(r.amount.cents)}。不再需要的话，先到原扣款渠道取消自动续费，'
-        '再点这里的「不再需要」关掉这条周期规则。',
+        s.remSubscriptionBody(
+            name.isEmpty ? s.remRecurringCharge : name, key, _yuan(r.amount.cents)),
         dedupKey: 'subscription:${r.id}:$key',
         // 一键处理：卡片上的「不再需要」据此停用这条规则
         actionRef: r.id,
@@ -238,6 +241,7 @@ class ReminderService {
     String bookId,
     DateTime today,
     _CategoryIndex cats,
+    AppStrings s,
   ) async {
     final budgets =
         (await _budget.listByBook(bookId)).successOrNull ?? const <Budget>[];
@@ -261,23 +265,23 @@ class ReminderService {
       final ratio = spent / limit;
       final periodKey = Clock.dayKeyOf(w.start);
       final label = b.categoryId == null
-          ? '总预算'
-          : '「${cats.nameOf(b.categoryId) ?? '分类'}」';
+          ? s.remTotalBudget
+          : s.remCategoryLabel(cats.nameOf(b.categoryId) ?? s.category);
       final pct = (ratio * 100).toStringAsFixed(0);
 
       if (ratio >= ReminderRules.budgetOverRatio) {
         c.add(
           ReminderKind.budgetWarn,
-          '预算已超支',
-          '$label 本期已用 $pct%，超出 ${_yuan(spent - limit)}',
+          s.remBudgetOverTitle,
+          s.remBudgetOverBody(label, pct, _yuan(spent - limit)),
           dedupKey: 'budget_warn:${b.id}:$periodKey:100',
           sinceMs: fromMs,
         );
       } else if (ratio >= ReminderRules.budgetWarnRatio) {
         c.add(
           ReminderKind.budgetWarn,
-          '预算预警',
-          '$label 本期已用 $pct%，剩余 ${_yuan(limit - spent)}',
+          s.remBudgetWarnTitle,
+          s.remBudgetWarnBody(label, pct, _yuan(limit - spent)),
           dedupKey: 'budget_warn:${b.id}:$periodKey:80',
           sinceMs: fromMs,
         );
@@ -286,7 +290,8 @@ class ReminderService {
   }
 
   // ── 4) 余额不足：安全可花为负（响铃） ──
-  Future<void> _lowBalance(_Collector c, String bookId, DateTime local) async {
+  Future<void> _lowBalance(
+      _Collector c, String bookId, DateTime local, AppStrings s) async {
     final result = await SafeToSpendCalculator(
       accountRepository: _accounts,
       budgetRepository: _budget,
@@ -301,8 +306,8 @@ class ReminderService {
     if (!result.hasAnyBudget || !result.isNegative) return;
     c.add(
       ReminderKind.lowBalance,
-      '余额不足预警',
-      '安全可花为负（${_yuan(result.safeToSpendCents)}），本月可用资金已被预留项吃掉',
+      s.remLowBalanceTitle,
+      s.remLowBalanceBody(_yuan(result.safeToSpendCents)),
       dedupKey: 'low_balance:${Clock.dayKeyOf(local)}',
     );
   }
@@ -314,6 +319,7 @@ class ReminderService {
     DateTime now,
     DateTime today,
     _CategoryIndex cats,
+    AppStrings s,
   ) async {
     final windowStart =
         now.subtract(const Duration(days: StatsWindowRules.windowDays));
@@ -353,8 +359,8 @@ class ReminderService {
       if (e.amount.cents <= p90 * ReminderRules.anomalyP90Factor) continue;
       c.add(
         ReminderKind.anomalySpend,
-        '异常支出',
-        '${_yuan(e.amount.cents)} 高于该分类近 90 天的常见水平',
+        s.remAnomalyTitle,
+        s.remAnomalyBody(_yuan(e.amount.cents)),
         dedupKey: 'anomaly_spend:${e.id}',
       );
     }
@@ -367,14 +373,14 @@ class ReminderService {
     if (todayTotal <= dailyAverage * ReminderRules.anomalyDailyFactor) return;
     c.add(
       ReminderKind.anomalySpend,
-      '当日支出偏高',
-      '今日已支出 ${_yuan(todayTotal)}，高于近 30 天日均 ${_yuan(dailyAverage)}',
+      s.remAnomalyDayTitle,
+      s.remAnomalyDayBody(_yuan(todayTotal), _yuan(dailyAverage)),
       dedupKey: 'anomaly_spend_day:${Clock.dayKeyOf(today)}',
     );
   }
 
   // ── 6) 周期账单已入账：免确认入账后（静默） ──
-  Future<void> _recurringPosted(_Collector c, DateTime now) async {
+  Future<void> _recurringPosted(_Collector c, DateTime now, AppStrings s) async {
     final due = (await _recurring.listDue(now: now)).successOrNull ??
         const <RecurringRule>[];
     // 免确认 = 自动入账；需确认的规则由周期页处理，不是九类提醒之一
@@ -382,8 +388,8 @@ class ReminderService {
     if (posted.isEmpty) return;
     c.add(
       ReminderKind.recurringPosted,
-      '周期账单已入账',
-      '已自动入账 ${posted.length} 笔周期账单',
+      s.remRecurringPostedTitle,
+      s.remRecurringPostedBody(posted.length),
       dedupKey: 'recurring_posted:${Clock.dayKeyOf(now.toLocal())}',
     );
   }
@@ -395,7 +401,7 @@ class ReminderService {
   // 「到点后首次启动补发」）取**记账月内首次扫描补发**，去重键带记账月标签，
   // 所以每个记账月仍然只出一次。
   // 统计范围按 PRD 取**上一个记账月**（对账是对完上个月的账，不是清历史欠账）。
-  Future<void> _reconcile(_Collector c) async {
+  Future<void> _reconcile(_Collector c, AppStrings s) async {
     final period = _calendar.previousPeriod();
     final fromMs = DateTime.parse(period.dayFrom).toUtc().millisecondsSinceEpoch;
     final toMs = DateTime.parse(period.dayTo)
@@ -418,8 +424,8 @@ class ReminderService {
     if (pending <= 0) return;
     c.add(
       ReminderKind.reconcile,
-      '对账提醒',
-      '${period.label} 有 $pending 笔账单未对账',
+      s.remReconcileTitle,
+      s.remReconcileBody(period.label, pending),
       dedupKey: 'reconcile:${_calendar.currentLabel()}',
     );
   }
@@ -429,6 +435,7 @@ class ReminderService {
     _Collector c,
     String bookId,
     DateTime now,
+    AppStrings s,
   ) async {
     final goals =
         (await _goals.listByBook(bookId)).successOrNull ?? const <SavingsGoal>[];
@@ -448,15 +455,15 @@ class ReminderService {
       if (need <= 0) continue;
       c.add(
         ReminderKind.savingsGoal,
-        '储蓄目标待存',
-        '「${v.goal.name}」本月需存 ${_yuan(need)}',
+        s.remSavingsGoalTitle,
+        s.remSavingsGoalBody(v.goal.name, _yuan(need)),
         dedupKey: 'savings_goal:${v.goal.id}:$period',
       );
     }
   }
 
   // ── 9) 备份提醒：距上次备份 > 30 天（静默） ──
-  Future<void> _backup(_Collector c, DateTime now) async {
+  Future<void> _backup(_Collector c, DateTime now, AppStrings s) async {
     final lastMs = _appMeta.lastBackupAtMs();
     // 从来没备份过 → 没有「距上次备份」这个量，不产生（不编造天数）
     if (lastMs == null) return;
@@ -467,8 +474,8 @@ class ReminderService {
     final bucket = elapsed.inDays ~/ ReminderRules.backupRemindInterval.inDays;
     c.add(
       ReminderKind.backup,
-      '备份提醒',
-      '距上次备份已 ${elapsed.inDays} 天，建议导出一次整库备份',
+      s.remBackupTitle,
+      s.remBackupBody(elapsed.inDays),
       dedupKey: 'backup:$bucket',
     );
   }
@@ -532,6 +539,7 @@ class ReminderService {
 
   /// 夜间汇总的系统通知（含预算跨阈值时升级为响铃）。
   Future<void> pushDigestIfDue({
+    required AppStrings s,
     required String bookId,
     required ReminderPrefs prefs,
   }) async {
@@ -541,8 +549,8 @@ class ReminderService {
     if (digest == null) return;
     await NotificationBridge.show(
       id: ReminderRules.digestNotificationId,
-      title: digest.title,
-      body: digest.body,
+      title: digest.title(s),
+      body: digest.body(s),
       payload: 'reminder_digest',
       silent: digest.level == ReminderLevel.silent,
     );

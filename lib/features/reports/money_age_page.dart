@@ -17,6 +17,9 @@ import 'package:plain/design_system/plain_icons_v3.dart';
 import 'package:plain/design_system/plain_ui.dart';
 import 'package:plain/domain/entities/enums.dart';
 import 'package:plain/domain/services/money_age_service.dart';
+import 'package:plain/app/l10n/app_strings.dart';
+import 'package:plain/app/l10n/strings_domain.dart';
+import 'package:plain/app/l10n/strings_reports.dart';
 
 const _svc = MoneyAgeService();
 
@@ -77,9 +80,10 @@ class _MoneyAgePageState extends ConsumerState<MoneyAgePage> {
 
   @override
   Widget build(BuildContext context) {
+    final s = AppStrings.of(context);
     final r = _result;
     return Scaffold(
-      appBar: const PlainTopBar(title: '资金年龄', showBack: true),
+      appBar: PlainTopBar(title: s.reportMoneyAgeTitle, showBack: true),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : ContentWidthConstraint(
@@ -90,14 +94,14 @@ class _MoneyAgePageState extends ConsumerState<MoneyAgePage> {
                   if (r == null || !r.hasEnoughData)
                     AppEmptyState(
                       icon: PlainIconData.chartLine,
-                      title: '数据积累中',
+                      title: s.maAccumulating,
                       subtitle:
                           '资金年龄需要至少 5 笔收入、跨度约两个月的数据。'
                           '当前收入 ${r?.incomeCount ?? 0} 笔、支出 ${r?.expenseCount ?? 0} 笔。',
                     )
                   else ...[
                     _Hero(result: r),
-                    PlainEyebrow('近 6 个月趋势'),
+                    PlainEyebrow(s.moneyAgeTrendEyebrow),
                     PlainPanel(children: [_Trend(result: r)]),
                   ],
                   const SizedBox(height: Spacing.md),
@@ -115,6 +119,7 @@ class _Hero extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final s = AppStrings.of(context);
     final colors = context.colors;
     final age = result.currentAgeDays;
     return Padding(
@@ -126,7 +131,7 @@ class _Hero extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.fromLTRB(2, Spacing.lg, 2, Spacing.sm),
             child: Text(
-              '当前资金年龄',
+              s.moneyAgeCurrentLabel,
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
@@ -151,13 +156,13 @@ class _Hero extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 6),
-                Text('天',
+                Text(s.moneyAgeUnit,
                     style: TextStyle(fontSize: 15, color: colors.inkSecondary)),
               ],
             ),
           ),
           Text(
-            result.interpretation,
+            result.interpretation(AppStrings.of(context)),
             style: TextStyle(
               fontSize: 14,
               height: 1.6,
@@ -181,6 +186,7 @@ class _Trend extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final s = AppStrings.of(context);
     final colors = context.colors;
     final maxAge = result.trend
         .map((p) => p.ageDays ?? 0)
@@ -221,7 +227,7 @@ class _Trend extends StatelessWidget {
                 SizedBox(
                   width: 64,
                   child: Text(
-                    p.ageDays == null ? '无支出' : '${p.ageDays!.round()} 天',
+                    p.ageDays == null ? s.moneyAgeNoExpense : s.moneyAgeDays(p.ageDays!.round()),
                     textAlign: TextAlign.right,
                     style: TextStyle(
                         fontSize: 12,
@@ -243,16 +249,17 @@ class _NotePanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final s = AppStrings.of(context);
     final colors = context.colors;
     final r = result;
     final lines = <String>[
-      '资金年龄 = 花掉的每一块钱，其来源收入距花掉那天有多久，按金额加权平均。',
-      '算法是 FIFO：每笔支出消耗最早尚未用完的那笔收入。',
-      '年龄越大越从容——说明钱在手里待得久，不靠当月工资过日子。',
+      s.moneyAgeNote1,
+      s.moneyAgeNote2,
+      s.moneyAgeNote3,
       if (r != null)
-        '当前参与计算：收入 ${r.incomeCount} 笔、支出 ${r.expenseCount} 笔。',
+        s.moneyAgeNoteCounts(r.incomeCount, r.expenseCount),
       if (r != null && r.trend.any((p) => p.expenseCents > 0))
-        '趋势里每月是当月支出的加权平均；当月没花钱显示「无支出」。',
+        s.moneyAgeNoteTrend,
     ];
     return PlainPanel(
       padding: const EdgeInsets.all(Spacing.lg),

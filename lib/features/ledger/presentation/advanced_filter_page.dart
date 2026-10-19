@@ -21,6 +21,11 @@ import 'package:plain/domain/entities/category.dart' as domain;
 import 'package:plain/domain/entities/enums.dart';
 import 'package:plain/domain/entities/ledger_entry.dart';
 import 'package:plain/domain/repositories/repositories.dart';
+import 'package:plain/app/l10n/app_strings.dart';
+import 'package:plain/app/l10n/strings_accounts.dart';
+import 'package:plain/app/l10n/strings_domain.dart';
+import 'package:plain/app/l10n/strings_ledger.dart';
+import 'package:plain/app/l10n/strings_settings_b.dart';
 
 class AdvancedFilterPage extends ConsumerStatefulWidget {
   const AdvancedFilterPage({super.key});
@@ -117,19 +122,20 @@ class _AdvancedFilterPageState extends ConsumerState<AdvancedFilterPage> {
   }
 
   Future<void> _exportCsv() async {
+    final s = AppStrings.of(context);
     if (_results.isEmpty) return;
-    final buf = StringBuffer('日期,类型,分类,金额,备注\n');
+    final buf = StringBuffer(s.csvExportHeader);
     for (final e in _results) {
       final cat = _categories[e.categoryId];
       final t = e.occurredAt.toLocal();
       final date = '${t.year}-${t.month.toString().padLeft(2, '0')}-${t.day.toString().padLeft(2, '0')}';
       final typeLabel = switch (e.type) {
-        EntryType.expense => '支出',
-        EntryType.income => '收入',
-        EntryType.transfer => '转账',
-        EntryType.borrowOut => '借出',
-        EntryType.borrowIn => '借入',
-        _ => '其他',
+        EntryType.expense => s.expense,
+        EntryType.income => s.income,
+        EntryType.transfer => s.transfer,
+        EntryType.borrowOut => s.entryBorrowOut,
+        EntryType.borrowIn => s.entryBorrowIn,
+        _ => s.other,
       };
       // 金额用整数分格式化，不用 double
       final abs = e.amount.cents.abs();
@@ -148,110 +154,83 @@ class _AdvancedFilterPageState extends ConsumerState<AdvancedFilterPage> {
       await file.writeAsString(buf.toString(), flush: true);
       if (mounted) {
         // 分享文件，用户可保存到任意位置
-        await Share.shareXFiles([XFile(file.path)], subject: '筛选结果 ${_results.length} 条');
+        await Share.shareXFiles([XFile(file.path)], subject: s.exportSubject(_results.length));
       }
     } catch (_) {
-      if (mounted) showAppToast(context, '导出失败');
+      if (mounted) showAppToast(context, s.exportFailed);
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final s = AppStrings.of(context);
     return Scaffold(
       appBar: PlainTopBar(
-        title: '高级筛选',
+        title: s.advancedFilterTitle,
         showBack: true,
         actions: [
           if (_applied && _results.isNotEmpty)
-            Material(
-              color: const Color(0x00000000),
-              borderRadius: BorderRadius.circular(12),
-              child: InkWell(
-                onTap: _exportCsv,
-                borderRadius: BorderRadius.circular(12),
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(minHeight: 44),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 8),
-                    child: Text('导出 CSV', style: TextStyle(fontSize: 14, color: context.colors.primary)),
-                  ),
-                ),
-              ),
-            ),
+            PlainTopBarTextAction(label: s.exportCsv, onTap: _exportCsv),
           if (_applied)
-            Material(
-              color: const Color(0x00000000),
-              borderRadius: BorderRadius.circular(12),
-              child: InkWell(
-                onTap: _clear,
-                borderRadius: BorderRadius.circular(12),
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(minHeight: 44),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 8),
-                    child: Text('清空', style: TextStyle(fontSize: 14, color: context.colors.primary)),
-                  ),
-                ),
-              ),
-            ),
+            PlainTopBarTextAction(label: s.clearAllAction, onTap: _clear),
         ],
       ),
       body: ListView(
         padding: const EdgeInsets.all(Spacing.lg),
         children: [
           // 分类
-          _SectionLabel('分类'),
+          _SectionLabel(s.category),
           _CategoryDropdown(value: _categoryId, categories: _categories.values.toList(), onChanged: (v) => setState(() => _categoryId = v)),
           const SizedBox(height: Spacing.md),
           // 类型
-          _SectionLabel('类型'),
+          _SectionLabel(s.typeLabel),
           Wrap(
             spacing: Spacing.sm,
             children: [
-              for (final (label, val) in [('全部', null), ('支出', 'expense'), ('收入', 'income'), ('转账', 'transfer')])
+              for (final (label, val) in [(s.reportFilterAll, null), (s.expense, 'expense'), (s.income, 'income'), (s.transfer, 'transfer')])
                 ChoiceChip(label: Text(label), selected: _type == val, onSelected: (_) => setState(() => _type = val)),
             ],
           ),
           const SizedBox(height: Spacing.md),
           // 金额区间
-          _SectionLabel('金额区间'),
+          _SectionLabel(s.crossAmountRange),
           Row(children: [
-            Expanded(child: TextField(controller: _minCtrl, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(labelText: '最低', prefixText: '¥', border: OutlineInputBorder()))),
+            Expanded(child: TextField(controller: _minCtrl, keyboardType: TextInputType.numberWithOptions(decimal: true), decoration: InputDecoration(labelText: s.minAmountLabel, prefixText: '¥', border: OutlineInputBorder()))),
             const SizedBox(width: Spacing.md),
-            Expanded(child: TextField(controller: _maxCtrl, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(labelText: '最高', prefixText: '¥', border: OutlineInputBorder()))),
+            Expanded(child: TextField(controller: _maxCtrl, keyboardType: TextInputType.numberWithOptions(decimal: true), decoration: InputDecoration(labelText: s.maxAmountLabel, prefixText: '¥', border: OutlineInputBorder()))),
           ]),
           const SizedBox(height: Spacing.md),
           // 关键词
-          _SectionLabel('关键词'),
-          TextField(controller: _keywordCtrl, decoration: const InputDecoration(labelText: '备注 / 分类名', border: OutlineInputBorder())),
+          _SectionLabel(s.keywordLabel),
+          TextField(controller: _keywordCtrl, decoration: InputDecoration(labelText: s.keywordHint, border: OutlineInputBorder())),
           const SizedBox(height: Spacing.md),
           // 时间
-          _SectionLabel('时间范围'),
+          _SectionLabel(s.timeRangeLabel),
           Row(children: [
-            Expanded(child: _DateField(label: '开始', date: _fromDate, onTap: () async {
+            Expanded(child: _DateField(label: s.startDateLabel, date: _fromDate, onTap: () async {
               final d = await showDatePicker(context: context, initialDate: _fromDate ?? DateTime.now(), firstDate: DateTime(2020), lastDate: DateTime(2100));
               if (d != null) setState(() => _fromDate = d);
             })),
             const SizedBox(width: Spacing.md),
-            Expanded(child: _DateField(label: '结束', date: _toDate, onTap: () async {
+            Expanded(child: _DateField(label: s.endDateLabel, date: _toDate, onTap: () async {
               final d = await showDatePicker(context: context, initialDate: _toDate ?? DateTime.now(), firstDate: DateTime(2020), lastDate: DateTime(2100));
               if (d != null) setState(() => _toDate = d);
             })),
           ]),
           const SizedBox(height: Spacing.xl),
-          FilledButton(onPressed: _loading ? null : _apply, child: _loading ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)) : const Text('应用筛选')),
+          FilledButton(onPressed: _loading ? null : _apply, child: _loading ? SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)) : Text(s.applyFilter)),
           const SizedBox(height: Spacing.lg),
           // 结果
           if (_applied) ...[
             Row(children: [
-              Text('结果 ${_results.length} 条', style: TextStyle(fontSize: 14, color: context.colors.inkSecondary, fontWeight: FontWeight.w500)),
+              Text(s.resultCount(_results.length), style: TextStyle(fontSize: 14, color: context.colors.inkSecondary, fontWeight: FontWeight.w500)),
               const Spacer(),
               if (_results.isNotEmpty)
-                TextButton.icon(onPressed: _exportCsv, icon: const PlainIcon(PlainIconData.export, size: 18), label: const Text('导出 CSV')),
+                TextButton.icon(onPressed: _exportCsv, icon: PlainIcon(PlainIconData.export, size: 18), label: Text(s.exportCsv)),
             ]),
             const SizedBox(height: Spacing.sm),
             if (_results.isEmpty)
-              const AppEmptyState(icon: PlainIconData.empty, title: '没有符合条件的账单', subtitle: '试试调整筛选条件')
+              AppEmptyState(icon: PlainIconData.empty, title: s.noMatchingEntries, subtitle: s.tryAdjustingFilter)
             else
               ..._results.map((e) => _ResultTile(entry: e, category: _categories[e.categoryId])),
           ],
@@ -282,10 +261,11 @@ class _CategoryDropdown extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final s = AppStrings.of(context);
     final roots = categories.where((c) => c.isRoot).toList();
     // 「全部分类」用空串占位：`showOptionPicker` 的取消也返回 null，
     // 若直接用 null 当值就无法与取消区分。
-    String currentName = '全部分类';
+    String currentName = s.allCategoriesOption;
     for (final c in roots) {
       if (c.id == value) currentName = c.name;
     }
@@ -295,10 +275,10 @@ class _CategoryDropdown extends StatelessWidget {
       onTap: () async {
         final picked = await showOptionPicker<String>(
           context: context,
-          title: '选择分类',
+          title: s.pickCategory,
           current: value ?? '',
           options: [
-            const PickerOption(value: '', label: '全部分类'),
+            PickerOption(value: '', label: s.allCategoriesOption),
             for (final c in roots) PickerOption(value: c.id, label: c.name),
           ],
         );
@@ -317,6 +297,7 @@ class _DateField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final s = AppStrings.of(context);
     final t = date?.toLocal();
     return InkWell(
       onTap: onTap,
@@ -324,7 +305,7 @@ class _DateField extends StatelessWidget {
       child: InputDecorator(
         decoration: InputDecoration(labelText: label, border: const OutlineInputBorder()),
         child: Text(
-          t != null ? '${t.year}-${t.month.toString().padLeft(2, '0')}-${t.day.toString().padLeft(2, '0')}' : '选择日期',
+          t != null ? '${t.year}-${t.month.toString().padLeft(2, '0')}-${t.day.toString().padLeft(2, '0')}' : s.selectDateHint,
           style: TextStyle(fontSize: 14, color: t != null ? null : context.colors.inkTertiary),
         ),
       ),

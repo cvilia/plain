@@ -1,6 +1,7 @@
 /// G-2 / C11：对账调整不得进入 daily_stats、分类统计与预算消耗。
 library;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:plain/app/l10n/strings_core.dart';
 import 'package:plain/core/time/clock.dart';
 import 'package:plain/data/db/database.dart';
 import 'package:plain/data/repositories/account_repository.dart';
@@ -50,7 +51,7 @@ void main() {
       amountExpression: '25', type: EntryType.expense,
       categoryId: 'cat-food', accountId: 'acc-cash',
       bookId: 'book-1', deviceId: 'dev-1',
-    ));
+    ), s: kDefaultAppStrings);
     expect(statsExpenseCents(), 2500);
 
     final r = await accountRepo.reconcile(
@@ -76,7 +77,7 @@ void main() {
       amountExpression: '25', type: EntryType.expense,
       categoryId: 'cat-food', accountId: 'acc-cash',
       bookId: 'book-1', deviceId: 'dev-1',
-    ));
+    ), s: kDefaultAppStrings);
     await accountRepo.reconcile(
       accountId: 'acc-cash',
       actualBalanceCents: -5000,
@@ -98,7 +99,7 @@ void main() {
       amountExpression: '25', type: EntryType.expense,
       categoryId: 'cat-food', accountId: 'acc-cash',
       bookId: 'book-1', deviceId: 'dev-1',
-    ));
+    ), s: kDefaultAppStrings);
     await accountRepo.reconcile(
       accountId: 'acc-cash',
       actualBalanceCents: -999,
@@ -117,7 +118,7 @@ void main() {
       amountExpression: '25', type: EntryType.expense,
       categoryId: 'cat-food', accountId: 'acc-cash',
       bookId: 'book-1', deviceId: 'dev-1',
-    ));
+    ), s: kDefaultAppStrings);
     expect((await ledgerRepo.verifyDailyStats()).successOrNull, true);
 
     // 人为污染：塞一行不该存在的统计

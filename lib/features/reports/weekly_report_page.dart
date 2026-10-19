@@ -18,6 +18,9 @@ import 'package:plain/design_system/plain_icons_v3.dart';
 import 'package:plain/design_system/plain_ui.dart';
 import 'package:plain/domain/entities/reminder.dart';
 import 'package:plain/domain/services/weekly_report_service.dart';
+import 'package:plain/app/l10n/app_strings.dart';
+import 'package:plain/app/l10n/strings_reports.dart';
+import 'package:plain/app/l10n/strings_domain.dart';
 
 class WeeklyReportPage extends ConsumerStatefulWidget {
   const WeeklyReportPage({super.key});
@@ -44,6 +47,7 @@ class _WeeklyReportPageState extends ConsumerState<WeeklyReportPage> {
     setState(() => _loading = true);
     final deps = ref.read(appDependenciesProvider);
     final report = await WeeklyReportService.build(
+      s: AppStrings.of(context),
       ledger: deps.ledgerRepository,
       categories: deps.categoryRepository,
       clock: deps.clock,
@@ -58,6 +62,7 @@ class _WeeklyReportPageState extends ConsumerState<WeeklyReportPage> {
 
   @override
   Widget build(BuildContext context) {
+    final s = AppStrings.of(context);
     final colors = context.colors;
     final report = _report;
     final enabled = ref.watch(weeklyReportEnabledProvider);
@@ -66,7 +71,7 @@ class _WeeklyReportPageState extends ConsumerState<WeeklyReportPage> {
 
     return Scaffold(
       backgroundColor: colors.surface,
-      appBar: const PlainTopBar(title: '本周消费画像', showBack: true),
+      appBar: PlainTopBar(title: s.wrSummaryTitle, showBack: true),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : ContentWidthConstraint(
@@ -77,25 +82,25 @@ class _WeeklyReportPageState extends ConsumerState<WeeklyReportPage> {
                   if (report == null || report.isEmpty)
                     AppEmptyState(
                       icon: PlainIconData.chartLine,
-                      title: '本周还没有记录',
-                      subtitle: '记一笔之后，这里会显示本周的消费画像。',
+                      title: s.weeklyNoRecordsTitle,
+                      subtitle: s.weeklyNoRecordsSubtitle,
                     )
                   else ...[
                     _Hero(report: report),
-                    PlainEyebrow('分类占比'),
+                    PlainEyebrow(s.reportCategoryShare),
                     PlainPanel(children: [_CategoryShares(report: report)]),
                     const SizedBox(height: Spacing.md),
                     if (report.highlights.isNotEmpty) ...[
-                      PlainEyebrow('本周小结'),
+                      PlainEyebrow(s.weeklySummaryEyebrow),
                       PlainPanel(children: [_Highlights(report: report)]),
                       const SizedBox(height: Spacing.md),
                     ],
                   ],
-                  PlainEyebrow('推送设置'),
+                  PlainEyebrow(s.weeklyPushSection),
                   PlainPanel(children: [
                     PlainRow(
-                      title: '每周日晚推送',
-                      value: enabled ? '已开启' : '已关闭',
+                      title: s.weeklyPushTitle,
+                      value: enabled ? s.weeklyEnabledOn : s.weeklyEnabledOff,
                       trailing: PlainSwitch(
                         value: enabled,
                         onChanged: (v) {
@@ -108,9 +113,9 @@ class _WeeklyReportPageState extends ConsumerState<WeeklyReportPage> {
                     ),
                     const Divider(height: 1, thickness: 1, indent: 16),
                     PlainRow(
-                      title: '提醒方式',
+                      title: s.weeklyLevelTitle,
                       trailing: PlainSeg(
-                        items: const ['响铃', '静默'],
+                        items: [s.weeklyLevelRing, s.weeklyLevelSilent],
                         selectedIndex: _level == ReminderLevel.ring ? 0 : 1,
                         onChanged: (i) {
                           final next =
@@ -147,6 +152,7 @@ class _Hero extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final s = AppStrings.of(context);
     final colors = context.colors;
     final hide = ref.watch(hideAmountsProvider);
     return Padding(
@@ -158,7 +164,7 @@ class _Hero extends ConsumerWidget {
           Padding(
             padding: const EdgeInsets.fromLTRB(2, Spacing.lg, 2, Spacing.xs),
             child: Text(
-              '本周支出',
+              s.weeklyExpenseLabel,
               style: TextStyle(
                 fontSize: 12,
                 height: designLineHeight(12),

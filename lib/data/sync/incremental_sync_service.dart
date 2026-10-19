@@ -11,6 +11,8 @@ library;
 
 import 'dart:convert';
 
+import 'package:plain/app/l10n/app_strings.dart';
+import 'package:plain/app/l10n/strings_core.dart';
 import 'package:plain/core/constants/app_constants.dart';
 import 'package:plain/core/logging/app_log.dart';
 import 'package:plain/core/time/clock.dart';
@@ -52,12 +54,14 @@ class IncrementalSyncService {
     required Clock clock,
     required String deviceId,
     AppLog? log,
+    AppStrings? strings,
   })  : _db = db,
         _client = client,
         _applier = applier,
         _clock = clock,
         _deviceId = deviceId,
-        _log = log;
+        _log = log,
+        _s = strings ?? kDefaultAppStrings;
 
   final AppDatabase _db;
   final SyncTransport _client;
@@ -65,6 +69,10 @@ class IncrementalSyncService {
   final Clock _clock;
   final String _deviceId;
   final AppLog? _log;
+
+  /// 返回给 UI 展示的文案来源。UI 应传 `AppStrings.of(context)`；
+  /// 后台/无 context 场景回退到 [kDefaultAppStrings]。
+  final AppStrings _s;
 
   String get _fileName =>
       SyncRules.logFileNameOf(_deviceId, generation: _generation);
@@ -86,15 +94,15 @@ class IncrementalSyncService {
     try {
       final ok = await _client.ensureCollection(config);
       if (!ok) {
-        return const SyncRunResult(
-            success: false, pushed: 0, pulled: 0, conflicts: 0, message: '无法创建远程目录');
+        return SyncRunResult(
+            success: false, pushed: 0, pulled: 0, conflicts: 0, message: _s.remoteDirCreateFailed);
       }
       final records = SyncWire.filterSyncable(_readLocalRecords());
       final bytes = SyncWire.encodeLines(records);
       final uploaded = await _client.put(config, _fileName, bytes);
       if (!uploaded) {
-        return const SyncRunResult(
-            success: false, pushed: 0, pulled: 0, conflicts: 0, message: '上传失败');
+        return SyncRunResult(
+            success: false, pushed: 0, pulled: 0, conflicts: 0, message: _s.uploadFailed);
       }
       _log?.info('sync.push', fields: {'records': records.length});
       return SyncRunResult(
@@ -106,7 +114,7 @@ class IncrementalSyncService {
       );
     } on Exception catch (e) {
       return SyncRunResult(
-          success: false, pushed: 0, pulled: 0, conflicts: 0, message: '推送异常: $e');
+          success: false, pushed: 0, pulled: 0, conflicts: 0, message: _s.pushException(e));
     }
   }
 
@@ -167,7 +175,7 @@ class IncrementalSyncService {
       );
     } on Exception catch (e) {
       return SyncRunResult(
-          success: false, pushed: 0, pulled: 0, conflicts: 0, message: '拉取异常: $e');
+          success: false, pushed: 0, pulled: 0, conflicts: 0, message: _s.pullException(e));
     }
   }
 

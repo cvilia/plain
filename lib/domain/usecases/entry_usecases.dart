@@ -1,6 +1,7 @@
 /// Entry use cases. See PRD STORY-1.1, 04-8.1.
 library;
 
+import 'package:plain/app/l10n/app_strings.dart';
 import 'package:plain/core/constants/app_constants.dart';
 import 'package:plain/core/id/uuid_v7.dart';
 import 'package:plain/core/money/expression_evaluator.dart';
@@ -19,6 +20,7 @@ class CreateEntryInput {
     this.accountId, this.toAccountId, this.note, this.occurredAt,
     this.source = EntrySource.manual, required this.bookId, required this.deviceId,
     this.reimburseStatus = ReimburseStatus.none,
+    this.excludeFromStats = false,
     this.exchangeRate, this.originalCurrency,
     this.memberId,
   });
@@ -36,6 +38,9 @@ class CreateEntryInput {
 
   /// STORY-1.8：报销状态。
   final ReimburseStatus reimburseStatus;
+
+  /// G-2：手动标记「不计入收支」（只改统计口径，不改账户余额）。
+  final bool excludeFromStats;
 
   /// STORY-8.2：归属成员；null = 由用例回落到本机成员。
   final String? memberId;
@@ -68,7 +73,7 @@ class CreateEntryUseCase {
   /// STORY-8.2：可选成员仓储。非空时把新账单归属到本机成员（「我」）。
   final MemberRepository? memberRepository;
 
-  Future<Result<LedgerEntry>> call(CreateEntryInput input) async {
+  Future<Result<LedgerEntry>> call(CreateEntryInput input, {required AppStrings s}) async {
     final eval = _evaluator.eval(input.amountExpression);
     if (eval.money.isZero) return err<LedgerEntry>(const ValidationFailure('entry.amount_zero', 'zero'));
     if (!eval.money.withinProductLimit) return err<LedgerEntry>(const ValidationFailure('entry.amount_over_limit', 'over'));
@@ -125,6 +130,7 @@ class CreateEntryUseCase {
       categoryId: input.categoryId, accountId: input.accountId, toAccountId: input.toAccountId,
       occurredAt: occurred, note: input.note, source: input.source,
       reimburseStatus: input.reimburseStatus,
+      excludeFromStats: input.excludeFromStats,
       memberId: input.memberId ?? await _currentMemberId(input.bookId),
       createdAt: now, updatedAt: now, revision: 1, deviceId: input.deviceId, baseRevision: 0,
     );
@@ -132,6 +138,7 @@ class CreateEntryUseCase {
     // STORY-6.1：套用自动化规则（post，手动记账作用域）
     if (ruleRepository != null) {
       entry = await applyAutomationRules(
+        s: s,
         ruleRepository: ruleRepository!,
         entry: entry,
         scope: RuleScope.manual,
@@ -162,6 +169,7 @@ class UpdateEntryUseCase {
     String? accountId, String? toAccountId, String? note,
     DateTime? occurredAt, EntryType? type,
     int? originalAmountCents, double? exchangeRate,
+    ReimburseStatus? reimburseStatus, bool? excludeFromStats,
     bool clearNote = false, bool clearCategoryId = false, bool clearAccount = false,
   }) async {
     if (amount != null && !amount.withinProductLimit) {
@@ -171,6 +179,7 @@ class UpdateEntryUseCase {
       amount: amount, categoryId: categoryId, accountId: accountId,
       toAccountId: toAccountId, note: note, occurredAt: occurredAt, type: type,
       originalAmountCents: originalAmountCents, exchangeRate: exchangeRate,
+      reimburseStatus: reimburseStatus, excludeFromStats: excludeFromStats,
       updatedAt: _clock.now(), revision: existing.revision + 1,
       baseRevision: existing.revision, clearNote: clearNote, clearCategoryId: clearCategoryId,
       clearAccount: clearAccount,

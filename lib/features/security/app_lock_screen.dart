@@ -10,6 +10,8 @@ import 'package:local_auth/local_auth.dart';
 import 'package:plain/app/theme/design_tokens.dart';
 import 'package:plain/design_system/plain_icons_v3.dart';
 import 'package:plain/features/security/app_lock_prefs.dart';
+import 'package:plain/app/l10n/app_strings.dart';
+import 'package:plain/app/l10n/strings_accounts.dart';
 
 /// Runtime enable flag (mirrors persisted prefs after preload).
 class AppLockEnabledNotifier extends Notifier<bool> {
@@ -111,6 +113,7 @@ class _AppLockScreenState extends ConsumerState<AppLockScreen> {
   }
 
   Future<void> _tryBiometric() async {
+    final s = AppStrings.of(context);
     if (_checking || !mounted) return;
     final lock = ref.read(appLockControllerProvider.notifier);
     if (!lock.canUseBiometric) return;
@@ -126,7 +129,7 @@ class _AppLockScreenState extends ConsumerState<AppLockScreen> {
       }
 
       final didAuth = await localAuth.authenticate(
-        localizedReason: '解锁素记',
+        localizedReason: s.unlockApp,
         options: const AuthenticationOptions(biometricOnly: true),
       );
 
@@ -160,6 +163,7 @@ class _AppLockScreenState extends ConsumerState<AppLockScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final s = AppStrings.of(context);
     final lockState = ref.watch(appLockControllerProvider);
     final lock = ref.read(appLockControllerProvider.notifier);
 
@@ -186,12 +190,12 @@ class _AppLockScreenState extends ConsumerState<AppLockScreen> {
                   ),
                 ),
                 const SizedBox(height: Spacing.xl),
-                Text('素记已锁定', style: Theme.of(context).textTheme.titleMedium),
+                Text(s.locked, style: Theme.of(context).textTheme.titleMedium),
                 const SizedBox(height: Spacing.sm),
                 Text(
                   lockState.failedAttempts > 0
-                      ? '失败次数: ${lockState.failedAttempts}/${AppLockController.maxAttempts}'
-                      : '使用生物识别或 PIN 解锁',
+                      ? s.failedAttemptsCount(lockState.failedAttempts, AppLockController.maxAttempts)
+                      : s.unlockWithBiometricOrPin,
                   style: TextStyle(fontSize: 14, color: context.colors.inkTertiary),
                 ),
                 const SizedBox(height: Spacing.xxl),
@@ -201,11 +205,11 @@ class _AppLockScreenState extends ConsumerState<AppLockScreen> {
                     child: FilledButton.icon(
                       onPressed: _checking ? null : _tryBiometric,
                       icon: const PlainIcon(PlainIconData.fingerprint),
-                      label: const Text('使用生物识别'),
+                      label: Text(s.useBiometric),
                     ),
                   ),
                   const SizedBox(height: Spacing.lg),
-                  Text('或输入 PIN 码', style: TextStyle(fontSize: 12, color: context.colors.inkTertiary)),
+                  Text(s.orEnterPin, style: TextStyle(fontSize: 12, color: context.colors.inkTertiary)),
                   const SizedBox(height: Spacing.lg),
                 ],
                 SizedBox(
@@ -236,7 +240,7 @@ class _AppLockScreenState extends ConsumerState<AppLockScreen> {
                   width: 200,
                   child: FilledButton(
                     onPressed: () => _verifyPin(_pinCtrl.text),
-                    child: const Text('解锁'),
+                    child: Text(s.unlock),
                   ),
                 ),
               ],
@@ -278,14 +282,15 @@ class _AppLockSetupDialogState extends State<_AppLockSetupDialog> {
   }
 
   Future<void> _submit() async {
+    final s = AppStrings.of(context);
     final pin = _pinCtrl.text.trim();
     final confirm = _confirmCtrl.text.trim();
     if (pin.length < 4) {
-      setState(() => _error = 'PIN 至少 4 位数字');
+      setState(() => _error = s.pinMinLength);
       return;
     }
     if (pin != confirm) {
-      setState(() => _error = '两次输入的 PIN 不一致');
+      setState(() => _error = s.pinMismatch);
       return;
     }
     await AppLockPrefs.savePin(
@@ -298,14 +303,15 @@ class _AppLockSetupDialogState extends State<_AppLockSetupDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final s = AppStrings.of(context);
     return AlertDialog(
-      title: const Text('设置应用锁'),
+      title: Text(s.setupAppLock),
       // Scrollable so the dialog never overflows on short windows / large text.
       content: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-          const Text('设置数字密码后才会开启应用锁。请牢记 PIN，忘记后只能清除应用数据。'),
+          Text(s.setupAppLockDesc),
           const SizedBox(height: Spacing.lg),
           TextField(
             controller: _pinCtrl,
@@ -313,7 +319,7 @@ class _AppLockSetupDialogState extends State<_AppLockSetupDialog> {
             maxLength: 6,
             keyboardType: TextInputType.number,
             inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-            decoration: const InputDecoration(labelText: 'PIN（4–6 位）', border: OutlineInputBorder()),
+            decoration: InputDecoration(labelText: s.pinLabel, border: OutlineInputBorder()),
           ),
           const SizedBox(height: Spacing.md),
           TextField(
@@ -322,11 +328,11 @@ class _AppLockSetupDialogState extends State<_AppLockSetupDialog> {
             maxLength: 6,
             keyboardType: TextInputType.number,
             inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-            decoration: const InputDecoration(labelText: '确认 PIN', border: OutlineInputBorder()),
+            decoration: InputDecoration(labelText: s.confirmPin, border: OutlineInputBorder()),
           ),
           SwitchListTile(
             contentPadding: EdgeInsets.zero,
-            title: const Text('同时启用生物识别'),
+            title: Text(s.enableBiometric),
             value: _useBiometric,
             onChanged: (v) => setState(() => _useBiometric = v),
           ),
@@ -336,8 +342,8 @@ class _AppLockSetupDialogState extends State<_AppLockSetupDialog> {
         ),
       ),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('取消')),
-        FilledButton(onPressed: _submit, child: const Text('开启')),
+        TextButton(onPressed: () => Navigator.pop(context, false), child: Text(s.cancel)),
+        FilledButton(onPressed: _submit, child: Text(s.enable)),
       ],
     );
   }

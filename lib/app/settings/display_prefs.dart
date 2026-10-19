@@ -10,8 +10,10 @@ const String kPrefSoundEnabled = 'pref.sound_enabled';
 const String kPrefStayAfterSave = 'pref.stay_after_save';
 
 /// 字号三档：0.9 / 1.0 / 1.15（对应小 / 标准 / 大）。
+///
+/// 档位**文案**已收口到 `AppStrings`（`fontScaleSmall` / `fontScaleStandard` /
+/// `fontScaleLarge`，见 `app/l10n/strings_core.dart`），UI 按 index 取。
 const List<double> kFontScales = [0.9, 1.0, 1.15];
-const List<String> kFontScaleLabels = ['小', '标准', '大'];
 
 class DisplayPrefs {
   const DisplayPrefs({

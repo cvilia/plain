@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" role="img" aria-label="ic_cat_travel">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <rect x="6" y="7.5" width="12" height="11.5" rx="2"/>
+  <path d="M9.75 7.5V5.25h4.5V7.5"/>
+  <path d="M6 11.25h12"/>
+  <circle cx="9.25" cy="20.25" r="1.25"/>
+  <circle cx="14.75" cy="20.25" r="1.25"/>
+  </g>
+</svg>

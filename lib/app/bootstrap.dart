@@ -8,7 +8,6 @@ import 'package:plain/core/time/clock.dart';
 import 'package:plain/data/db/database.dart';
 import 'package:plain/data/repositories/account_repository.dart';
 import 'package:plain/data/repositories/app_meta_repository.dart';
-import 'package:plain/data/repositories/attachment_repository.dart';
 import 'package:plain/data/repositories/automation_rule_repository.dart';
 import 'package:plain/data/repositories/budget_repository.dart';
 import 'package:plain/data/repositories/change_log_repository.dart';
@@ -28,10 +27,8 @@ import 'package:plain/data/sync/incremental_sync_service.dart';
 import 'package:plain/data/repositories/savings_goal_repository.dart';
 import 'package:plain/data/repositories/tax_filing_repository.dart';
 import 'package:plain/data/sync/change_log_writer.dart';
-import 'package:plain/data/platform/attachment_store.dart';
 import 'package:plain/domain/repositories/repositories.dart';
 import 'package:plain/domain/services/accounting_calendar.dart';
-import 'package:plain/domain/services/attachment_service.dart';
 import 'package:plain/domain/services/member_service.dart';
 import 'package:plain/domain/services/reminder_prefs_store.dart';
 import 'package:plain/domain/services/reminder_service.dart';
@@ -44,6 +41,8 @@ import 'package:plain/domain/usecases/loan_usecases.dart';
 import 'package:plain/domain/usecases/recurring_usecases.dart';
 import 'package:plain/domain/services/weekly_report_service.dart';
 import 'package:plain/app/settings/ledger_settings.dart';
+import 'package:plain/app/l10n/strings_core.dart';
+import 'package:plain/app/l10n/app_strings.dart';
 
 class AppDependencies {
   const AppDependencies({
@@ -57,9 +56,6 @@ class AppDependencies {
     required this.taxFilingRepository,
     required this.currencyRateRepository,
     required this.merchantRuleRepository,
-    required this.attachmentRepository,
-    required this.attachmentService,
-    required this.attachmentStore,
     required this.appMetaRepository,
     required this.reminderRepository,
     required this.reminderService,
@@ -77,9 +73,13 @@ class AppDependencies {
     required this.depositToGoal, required this.setGoalAutoTransfer,
     required this.setLoanRepaymentSchedule,
     required this.deviceId, required this.bookId,
+    this.strings = kDefaultAppStrings,
   });
 
   final AppDatabase db;
+
+  /// 后台任务（通知 / 周报推送）用的文案包，无 context 时的来源。
+  final AppStrings strings;
   final Clock clock;
   final AppLog log;
   final UuidV7 idGen;
@@ -95,9 +95,6 @@ class AppDependencies {
   final TaxFilingRepository taxFilingRepository;
   final CurrencyRateRepository currencyRateRepository;
   final MerchantRuleRepository merchantRuleRepository;
-  final AttachmentRepository attachmentRepository;
-  final AttachmentService attachmentService;
-  final AttachmentStore attachmentStore;
 
   /// STORY-6.3：提醒历史（去重 + 近 90 天可查）与「上次备份时间」。
   final AppMetaRepository appMetaRepository;
@@ -171,21 +168,12 @@ Future<void> runChangeLogGc(AppDependencies deps) async {
 /// 内部已吞掉所有异常（推送是尽力而为，绝不能拖累启动）。
 Future<void> runWeeklyReportPush(AppDependencies deps) async {
   await WeeklyReportService.pushIfDue(
+    s: deps.strings,
     ledger: deps.ledgerRepository,
     categories: deps.categoryRepository,
     clock: deps.clock,
     bookId: deps.bookId,
   );
-}
-
-/// STORY-1.5 AC3：每日巡检清理超 30 天的孤儿附件（文件 + 元数据）。
-/// 失败不阻塞启动，下次再试。
-Future<void> runAttachmentOrphanSweep(AppDependencies deps) async {
-  try {
-    await deps.attachmentService.purgeExpiredOrphans();
-  } catch (_) {
-    // 巡检是自愈手段，异常仅吞掉
-  }
 }
 
 /// STORY-7.1：储蓄目标存储的「已存」计数按账本重算（自愈）。
@@ -223,11 +211,13 @@ Future<void> runReminderScan(AppDependencies deps) async {
   try {
     final prefs = await ReminderPrefsStore.load();
     final items = await deps.reminderService.collect(
+      s: deps.strings,
       bookId: deps.bookId,
       prefs: prefs,
     );
     await deps.reminderService.pushToSystem(items);
     await deps.reminderService.pushDigestIfDue(
+      s: deps.strings,
       bookId: deps.bookId,
       prefs: prefs,
     );
@@ -375,19 +365,6 @@ AppDependencies buildDependencies({
   final idGen = UuidV7();
   final changeLogWriter = ChangeLogWriter(db, clock: effectiveClock);
   final changeLogRepo = ChangeLogRepository(db);
-  final attachmentRepo = AttachmentRepositoryImpl(
-    db: db,
-    clock: effectiveClock,
-    changeLogWriter: changeLogWriter,
-    deviceId: deviceId,
-  );
-  final attachmentStore = AttachmentStore();
-  final attachmentService = AttachmentService(
-    repository: attachmentRepo,
-    store: attachmentStore,
-    idGen: idGen,
-    clock: effectiveClock,
-  );
   // STORY-8.2：家庭成员
   final memberRepo = MemberRepositoryImpl(
     db: db,
@@ -404,7 +381,6 @@ AppDependencies buildDependencies({
     db: db,
     changeLogWriter: changeLogWriter,
     clock: effectiveClock,    log: log,
-    attachments: attachmentRepo,
   );
   // STORY-8.1：增量同步（applier 要拿到账单仓储，才能同口径维护统计）
   final syncConflicts = SyncConflictRepositoryImpl(db: db);
@@ -484,9 +460,6 @@ AppDependencies buildDependencies({
     taxFilingRepository: taxFilingRepo,
     currencyRateRepository: currencyRateRepo,
     merchantRuleRepository: merchantRuleRepo,
-    attachmentRepository: attachmentRepo,
-    attachmentService: attachmentService,
-    attachmentStore: attachmentStore,
     appMetaRepository: appMetaRepo,
     reminderRepository: reminderRepo,
     reminderService: reminderSvc,

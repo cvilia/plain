@@ -3,8 +3,10 @@ library;
 
 import 'dart:convert';
 
+import 'package:plain/app/l10n/app_strings.dart';
 import 'package:plain/domain/entities/automation_rule.dart';
 import 'package:plain/domain/entities/ledger_entry.dart';
+import 'package:plain/app/l10n/strings_domain.dart';
 
 /// 命中结果：记录命中的规则与动作摘要（供试运行 / 预览）。
 class RuleHit {
@@ -89,6 +91,7 @@ class RuleEngine {
   (LedgerEntry, List<RuleHit>) applyAll(
     LedgerEntry entry,
     List<AutomationRule> rules, {
+    required AppStrings s,
     RuleScope scope = RuleScope.manual,
   }) {
     final sorted = [...rules]
@@ -104,7 +107,7 @@ class RuleEngine {
       if (!_scopeOk(r, scope)) continue;
       if (!matches(current, r)) continue;
       final summaries = <String>[];
-      current = _applyActions(current, r, summaries);
+      current = _applyActions(current, r, summaries, s);
       hits.add(RuleHit(rule: r, actionSummaries: summaries));
     }
     return (current, hits);
@@ -119,6 +122,7 @@ class RuleEngine {
     LedgerEntry e,
     AutomationRule rule,
     List<String> summaries,
+    AppStrings s,
   ) {
     var out = e;
     for (final a in rule.actions) {
@@ -126,12 +130,12 @@ class RuleEngine {
         case RuleActionType.setCategory:
           if (a.value != null && a.value!.isNotEmpty) {
             out = out.copyWith(categoryId: a.value);
-            summaries.add('设分类 → ${a.value}');
+            summaries.add(s.ruleSetCategory(a.value!));
           }
         case RuleActionType.setAccount:
           if (a.value != null && a.value!.isNotEmpty) {
             out = out.copyWith(accountId: a.value);
-            summaries.add('设账户 → ${a.value}');
+            summaries.add(s.ruleSetAccount(a.value!));
           }
         case RuleActionType.setNotePrefix:
           final prefix = a.value ?? '';
@@ -140,15 +144,15 @@ class RuleEngine {
               ? prefix
               : (out.note!.startsWith(prefix) ? out.note! : '$prefix${out.note}');
           out = out.copyWith(note: note);
-          summaries.add('备注前缀「$prefix」');
+          summaries.add(s.ruleSetNotePrefix(prefix));
         case RuleActionType.setNotInOutflow:
           // G-2：标记「不计入收支」。只改统计口径，不影响账户余额。
           if (out.canMarkExcluded && !out.excludeFromStats) {
             out = out.copyWith(excludeFromStats: true);
-            summaries.add('标不计入收支');
+            summaries.add(s.ruleMarkExcluded);
           }
         case RuleActionType.setReimbursable:
-          summaries.add('标待报销');
+          summaries.add(s.ruleMarkReimbursable);
         case RuleActionType.unknown:
           break;
       }
@@ -159,27 +163,31 @@ class RuleEngine {
   /// 试运行：对 [entries] 只算不改。
   List<({LedgerEntry entry, List<String> summaries})> dryRun(
     List<LedgerEntry> entries,
-    AutomationRule rule,
-  ) {
+    AutomationRule rule, {
+    required AppStrings s,
+  }) {
     final out = <({LedgerEntry entry, List<String> summaries})>[];
     for (final e in entries) {
       if (!matches(e, rule)) continue;
       final summaries = <String>[];
-      _applyActions(e, rule, summaries);
+      _applyActions(e, rule, summaries, s);
       out.add((entry: e, summaries: summaries));
     }
     return out;
   }
 
   /// AC5：校验正则条件，返回错误位置（无效则非 null）。
-  static String? validateConditions(List<RuleCondition> conditions) {
+  static String? validateConditions(
+    List<RuleCondition> conditions, {
+    required AppStrings s,
+  }) {
     for (var i = 0; i < conditions.length; i++) {
       final c = conditions[i];
       if (c.op != RuleOp.regex) continue;
       try {
         RegExp(c.value);
       } on FormatException catch (e) {
-        return '条件 ${i + 1} 正则非法: ${e.message}';
+        return s.ruleRegexInvalid(i + 1, e.message);
       }
     }
     return null;

@@ -10,6 +10,7 @@ import 'dart:math';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:plain/app/bootstrap.dart';
+import 'package:plain/app/l10n/app_strings.dart';
 
 import 'package:plain/core/constants/app_constants.dart';
 import 'package:plain/core/id/uuid_v7.dart';
@@ -19,6 +20,7 @@ import 'package:plain/domain/entities/enums.dart';
 import 'package:plain/domain/entities/member.dart';
 import 'package:plain/domain/repositories/repositories.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:plain/app/l10n/strings_domain.dart';
 
 /// 一名参与人的应付份额。
 class AaShare {
@@ -181,8 +183,8 @@ class MemberService {
   }
 
   /// 按成员 id 解析出显示名（已退出者标「已退出成员」）。
-  static String labelOf(String memberId, Map<String, Member> byId) =>
-      byId[memberId]?.attributionLabel ?? '未知成员';
+  static String labelOf(String memberId, Map<String, Member> byId, AppStrings s) =>
+      byId[memberId]?.attributionLabel(s) ?? s.unknownMember;
 
   Future<Result<void>> setParticipants({
     required String entryId,

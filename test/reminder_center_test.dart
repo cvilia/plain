@@ -4,6 +4,7 @@ library;
 
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:plain/app/l10n/strings_core.dart';
 import 'package:plain/core/constants/app_constants.dart';
 import 'package:plain/core/id/uuid_v7.dart';
 import 'package:plain/core/money/money.dart';
@@ -213,7 +214,7 @@ void main() {
       occurredAt: at,
       bookId: bookId,
       deviceId: deviceId,
-    ));
+    ), s: kDefaultAppStrings);
     expect(result.isSuccess, isTrue, reason: '造账单失败：${result.failureOrNull}');
   }
 
@@ -323,7 +324,7 @@ void main() {
 
   test('九类提醒全部产生，且各归各级别', () async {
     await seedAllNine();
-    final items = await service.collect(bookId: bookId, prefs: const ReminderPrefs());
+    final items = await service.collect(bookId: bookId, prefs: const ReminderPrefs(), s: kDefaultAppStrings);
 
     expect(kindsOf(items), ReminderKind.values.toSet(),
         reason: '缺：${ReminderKind.values.toSet().difference(kindsOf(items)).map((k) => k.wire)}');
@@ -359,7 +360,7 @@ void main() {
     );
     await seedAccount(id: 'acc-cash', name: '现金');
 
-    final items = await service.collect(bookId: bookId, prefs: const ReminderPrefs());
+    final items = await service.collect(bookId: bookId, prefs: const ReminderPrefs(), s: kDefaultAppStrings);
     expect(items, isEmpty, reason: '没有数据就该一条都不产生');
   });
 
@@ -371,6 +372,7 @@ void main() {
       bookId: bookId,
       prefs: const ReminderPrefs(),
       persist: false,
+      s: kDefaultAppStrings,
     );
     expect(kindsOf(baseline), ReminderKind.values.toSet());
 
@@ -379,6 +381,7 @@ void main() {
         bookId: bookId,
         prefs: ReminderPrefs(disabled: {kind}),
         persist: false,
+        s: kDefaultAppStrings,
       );
       expect(items.where((r) => r.kind == kind), isEmpty,
           reason: '关掉 ${kind.wire} 后仍然产生了');
@@ -433,6 +436,7 @@ void main() {
       bookId: bookId,
       prefs: const ReminderPrefs(),
       persist: false,
+      s: kDefaultAppStrings,
     );
     await service.pushToSystem(items);
     final shown = calls.where((c) => c.method == 'show').toList();
@@ -454,6 +458,7 @@ void main() {
       bookId: bookId,
       prefs: const ReminderPrefs(allMuted: true),
       persist: false,
+      s: kDefaultAppStrings,
     );
     expect(muted, isEmpty);
     await service.pushToSystem(muted);
@@ -466,12 +471,12 @@ void main() {
   test('同类去重：同一预算周期的同一分类只出一次，第二轮全量不再重复', () async {
     await seedAllNine();
 
-    final first = await service.collect(bookId: bookId, prefs: const ReminderPrefs());
+    final first = await service.collect(bookId: bookId, prefs: const ReminderPrefs(), s: kDefaultAppStrings);
     expect(first.where((r) => r.kind == ReminderKind.budgetWarn).length, 2);
     expect(kindsOf(first), ReminderKind.values.toSet());
 
     // 同一时刻再扫：全部已被历史去重挡掉（含预算 80%/100%、异常单笔、还款日）
-    final second = await service.collect(bookId: bookId, prefs: const ReminderPrefs());
+    final second = await service.collect(bookId: bookId, prefs: const ReminderPrefs(), s: kDefaultAppStrings);
     expect(second, isEmpty, reason: '去重失效：${second.map((r) => r.dedupKey)}');
   });
 
@@ -481,7 +486,7 @@ void main() {
     await seedBudget(id: 'bud-shop', categoryId: 'cat-shop', cents: 100000);
     await spend('800', category: 'cat-shop');
 
-    final warn = await service.collect(bookId: bookId, prefs: const ReminderPrefs());
+    final warn = await service.collect(bookId: bookId, prefs: const ReminderPrefs(), s: kDefaultAppStrings);
     final warnKeys = warn
         .where((r) => r.kind == ReminderKind.budgetWarn)
         .map((r) => r.dedupKey)
@@ -491,7 +496,7 @@ void main() {
 
     // 再花 300 → 合计 110% → 这一次该出 100%
     await spend('300', category: 'cat-shop');
-    final over = await service.collect(bookId: bookId, prefs: const ReminderPrefs());
+    final over = await service.collect(bookId: bookId, prefs: const ReminderPrefs(), s: kDefaultAppStrings);
     final overKeys = over
         .where((r) => r.kind == ReminderKind.budgetWarn)
         .map((r) => r.dedupKey)
@@ -506,7 +511,7 @@ void main() {
     await seedAllNine();
     clock.set(DateTime(2026, 6, 1, 23, 30));
 
-    final night = await service.collect(bookId: bookId, prefs: const ReminderPrefs());
+    final night = await service.collect(bookId: bookId, prefs: const ReminderPrefs(), s: kDefaultAppStrings);
     expect(kindsOf(night), ReminderKind.values.toSet());
 
     // 原本响铃的四类全部降级为静默，并记得「曾经想响铃」
@@ -535,8 +540,8 @@ void main() {
     expect(digest!.postedCount, greaterThanOrEqualTo(1));
     expect(digest.budgetWarnCount, greaterThanOrEqualTo(1));
     expect(digest.downgradedCount, greaterThanOrEqualTo(1));
-    expect(digest.body, contains('已入账'));
-    expect(digest.body, contains('预算预警'));
+    expect(digest.body(kDefaultAppStrings), contains('已入账'));
+    expect(digest.body(kDefaultAppStrings), contains('预算预警'));
     expect(digest.level, ReminderLevel.ring, reason: '含预算跨阈值应升级为响铃');
 
     // 汇总只发一次
@@ -546,7 +551,7 @@ void main() {
   test('全部静音时不推夜间汇总', () async {
     await seedAllNine();
     clock.set(DateTime(2026, 6, 1, 23, 30));
-    await service.collect(bookId: bookId, prefs: const ReminderPrefs());
+    await service.collect(bookId: bookId, prefs: const ReminderPrefs(), s: kDefaultAppStrings);
     clock.set(DateTime(2026, 6, 2, 8, 0));
 
     final calls = <MethodCall>[];
@@ -565,6 +570,7 @@ void main() {
     await service.pushDigestIfDue(
       bookId: bookId,
       prefs: const ReminderPrefs(allMuted: true),
+      s: kDefaultAppStrings,
     );
     expect(calls, isEmpty);
     // 没有推出去的汇总不该被标记为已汇总
@@ -576,7 +582,7 @@ void main() {
 
   test('历史近 90 天可查：含已读/未读与触发时间，超期被 GC', () async {
     await seedAllNine();
-    final items = await service.collect(bookId: bookId, prefs: const ReminderPrefs());
+    final items = await service.collect(bookId: bookId, prefs: const ReminderPrefs(), s: kDefaultAppStrings);
     expect(items, isNotEmpty);
 
     final now = clock.now();
@@ -623,10 +629,10 @@ void main() {
     expect(empty.successOrNull, isEmpty);
   });
 
-  // ── ⑦ schema v24：提醒历史表进得了还原清单 ──
+  // ── ⑦ schema v25：提醒历史表进得了还原清单 ──
 
-  test('reminders 表与索引已建立（schema v24）', () async {
-    expect(kSchemaVersion, 24);
+  test('reminders 表与索引已建立（schema v25）', () async {
+    expect(kSchemaVersion, 25);
     final tables = db.raw
         .select("SELECT name FROM sqlite_master WHERE type='table'")
         .map((r) => r['name'] as String)
@@ -651,7 +657,7 @@ void main() {
     // 大额那笔落在**昨天**（2026-05-31），不是今天
     await spend('1000', at: DateTime(2026, 5, 31, 12), category: 'cat-hist');
 
-    final items = await service.collect(bookId: bookId, prefs: const ReminderPrefs());
+    final items = await service.collect(bookId: bookId, prefs: const ReminderPrefs(), s: kDefaultAppStrings);
     expect(items.any((r) => r.kind == ReminderKind.anomalySpend), isTrue,
         reason: '只看当天会漏报：那天没打开 App，这笔异常就永远不提醒');
   });
@@ -661,7 +667,7 @@ void main() {
     // 时钟是 2026-06-01 → 上一个记账月是 5 月；这笔落在 4 月
     await spend('50', at: DateTime(2026, 4, 20, 12), category: 'cat-hist');
 
-    final items = await service.collect(bookId: bookId, prefs: const ReminderPrefs());
+    final items = await service.collect(bookId: bookId, prefs: const ReminderPrefs(), s: kDefaultAppStrings);
     expect(items.any((r) => r.kind == ReminderKind.reconcile), isFalse,
         reason: '对账是对上个月的账，不是清历史欠账');
   });
@@ -670,7 +676,7 @@ void main() {
     await seedAccount(id: 'acc-cash', name: '现金');
     await spend('50', at: DateTime(2026, 5, 20, 12), category: 'cat-hist');
 
-    final items = await service.collect(bookId: bookId, prefs: const ReminderPrefs());
+    final items = await service.collect(bookId: bookId, prefs: const ReminderPrefs(), s: kDefaultAppStrings);
     final reconcile = items.where((r) => r.kind == ReminderKind.reconcile).toList();
     expect(reconcile, isNotEmpty);
     expect(reconcile.first.body.contains('2026-05'), isTrue,
@@ -690,18 +696,19 @@ void main() {
     );
     appMetaRepo.markBackedUpAt(clock.now().subtract(const Duration(days: 40)));
 
-    final items = await service.collect(bookId: bookId, prefs: const ReminderPrefs());
+    final items = await service.collect(bookId: bookId, prefs: const ReminderPrefs(), s: kDefaultAppStrings);
     final sub = items.where((r) => r.kind == ReminderKind.subscription).firstOrNull;
     expect(sub, isNotNull, reason: '连续扣款 3 次、下次扣款 3 天后 → 应产生订阅提醒');
     expect(sub!.actionRef, 'rule-sub', reason: '卡片要据此停用那条周期规则');
-    expect(sub.actionLabel, '不再需要');
+    expect(sub.actionLabel(kDefaultAppStrings), '不再需要');
     expect(sub.body.contains('取消自动续费'), isTrue,
         reason: '只能关本机规则，原扣款渠道要用户自己去取消，必须说清');
 
     // 其余种类不该出现动作按钮（避免到处是看不懂的按钮）
     final others = items.where((r) => r.kind != ReminderKind.subscription);
     for (final r in others) {
-      expect(r.actionLabel, isNull, reason: '${r.kind.wire} 不该有动作');
+      expect(r.actionLabel(kDefaultAppStrings), isNull,
+          reason: '${r.kind.wire} 不该有动作');
     }
   });
 }

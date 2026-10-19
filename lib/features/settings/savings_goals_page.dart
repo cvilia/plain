@@ -26,6 +26,11 @@ import 'package:plain/domain/repositories/repositories.dart';
 import 'package:plain/domain/services/goal_progress_service.dart';
 import 'package:plain/domain/services/goal_system_service.dart';
 import 'package:plain/domain/services/loan_amortization_service.dart';
+import 'package:plain/app/l10n/app_strings.dart';
+import 'package:plain/app/l10n/strings_accounts.dart';
+import 'package:plain/app/l10n/strings_core.dart';
+import 'package:plain/app/l10n/strings_settings_a.dart';
+import 'package:plain/app/l10n/strings_ledger.dart';
 
 const _amortization = LoanAmortizationService();
 
@@ -73,6 +78,7 @@ class _SavingsGoalsPageState extends ConsumerState<SavingsGoalsPage> {
   }
 
   Future<void> _reload() async {
+    final s = AppStrings.of(context);
     setState(() => _loading = true);
     final deps = ref.read(appDependenciesProvider);
     final res = await deps.savingsGoalRepository.listByBook(deps.bookId);
@@ -137,6 +143,7 @@ class _SavingsGoalsPageState extends ConsumerState<SavingsGoalsPage> {
     final calendar = ref.read(calendarProvider);
     final period = calendar.currentPeriod();
     final limitRes = await _goalSystem.limitGoals(
+      s: s,
       bookId: deps.bookId,
       from: DateTime.parse(period.dayFrom),
       to: DateTime.parse(period.dayTo).add(const Duration(days: 1)),
@@ -168,13 +175,14 @@ class _SavingsGoalsPageState extends ConsumerState<SavingsGoalsPage> {
 
   /// STORY-7.2 AC4：建限额目标 = 写一条分类预算（同分类已有则改额度）。
   Future<void> _addLimit() async {
+    final s = AppStrings.of(context);
     final deps = ref.read(appDependenciesProvider);
     final catRes = await deps.categoryRepository.listAll(kind: CategoryKind.expense);
     final categories = (catRes.successOrNull ?? const <Category>[])
         .where((c) => c.parentId != null) // 限额落在叶子分类上（与预算页一致）
         .toList();
     if (categories.isEmpty) {
-      if (mounted) showAppToast(context, '还没有可用的支出分类');
+      if (mounted) showAppToast(context, s.goalNoExpenseCategory);
       return;
     }
     if (!mounted) return;
@@ -196,7 +204,7 @@ class _SavingsGoalsPageState extends ConsumerState<SavingsGoalsPage> {
       ),
     );
     if (cat == null || !mounted) return;
-    final amount = await _askLimitAmount(context, title: '「${cat.name}」每月上限');
+    final amount = await _askLimitAmount(context, title: s.goalMonthlyLimitTitle(cat.name));
     if (amount == null || !mounted) return;
     final res = await _goalSystem.setCategoryLimit(
       bookId: deps.bookId,
@@ -215,10 +223,11 @@ class _SavingsGoalsPageState extends ConsumerState<SavingsGoalsPage> {
 
   /// 调整/删除已有限额目标（改的还是那条预算行）。
   Future<void> _editLimit(LimitGoalView view) async {
+    final s = AppStrings.of(context);
     final deps = ref.read(appDependenciesProvider);
     final amount = await _askLimitAmount(
       context,
-      title: '「${view.categoryName}」每月上限',
+      title: s.goalMonthlyLimitTitle(view.categoryName),
       initial: view.limitCents,
       allowDelete: true,
     );
@@ -227,7 +236,7 @@ class _SavingsGoalsPageState extends ConsumerState<SavingsGoalsPage> {
       await _goalSystem.removeLimit(view.budget.id);
       ref.invalidateData.bumpBudgetMutated();
       await _reload();
-      if (mounted) showAppToast(context, '已删除限额目标');
+      if (mounted) showAppToast(context, s.goalLimitDeleted);
       return;
     }
     final res = await _goalSystem.setCategoryLimit(
@@ -290,10 +299,11 @@ class _SavingsGoalsPageState extends ConsumerState<SavingsGoalsPage> {
 
   @override
   Widget build(BuildContext context) {
+    final s = AppStrings.of(context);
     final now = ref.read(appDependenciesProvider).clock.now();
     return Scaffold(
       appBar: PlainTopBar(
-        title: '目标体系',
+        title: s.goalSystemTitle,
         showBack: true,
         actions: [
           Material(
@@ -306,7 +316,7 @@ class _SavingsGoalsPageState extends ConsumerState<SavingsGoalsPage> {
                 width: 52,
                 height: 44,
                 child: Center(
-                  child: Text('新建', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500, color: context.colors.primary)),
+                  child: Text(s.newAction, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500, color: context.colors.primary)),
                 ),
               ),
             ),
@@ -322,16 +332,16 @@ class _SavingsGoalsPageState extends ConsumerState<SavingsGoalsPage> {
                 if (_goals.isEmpty)
                   AppEmptyState(
                     icon: PlainIconData.chartLine,
-                    title: '还没有目标',
-                    subtitle: '建一个储蓄目标攒钱、关联贷款做还债目标，或用限额目标控制某类开销',
+                    title: s.goalEmptyTitle,
+                    subtitle: s.goalEmptySubtitle,
                     action: FilledButton.icon(
                       onPressed: _showCreateSheet,
                       icon: const PlainIcon(PlainIconData.plus),
-                      label: const Text('新建目标'),
+                      label: Text(s.goalNew),
                     ),
                   )
                 else ...[
-                  PlainEyebrow('目标 · ${_goals.length} 个'),
+                  PlainEyebrow(s.goalCount(_goals.length)),
                   DecoratedBox(
                     decoration: BoxDecoration(
                       color: context.colors.surface,
@@ -370,7 +380,7 @@ class _SavingsGoalsPageState extends ConsumerState<SavingsGoalsPage> {
                     ),
                   ),
                 // ── STORY-7.2：限额目标（= 分类预算，同一份数据）──
-                PlainEyebrow('限额目标 · ${_limits.length} 个'),
+                PlainEyebrow(s.goalLimitCount(_limits.length)),
                 if (_limits.isEmpty)
                   PlainPanel(children: [
                     Padding(
@@ -391,7 +401,7 @@ class _SavingsGoalsPageState extends ConsumerState<SavingsGoalsPage> {
                           FilledButton.icon(
                             onPressed: _addLimit,
                             icon: const PlainIcon(PlainIconData.plus),
-                            label: const Text('添加限额目标'),
+                            label: Text(s.goalAddLimit),
                           ),
                         ],
                       ),
@@ -430,7 +440,7 @@ class _SavingsGoalsPageState extends ConsumerState<SavingsGoalsPage> {
                           TextButton.icon(
                             onPressed: _addLimit,
                             icon: const PlainIcon(PlainIconData.plus, size: 16),
-                            label: const Text('添加'),
+                            label: Text(s.addAction),
                           ),
                         ],
                       ),
@@ -443,28 +453,29 @@ class _SavingsGoalsPageState extends ConsumerState<SavingsGoalsPage> {
   }
 
   Future<void> _showDeposit(SavingsGoal g) async {
+    final s = AppStrings.of(context);
     // 存入是「可用账户 → 目标虚拟账户」的内部转账，必须先有转出端
     if (!g.canDeposit) {
-      showAppToast(context, '请先给该目标关联一个账户');
+      showAppToast(context, s.goalAccountRequired);
       return;
     }
     // 还债目标的进度靠还款推进，不提供「存入」
     if (g.isDebt) {
-      showAppToast(context, '还债目标通过还款推进，不能存入');
+      showAppToast(context, s.goalDebtNoDeposit);
       return;
     }
     final ctrl = TextEditingController();
     await showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text('存入「${g.name}」'),
+        title: Text(s.goalDepositTitle(g.name)),
         content: TextField(
           controller: ctrl,
           keyboardType: const TextInputType.numberWithOptions(decimal: true),
-          decoration: const InputDecoration(labelText: '金额', border: OutlineInputBorder()),
+          decoration: InputDecoration(labelText: s.amountFieldLabel, border: OutlineInputBorder()),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('取消')),
+          TextButton(onPressed: () => Navigator.pop(ctx), child: Text(s.cancel)),
           FilledButton(
             onPressed: () async {
               final v = double.tryParse(ctrl.text.trim()) ?? 0;
@@ -479,15 +490,15 @@ class _SavingsGoalsPageState extends ConsumerState<SavingsGoalsPage> {
               if (ctx.mounted) Navigator.pop(ctx);
               if (!mounted) return;
               if (r.isSuccess) {
-                showAppToast(context, '已存入');
+                showAppToast(context, s.goalDeposited);
                 ref.invalidateData.bumpEntryMutated();
                 ref.invalidateData.bumpAccountsMutated();
                 _reload();
               } else {
-                showAppToast(context, '存入失败');
+                showAppToast(context, s.goalDepositFailed);
               }
             },
-            child: const Text('确定'),
+            child: Text(s.ok),
           ),
         ],
       ),
@@ -496,6 +507,7 @@ class _SavingsGoalsPageState extends ConsumerState<SavingsGoalsPage> {
 
   /// STORY-7.1 AC6：开启「自动按月划拨」——走统一周期引擎，锚定记账月首日。
   Future<void> _toggleAuto(SavingsGoal g) async {
+    final s = AppStrings.of(context);
     final deps = ref.read(appDependenciesProvider);
     final r = await deps.setGoalAutoTransfer(
       goalId: g.id,
@@ -506,13 +518,13 @@ class _SavingsGoalsPageState extends ConsumerState<SavingsGoalsPage> {
     if (r.isFailure) {
       final code = r.failureOrNull?.code;
       showAppToast(context, switch (code) {
-        'goal.account_required' => '请先给该目标关联一个账户',
-        'goal.nothing_to_transfer' => '该目标已存满，无需划拨',
-        _ => '操作失败',
+        'goal.account_required' => s.goalAccountRequired,
+        'goal.nothing_to_transfer' => s.goalNothingToTransfer,
+        _ => s.operationFailed,
       });
       return;
     }
-    showAppToast(context, g.autoTransfer ? '已关闭自动划拨' : '已开启自动划拨');
+    showAppToast(context, g.autoTransfer ? s.goalAutoOff : s.goalAutoOn);
     ref.invalidateData.bumpRecurringMutated();
     _reload();
   }
@@ -522,9 +534,10 @@ class _SavingsGoalsPageState extends ConsumerState<SavingsGoalsPage> {
   /// 「提前 N 个月还清、少付利息 ¥Z」由 `LoanAmortizationService` 派生，
   /// 依据的是关联贷款的真实参数与剩余本金，不写死任何数字。
   Future<void> _showPrepay(SavingsGoal g) async {
+    final s = AppStrings.of(context);
     final ctx = _debt[g.id];
     if (ctx == null) {
-      showAppToast(context, '关联的贷款账户缺少参数，无法测算');
+      showAppToast(context, s.goalLoanMissingParams);
       return;
     }
     // 不手管 controller：`showDialog` 返回时弹窗淡出动画还没结束、子树仍会重建，
@@ -545,7 +558,7 @@ class _SavingsGoalsPageState extends ConsumerState<SavingsGoalsPage> {
           );
           final hasInput = extra > 0 || lump > 0;
           return AlertDialog(
-            title: Text('提前还款测算「${g.name}」'),
+            title: Text(s.goalPrepayTitle(g.name)),
             content: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -553,8 +566,8 @@ class _SavingsGoalsPageState extends ConsumerState<SavingsGoalsPage> {
                 TextFormField(
                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
                   onChanged: (v) => setDlg(() => extraText = v),
-                  decoration: const InputDecoration(
-                      labelText: '每月额外还',
+                  decoration: InputDecoration(
+                      labelText: s.extraMonthly,
                       border: OutlineInputBorder(),
                       prefixText: '¥'),
                 ),
@@ -562,16 +575,16 @@ class _SavingsGoalsPageState extends ConsumerState<SavingsGoalsPage> {
                 TextFormField(
                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
                   onChanged: (v) => setDlg(() => lumpText = v),
-                  decoration: const InputDecoration(
-                      labelText: '一次性还本',
+                  decoration: InputDecoration(
+                      labelText: s.lumpSum,
                       border: OutlineInputBorder(),
                       prefixText: '¥'),
                 ),
                 const SizedBox(height: Spacing.lg),
                 Text(
                   hasInput
-                      ? '可提前 ${r.monthsSaved} 个月还清，少付利息 ${formatAmountYuan(r.interestSavedCents)}'
-                      : '基准剩余 ${r.baseline.months} 期、利息 ${formatAmountYuan(r.baseline.interestCents)}',
+                      ? s.goalPrepayResult(r.monthsSaved, formatAmountYuan(r.interestSavedCents))
+                      : s.goalPrepayBaseline(r.baseline.months, formatAmountYuan(r.baseline.interestCents)),
                   style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
@@ -583,7 +596,7 @@ class _SavingsGoalsPageState extends ConsumerState<SavingsGoalsPage> {
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(dctx),
-                child: const Text('关闭'),
+                child: Text(s.close),
               ),
             ],
           );
@@ -599,6 +612,7 @@ class _SavingsGoalsPageState extends ConsumerState<SavingsGoalsPage> {
   }
 
   Future<void> _showCreateSheet() async {
+    final s = AppStrings.of(context);
     final nameCtrl = TextEditingController();
     final targetCtrl = TextEditingController();
     // STORY-7.2：储蓄目标 vs 还债目标
@@ -620,28 +634,28 @@ class _SavingsGoalsPageState extends ConsumerState<SavingsGoalsPage> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text('新建储蓄目标', style: Theme.of(ctx).textTheme.titleMedium),
+            Text(s.goalCreateTitle, style: Theme.of(ctx).textTheme.titleMedium),
             const SizedBox(height: Spacing.md),
-            TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: '名称', border: OutlineInputBorder())),
+            TextField(controller: nameCtrl, decoration: InputDecoration(labelText: s.nameLabel, border: OutlineInputBorder())),
             const SizedBox(height: Spacing.md),
             TextField(
               controller: targetCtrl,
               keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              decoration: const InputDecoration(labelText: '目标金额', border: OutlineInputBorder()),
+              decoration: InputDecoration(labelText: s.goalTargetAmount, border: OutlineInputBorder()),
             ),
             const SizedBox(height: Spacing.md),
             // 类型决定「关联账户」的候选集：储蓄选可用账户，还债选贷款账户
             PickerField(
-              label: '目标类型',
-              value: isDebt ? '还债目标' : '储蓄目标',
+              label: s.goalTypeLabel,
+              value: isDebt ? s.goalTypeDebt : s.homeCardSavingsGoals,
               onTap: () async {
                 final picked = await showOptionPicker<String>(
                   context: ctx,
-                  title: '目标类型',
+                  title: s.goalTypeLabel,
                   current: isDebt ? 'debt' : 'savings',
-                  options: const [
-                    PickerOption(value: 'savings', label: '储蓄目标'),
-                    PickerOption(value: 'debt', label: '还债目标'),
+                  options: [
+                    PickerOption(value: 'savings', label: s.homeCardSavingsGoals),
+                    PickerOption(value: 'debt', label: s.goalTypeDebt),
                   ],
                 );
                 if (picked == null) return;
@@ -655,19 +669,19 @@ class _SavingsGoalsPageState extends ConsumerState<SavingsGoalsPage> {
             const SizedBox(height: Spacing.md),
             // 关联账户 = 存款划拨的转出端；还债目标则指向贷款账户
             PickerField(
-              label: isDebt ? '关联贷款' : '关联账户',
+              label: isDebt ? s.goalLinkLoan : s.goalLinkAccount,
               value: () {
                 final list = isDebt ? _loanAccounts : _accounts;
                 for (final a in list) {
                   if (a.id == accountId) return a.name;
                 }
-                return '未选择';
+                return s.notSelected;
               }(),
               onTap: () async {
                 final list = isDebt ? _loanAccounts : _accounts;
                 final picked = await showOptionPicker<String>(
                   context: ctx,
-                  title: isDebt ? '关联贷款' : '关联账户',
+                  title: isDebt ? s.goalLinkLoan : s.goalLinkAccount,
                   current: accountId,
                   options: [
                     for (final a in list)
@@ -679,7 +693,7 @@ class _SavingsGoalsPageState extends ConsumerState<SavingsGoalsPage> {
             ),
             const SizedBox(height: Spacing.md),
             PlainRow(
-              title: '截止日期',
+              title: s.goalDueDate,
               value: formatDate(dueAt),
               showChevron: true,
               onTap: () async {
@@ -716,11 +730,11 @@ class _SavingsGoalsPageState extends ConsumerState<SavingsGoalsPage> {
                 ));
                 if (ctx.mounted) Navigator.pop(ctx);
                 if (mounted) {
-                  showAppToast(context, '目标已创建');
+                  showAppToast(context, s.goalCreated);
                   _reload();
                 }
               },
-              child: const Text('保存'),
+              child: Text(s.save),
             ),
           ],
         ),
@@ -739,6 +753,7 @@ class _LimitRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final s = AppStrings.of(context);
     final colors = context.colors;
     final pct = (view.progress * 100).round();
     return InkWell(
@@ -787,8 +802,8 @@ class _LimitRow extends StatelessWidget {
             const SizedBox(height: 6),
             Text(
               view.isOver
-                  ? '已超支 ¥${formatAmount(-view.remainingCents, hide: false)}'
-                  : '剩余 ¥${formatAmount(view.remainingCents, hide: false)} · 已用 $pct%',
+                  ? s.goalLimitOver(formatAmount(-view.remainingCents, hide: false))
+                  : s.goalLimitRemaining(formatAmount(view.remainingCents, hide: false), pct),
               style: TextStyle(
                 fontSize: 12,
                 height: designLineHeight(12),
@@ -809,6 +824,7 @@ class _Hero extends StatelessWidget {  const _Hero({required this.views, require
 
   @override
   Widget build(BuildContext context) {
+    final s = AppStrings.of(context);
     final colors = context.colors;
     final totalSaved = views.fold(0, (s, v) => s + v.savedCents);
     final totalTarget = views.fold(0, (s, v) => s + v.targetCents);
@@ -823,7 +839,7 @@ class _Hero extends StatelessWidget {  const _Hero({required this.views, require
           Padding(
             padding: const EdgeInsets.only(top: 16, bottom: 8, left: 2),
             child: Text(
-              '目标已存 / 目标总额',
+              s.goalHeroSavedOfTarget,
               style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, letterSpacing: 0.08 * 12, color: colors.inkTertiary),
             ),
           ),
@@ -834,9 +850,9 @@ class _Hero extends StatelessWidget {  const _Hero({required this.views, require
           const SizedBox(height: 16),
           Row(
             children: [
-              _Split(label: '总进度', text: '$pct%'),
+              _Split(label: s.goalTotalProgress, text: '$pct%'),
               const SizedBox(width: 28),
-              _Split(label: '月需存入', text: formatAmountYuan(monthly)),
+              _Split(label: s.goalMonthlyNeed, text: formatAmountYuan(monthly)),
             ],
           ),
           const SizedBox(height: 16),
@@ -888,12 +904,13 @@ class _GoalRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final s = AppStrings.of(context);
     final colors = context.colors;
     final g = view.goal;
     final monthly = view.monthlyRequiredCentsAt(now);
     final progress = view.progress.clamp(0.0, 1.0).toDouble();
     final remaining = (view.targetCents - view.savedCents).clamp(0, view.targetCents).toInt();
-    final pct = (view.progress * 100).toStringAsFixed(0);
+    final pct = (view.progress * 100).round();
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: Spacing.md),
       child: Column(
@@ -912,11 +929,11 @@ class _GoalRow extends StatelessWidget {
             children: [
               Expanded(
                 child: Text(
-                  '$pct% · 还差 ${formatAmountYuan(remaining)}',
+                  s.goalRemainingPct(pct, formatAmountYuan(remaining)),
                   style: TextStyle(fontSize: 12, color: colors.inkTertiary),
                 ),
               ),
-              Text('月存 ${formatAmountYuan(monthly)}', style: TextStyle(fontSize: 12, color: colors.inkSecondary)),
+              Text(s.goalMonthlySave(formatAmountYuan(monthly)), style: TextStyle(fontSize: 12, color: colors.inkSecondary)),
             ],
           ),
           const SizedBox(height: Spacing.sm),
@@ -924,13 +941,13 @@ class _GoalRow extends StatelessWidget {
             children: [
               // STORY-7.1：手动存入（还债目标不适用）
               if (!g.isDebt) ...[
-                TextButton(onPressed: onDeposit, child: const Text('存入')),
+                TextButton(onPressed: onDeposit, child: Text(s.goalDepositAction)),
                 const SizedBox(width: Spacing.sm),
               ],
               // STORY-7.1 AC6：自动按月划拨（走统一周期引擎）
               if (!g.isDebt) ...[
                 Text(
-                  '自动按月划拨',
+                  s.goalAutoTransfer,
                   style: TextStyle(fontSize: 14, color: colors.inkSecondary),
                 ),
                 const Spacer(),
@@ -939,7 +956,7 @@ class _GoalRow extends StatelessWidget {
               // STORY-7.2 AC3：还债目标可做提前还款测算
               if (g.isDebt && debt != null) ...[
                 const Spacer(),
-                TextButton(onPressed: onPrepay, child: const Text('提前还款测算')),
+                TextButton(onPressed: onPrepay, child: Text(s.prepayCalc)),
               ],
             ],
           ),
@@ -957,7 +974,7 @@ class _GoalRow extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.only(top: Spacing.sm),
               child: Text(
-                '关联的贷款账户缺少本金/利率/期数，无法测算',
+                s.goalLoanIncomplete,
                 style: TextStyle(fontSize: 12, color: colors.inkTertiary),
               ),
             ),
@@ -966,7 +983,7 @@ class _GoalRow extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.only(top: Spacing.xs),
               child: Text(
-                '未达成（截止日已过）',
+                s.goalOverdue,
                 style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: colors.accent),
               ),
             ),
@@ -1008,6 +1025,7 @@ class _ProgressBar extends StatelessWidget {
 class _NotePanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
+    final s = AppStrings.of(context);
     final colors = context.colors;
     return Container(
       width: double.infinity,
@@ -1021,19 +1039,19 @@ class _NotePanel extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _RichPara(
-            plain: '把「一年一次的大额支出」拆成月存（保险费、旅行、年检）， 避免某个月突然被击穿。',
-            parts: const [
-              (true, '沉淀基金'),
-              (false, '把「一年一次的大额支出」拆成月存（保险费、旅行、年检）， 避免某个月突然被击穿。'),
+            plain: s.goalFundPlain,
+            parts: [
+              (true, s.goalFundBold),
+              (false, s.goalFundPlain),
             ],
           ),
           const SizedBox(height: Spacing.sm),
           _RichPara(
-            plain: '目标里的钱 —— 否则你会以为自己很有钱。',
-            parts: const [
-              (false, '目标里的钱'),
-              (true, '从「安全可花」基数中扣除'),
-              (false, ' —— 否则你会以为自己很有钱。'),
+            plain: s.goalDeductPlain,
+            parts: [
+              (false, s.goalDeductA),
+              (true, s.goalDeductB),
+              (false, s.goalDeductC),
             ],
           ),
         ],

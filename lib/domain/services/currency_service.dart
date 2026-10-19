@@ -6,7 +6,9 @@
 /// （原先存在内存 Map 里，重启即丢，也无法测试）。
 library;
 
+import 'package:plain/app/l10n/app_strings.dart';
 import 'package:plain/core/constants/app_constants.dart';
+import 'package:plain/app/l10n/strings_domain.dart';
 
 /// 币种转换结果。
 class CurrencyConversion {
@@ -78,6 +80,7 @@ class CurrencyService {
   /// 跨币种转账校验（AC3）。
   /// 返回 null = 校验通过；返回错误信息 = 拦截。
   String? validateTransfer({
+    required AppStrings s,
     required String fromCurrency,
     required String toCurrency,
     required double? rate,
@@ -85,8 +88,8 @@ class CurrencyService {
     required int? toAmountCents,
   }) {
     if (fromCurrency == toCurrency) return null;
-    if (rate == null || rate <= 0) return '需填写两边金额与汇率';
-    if (fromAmountCents == null || toAmountCents == null) return '需填写两边金额与汇率';
+    if (rate == null || rate <= 0) return s.currencyRateRequired;
+    if (fromAmountCents == null || toAmountCents == null) return s.currencyRateRequired;
     return null;
   }
 }

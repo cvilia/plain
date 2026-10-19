@@ -14,6 +14,11 @@ import 'package:plain/design_system/plain_ui.dart';
 import 'package:plain/domain/entities/recurring_rule.dart';
 import 'package:plain/domain/entities/reminder.dart';
 import 'package:plain/domain/services/reminder_prefs_store.dart';
+import 'package:plain/app/l10n/app_strings.dart';
+import 'package:plain/app/l10n/strings_reports.dart';
+import 'package:plain/app/l10n/strings_settings_b.dart';
+import 'package:plain/app/l10n/strings_domain.dart';
+import 'package:plain/app/l10n/strings_ledger.dart';
 
 // gate-copy 屏16 必现（门禁字面量）：
 // 分级通知（G-3）：只进提醒中心、不响铃；同时走系统通知。
@@ -73,7 +78,8 @@ class _RemindersPageState extends ConsumerState<RemindersPage> {
     final service = deps.reminderService;
 
     // 1) 先扫一遍（九类，已按开关过滤 + 去重 + 夜间降级），2) 推送系统通知
-    final fresh = await service.collect(bookId: deps.bookId, prefs: prefs);
+    final fresh = await service.collect(
+        s: AppStrings.of(context), bookId: deps.bookId, prefs: prefs);
     await service.pushToSystem(fresh);
 
     // 3) 列表读**历史**（PRD AC6：近 90 天可查，含已读与触发时间）
@@ -108,10 +114,11 @@ class _RemindersPageState extends ConsumerState<RemindersPage> {
   }
 
   Future<void> _markRead(AppReminder reminder) async {
+    final s = AppStrings.of(context);
     final deps = ref.read(appDependenciesProvider);
     await deps.reminderRepository.markRead(id: reminder.id, read: true);
     if (!mounted) return;
-    showAppToast(context, '已标记为已读');
+    showAppToast(context, s.markedRead);
     await _reload();
   }
 
@@ -120,6 +127,7 @@ class _RemindersPageState extends ConsumerState<RemindersPage> {
   /// 我们只能关掉本机的周期规则；**原扣款渠道的自动续费要用户自己去取消**，
   /// 因此提示里明确说这一步，别让人以为点了就万事大吉。
   Future<void> _handleAction(AppReminder reminder) async {
+    final s = AppStrings.of(context);
     final ruleId = reminder.actionRef;
     if (ruleId == null) return;
     if (reminder.kind != ReminderKind.subscription) return;
@@ -130,7 +138,7 @@ class _RemindersPageState extends ConsumerState<RemindersPage> {
         .where((r) => r.id == ruleId)
         .firstOrNull;
     if (rule == null) {
-      if (mounted) showAppToast(context, '这条周期规则已经不在了');
+      if (mounted) showAppToast(context, s.recurringRuleGone);
       return;
     }
     final now = deps.clock.now();
@@ -142,25 +150,24 @@ class _RemindersPageState extends ConsumerState<RemindersPage> {
     ));
     await deps.reminderRepository.markRead(id: reminder.id, read: true);
     if (!mounted) return;
-    showAppToast(context, '已关掉这条周期规则；别忘了到原扣款渠道取消自动续费');
+    showAppToast(context, s.recurringRuleDisabled);
     await _reload();
   }
 
   @override
   Widget build(BuildContext context) {
+    final s = AppStrings.of(context);
     final colors = context.colors;
     final prefs = ref.watch(reminderPrefsProvider);
     final list = _filtered;
     return Scaffold(
       backgroundColor: colors.surface,
       appBar: PlainTopBar(
-        title: '提醒中心',
+        title: s.remindersTitle,
         showBack: true,
         actions: [
-          _TextAction(
-            label: '设置',
-            onPressed: () => _showKindSettings(),
-          ),
+          // 顶栏文字动作走公共组件（设计稿 `.textbtn`：34 高 / 15 号 / w500 / primaryInk）
+          PlainTopBarTextAction(label: s.settings, onTap: () => _showKindSettings()),
         ],
       ),
       body: Column(
@@ -168,7 +175,7 @@ class _RemindersPageState extends ConsumerState<RemindersPage> {
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
             child: PlainSeg(
-              items: const ['全部', '预算', '账单', '周期'],
+              items: [s.reportFilterAll, s.entityBudget, s.entityTransaction, s.sourceRecurring],
               selectedIndex: _segIndex,
               onChanged: (i) => setState(() => _segIndex = i),
             ),
@@ -178,11 +185,11 @@ class _RemindersPageState extends ConsumerState<RemindersPage> {
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
               child: Row(
                 children: [
-                  const PlainTag(label: '全部静音', tone: PlainTagTone.neutral),
+                  PlainTag(label: s.muteAll, tone: PlainTagTone.neutral),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      '不推系统通知，仅进提醒中心',
+                      s.muteAllBody,
                       style: TextStyle(fontSize: 12, color: colors.inkTertiary),
                     ),
                   ),
@@ -200,7 +207,7 @@ class _RemindersPageState extends ConsumerState<RemindersPage> {
                           padding: const EdgeInsets.symmetric(vertical: 48),
                           child: Center(
                             child: Text(
-                              '暂无提醒',
+                              s.noReminders,
                               style: TextStyle(color: colors.inkTertiary),
                             ),
                           ),
@@ -223,25 +230,25 @@ class _RemindersPageState extends ConsumerState<RemindersPage> {
                                 color: colors.inkTertiary,
                               ),
                               children: [
-                                const TextSpan(text: '分级通知（G-3）：'),
+                                TextSpan(text: s.tieredTitle),
                                 TextSpan(
-                                  text: '静默',
+                                  text: s.weeklyLevelSilent,
                                   style: TextStyle(
                                     fontWeight: FontWeight.w600,
                                     color: colors.inkSecondary,
                                   ),
                                 ),
-                                const TextSpan(
-                                  text: '只进提醒中心、不响铃；',
+                                TextSpan(
+                                  text: s.silentExplained,
                                 ),
                                 TextSpan(
-                                  text: '响铃',
+                                  text: s.weeklyLevelRing,
                                   style: TextStyle(
                                     fontWeight: FontWeight.w600,
                                     color: colors.inkSecondary,
                                   ),
                                 ),
-                                const TextSpan(text: '同时走系统通知。'),
+                                TextSpan(text: s.ringExplained),
                               ],
                             ),
                           ),
@@ -254,8 +261,8 @@ class _RemindersPageState extends ConsumerState<RemindersPage> {
                                 color: colors.inkTertiary,
                               ),
                               children: [
-                                const TextSpan(
-                                  text: '预算 90% 静默、100% 响铃 —— 但两者都',
+                                TextSpan(
+                                  text: s.budgetTieredPrefix,
                                 ),
                                 TextSpan(
                                   text: '不阻挡你继续记账',
@@ -270,7 +277,7 @@ class _RemindersPageState extends ConsumerState<RemindersPage> {
                           ),
                           const SizedBox(height: 3),
                           Text(
-                            '提醒历史保留近 90 天',
+                            s.historyRetention,
                             style: TextStyle(
                               fontSize: 12,
                               height: 1.72,
@@ -288,6 +295,7 @@ class _RemindersPageState extends ConsumerState<RemindersPage> {
   }
 
   void _showKindSettings() {
+    final s = AppStrings.of(context);
     showModalBottomSheet<void>(
       context: context,
       builder: (ctx) {
@@ -304,7 +312,7 @@ class _RemindersPageState extends ConsumerState<RemindersPage> {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       Text(
-                        '提醒类型',
+                        s.reminderTypes,
                         style: TextStyle(
                           fontSize: 20,
                           fontWeight: FontWeight.w600,
@@ -313,8 +321,8 @@ class _RemindersPageState extends ConsumerState<RemindersPage> {
                       ),
                       const SizedBox(height: 12),
                       PlainRow(
-                        title: '全部静音',
-                        subtitle: '开启后不推系统通知，仅进提醒中心',
+                        title: s.muteAll,
+                        subtitle: s.muteAllSwitchSubtitle,
                         trailing: PlainSwitch(
                           value: p.allMuted,
                           onChanged: (_) {
@@ -328,8 +336,8 @@ class _RemindersPageState extends ConsumerState<RemindersPage> {
                       ),
                       for (final k in ReminderKind.values)
                         PlainRow(
-                          title: k.label,
-                          subtitle: k.rings ? '响铃' : '静默',
+                          title: k.label(AppStrings.of(context)),
+                          subtitle: k.rings ? s.weeklyLevelRing : s.weeklyLevelSilent,
                           trailing: PlainSwitch(
                             value: p.isEnabled(k),
                             enabled: !p.allMuted,
@@ -344,7 +352,7 @@ class _RemindersPageState extends ConsumerState<RemindersPage> {
                         ),
                       const SizedBox(height: 8),
                       Text(
-                        '夜间 23:00–07:00 响铃自动降为静默，次日 08:00 汇总（G-3）',
+                        s.quietHoursHint,
                         style: TextStyle(fontSize: 12, color: colors.inkTertiary),
                       ),
                     ],
@@ -384,6 +392,7 @@ class _ReminderCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final s = AppStrings.of(context);
     final colors = context.colors;
     final isRing = reminder.level == ReminderLevel.ring;
     return Container(
@@ -427,14 +436,14 @@ class _ReminderCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 3),
                     Text(
-                      _metaLine(),
+                      _metaLine(s),
                       style: TextStyle(fontSize: 12, color: colors.inkFaint),
                     ),
                   ],
                 ),
               ),
               PlainTag(
-                label: isRing ? '响铃' : '静默',
+                label: isRing ? s.weeklyLevelRing : s.weeklyLevelSilent,
                 tone: isRing ? PlainTagTone.ring : PlainTagTone.neutral,
               ),
             ],
@@ -447,19 +456,19 @@ class _ReminderCard extends StatelessWidget {
               runSpacing: 8,
               children: [
                 // STORY-6.3：订阅提醒要能「一键标记不再需要」（PRD 要求配取消路径指引）
-                if (reminder.actionLabel != null)
+                if (reminder.actionLabel(s) != null)
                   _SecondaryAction(
-                    label: reminder.actionLabel!,
+                    label: reminder.actionLabel(s)!,
                     onPressed: () => onAction(reminder),
                   ),
                 _SecondaryAction(
-                  label: '稍后',
+                  label: s.later,
                   onPressed: () {
-                    showAppToast(context, '已稍后提醒');
+                    showAppToast(context, s.snoozed);
                   },
                 ),
                 _SecondaryAction(
-                  label: reminder.read ? '已读' : '知道了',
+                  label: reminder.read ? s.read : s.gotIt,
                   emphasized: !reminder.read,
                   onPressed: onRead,
                 ),
@@ -472,13 +481,13 @@ class _ReminderCard extends StatelessWidget {
   }
 
   /// 触发时间 + 已读状态（PRD AC6：历史列出全部提醒与触发时间）。
-  String _metaLine() {
+  String _metaLine(AppStrings s) {
     final t = reminder.triggeredAt.toLocal();
     final mm = t.month.toString().padLeft(2, '0');
     final dd = t.day.toString().padLeft(2, '0');
     final hh = t.hour.toString().padLeft(2, '0');
     final mi = t.minute.toString().padLeft(2, '0');
-    final read = reminder.read ? '已读' : '未读';
+    final read = reminder.read ? s.read : s.unread;
     return '$mm-$dd $hh:$mi · $read';
   }
 }
@@ -502,37 +511,6 @@ class _NotePanel extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: children,
-      ),
-    );
-  }
-}
-
-/// 顶栏文字按钮（textbtn）。
-class _TextAction extends StatelessWidget {
-  const _TextAction({required this.label, required this.onPressed});
-  final String label;
-  final VoidCallback? onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.colors;
-    return Material(
-      color: const Color(0x00000000),
-      borderRadius: BorderRadius.circular(12),
-      child: InkWell(
-        onTap: onPressed,
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-          child: Text(
-            label,
-            style: TextStyle(
-              fontSize: 15,
-              fontWeight: FontWeight.w500,
-              color: onPressed == null ? colors.inkFaint : colors.primaryInk,
-            ),
-          ),
-        ),
       ),
     );
   }

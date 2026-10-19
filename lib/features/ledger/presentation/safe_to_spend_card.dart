@@ -11,6 +11,8 @@ import 'package:plain/core/format/amount_formatter.dart';
 import 'package:plain/core/refresh/data_invalidation.dart';
 import 'package:plain/design_system/plain_icons_v3.dart';
 import 'package:plain/domain/services/safe_to_spend_service.dart';
+import 'package:plain/app/l10n/app_strings.dart';
+import 'package:plain/app/l10n/strings_ledger.dart';
 
 final _safeToSpendProvider = FutureProvider<SafeToSpendResult?>((ref) async {
   ref.watch(ledgerVersionProvider);
@@ -62,6 +64,7 @@ class _CardState extends State<_Card> {
 
   @override
   Widget build(BuildContext context) {
+    final s = AppStrings.of(context);
     final r = widget.result;
     final colors = context.colors;
     final hideAmounts = false; // AmountText handles hide mode via provider
@@ -90,7 +93,7 @@ class _CardState extends State<_Card> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('今日可花', style: AppTextStyles.eyebrow.copyWith(color: colors.inkTertiary)),
+                          Text(s.todaySpendable, style: AppTextStyles.eyebrow.copyWith(color: colors.inkTertiary)),
                           const SizedBox(height: 4),
                           // 设计稿字阶无 28。29 屏里也没覆盖本卡片本身
                           // （只在「首页卡片自定义」把它当行名提到，15/500），
@@ -117,7 +120,7 @@ class _CardState extends State<_Card> {
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
-                        Text('日均', style: TextStyle(fontSize: 12, color: colors.inkTertiary)),
+                        Text(s.dailyAverage, style: TextStyle(fontSize: 12, color: colors.inkTertiary)),
                         const SizedBox(height: 2),
                         Text(
                           formatAmount(daily, hide: hideAmounts),
@@ -128,23 +131,23 @@ class _CardState extends State<_Card> {
                             fontFeatures: kTabularFigures,
                           ),
                         ),
-                        Text('剩 ${r.remainingDays} 天', style: TextStyle(fontSize: 12, color: colors.inkTertiary)),
+                        Text(s.remainingDays(r.remainingDays), style: TextStyle(fontSize: 12, color: colors.inkTertiary)),
                       ],
                     ),
                   ],
                 ),
                 if (r.isNegative) ...[
                   const SizedBox(height: Spacing.sm),
-                  Text('本月已超支，建议暂停非必要支出', style: TextStyle(fontSize: 12, color: colors.expense)),
+                  Text(s.overspentThisMonth, style: TextStyle(fontSize: 12, color: colors.expense)),
                 ],
                 if (_expanded) ...[
                   const SizedBox(height: Spacing.md),
                   const Divider(height: 1),
                   const SizedBox(height: Spacing.sm),
-                  _BreakRow(label: '可用资金', value: r.availableCents, color: colors.income),
-                  _BreakRow(label: '未来账单预留', value: -r.futureBillsCents, color: colors.expense),
-                  _BreakRow(label: '目标待拨付', value: -r.goalAllocationCents, color: colors.expense),
-                  _BreakRow(label: '刚性支出预留', value: -r.rigidReserveCents, color: colors.expense),
+                  _BreakRow(label: s.availableFunds, value: r.availableCents, color: colors.income),
+                  _BreakRow(label: s.futureBillsReserved, value: -r.futureBillsCents, color: colors.expense),
+                  _BreakRow(label: s.goalPendingAllocation, value: -r.goalAllocationCents, color: colors.expense),
+                  _BreakRow(label: s.rigidReserved, value: -r.rigidReserveCents, color: colors.expense),
                 ],
                 const SizedBox(height: Spacing.sm),
                 Row(
@@ -156,7 +159,7 @@ class _CardState extends State<_Card> {
                       color: colors.inkTertiary,
                     ),
                     const SizedBox(width: 4),
-                    Text(_expanded ? '收起明细' : '展开明细', style: TextStyle(fontSize: 12, color: colors.inkTertiary)),
+                    Text(_expanded ? s.collapseDetails : s.expandDetails, style: TextStyle(fontSize: 12, color: colors.inkTertiary)),
                   ],
                 ),
               ],

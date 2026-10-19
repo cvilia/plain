@@ -1,6 +1,9 @@
 /// STORY-8.1 同步冲突（冲突中心的条目）。
 library;
 
+import 'package:plain/app/l10n/app_strings.dart';
+import 'package:plain/app/l10n/strings_domain.dart';
+
 enum ConflictResolution {
   unresolved('unresolved'),
   keepLocal('local'),
@@ -17,11 +20,11 @@ enum ConflictResolution {
     return ConflictResolution.unresolved;
   }
 
-  String get label => switch (this) {
-        ConflictResolution.unresolved => '待裁决',
-        ConflictResolution.keepLocal => '保留本机版本',
-        ConflictResolution.keepRemote => '保留远端版本',
-        ConflictResolution.keepBoth => '都保留',
+  String label(AppStrings s) => switch (this) {
+        ConflictResolution.unresolved => s.conflictUnresolved,
+        ConflictResolution.keepLocal => s.conflictKeepLocal,
+        ConflictResolution.keepRemote => s.conflictKeepRemote,
+        ConflictResolution.keepBoth => s.conflictKeepBoth,
       };
 }
 
@@ -69,16 +72,15 @@ class SyncConflict {
 
   bool get isOpen => resolution == ConflictResolution.unresolved;
 
-  String get entityLabel => switch (entityType) {
-        'transaction' => '账单',
-        'category' => '分类',
-        'account' => '账户',
-        'budget' => '预算',
-        'member' => '成员',
-        'attachment' => '附件',
-        'savings_goal' => '储蓄目标',
-        'recurring_rule' => '周期规则',
-        'currency_rate' => '锁定汇率',
+  String entityLabel(AppStrings s) => switch (entityType) {
+        'transaction' => s.entityTransaction,
+        'category' => s.category,
+        'account' => s.account,
+        'budget' => s.entityBudget,
+        'member' => s.entityMember,
+        'savings_goal' => s.entitySavingsGoal,
+        'recurring_rule' => s.entityRecurringRule,
+        'currency_rate' => s.entityCurrencyRate,
         _ => entityType,
       };
 

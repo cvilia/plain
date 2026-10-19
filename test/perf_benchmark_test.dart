@@ -3,6 +3,7 @@
 library;
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:plain/app/l10n/strings_core.dart';
 import 'package:plain/core/id/uuid_v7.dart';
 import 'package:plain/core/money/expression_evaluator.dart';
 import 'package:plain/core/time/clock.dart';
@@ -61,7 +62,7 @@ void main() {
           accountId: 'acc-${i % 3}',
           bookId: 'book-1',
           deviceId: 'dev-1',
-        ));
+        ), s: kDefaultAppStrings);
       }
       sw.stop();
       // 100 inserts should complete in <2s
@@ -77,7 +78,7 @@ void main() {
           categoryId: 'cat-${i % 12}',
           bookId: 'book-1',
           deviceId: 'dev-1',
-        ));
+        ), s: kDefaultAppStrings);
       }
 
       final sw = Stopwatch()..start();
@@ -97,7 +98,7 @@ void main() {
           categoryId: 'cat-${i % 12}',
           bookId: 'book-1',
           deviceId: 'dev-1',
-        ));
+        ), s: kDefaultAppStrings);
       }
 
       final sw = Stopwatch()..start();

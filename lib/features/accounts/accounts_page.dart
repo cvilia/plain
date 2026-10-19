@@ -18,6 +18,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:plain/app/bootstrap.dart';
 import 'package:plain/app/breakpoints.dart';
+import 'package:plain/app/l10n/app_strings.dart';
+import 'package:plain/app/l10n/strings_accounts.dart';
 import 'package:plain/app/theme/design_tokens.dart';
 import 'package:plain/core/constants/app_constants.dart';
 import 'package:plain/core/format/amount_formatter.dart';
@@ -31,6 +33,7 @@ import 'package:plain/domain/entities/enums.dart';
 import 'package:plain/domain/entities/ledger_entry.dart';
 import 'package:plain/domain/repositories/repositories.dart';
 import 'package:plain/domain/usecases/entry_usecases.dart';
+import 'package:plain/app/l10n/strings_domain.dart';
 
 final _accountsProvider = FutureProvider<List<_AccountWithBalance>>((ref) async {
   // Refetch when accounts or ledger entries change (balances derive from both).
@@ -89,11 +92,12 @@ class AccountsPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final s = AppStrings.of(context);
     final accountsAsync = ref.watch(_accountsProvider);
 
     return Scaffold(
       appBar: PlainTopBar(
-        title: '资产',
+        title: s.accounts,
         // 底部 Tab 页是导航终点，没有「上一页」可回 —— 不放返回箭头
         // （标题居中由 PlainTopBar 的默认行为统一负责）
         actions: [
@@ -111,7 +115,7 @@ class AccountsPage extends ConsumerWidget {
                 width: 52,
                 height: 44,
                 child: Center(
-                  child: Text('净值',
+                  child: Text(s.netWorth,
                       style: TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.w500,
@@ -141,12 +145,12 @@ class AccountsPage extends ConsumerWidget {
             return ContentWidthConstraint(
               child: AppEmptyState(
                 icon: PlainIconData.wallet,
-                title: '还没有账户',
-                subtitle: '添加现金或银行卡',
+                title: s.noAccounts,
+                subtitle: s.addCashOrCard,
                 action: FilledButton.icon(
                   onPressed: () => _showAddSheet(context, ref),
                   icon: const PlainIcon(PlainIconData.plus),
-                  label: const Text('添加账户'),
+                  label: Text(s.addAccount),
                 ),
               ),
             );
@@ -165,7 +169,7 @@ class AccountsPage extends ConsumerWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        '净资产',
+                        s.netAssets,
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
@@ -188,7 +192,7 @@ class AccountsPage extends ConsumerWidget {
                 Padding(
                   padding: const EdgeInsets.fromLTRB(2, 8, 2, 8),
                   child: Text(
-                    '资产',
+                    s.accounts,
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
@@ -241,7 +245,7 @@ class AccountsPage extends ConsumerWidget {
                   Padding(
                     padding: const EdgeInsets.fromLTRB(2, 24, 2, 8),
                     child: Text(
-                      '负债',
+                      s.liabilities,
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
@@ -286,7 +290,7 @@ class AccountsPage extends ConsumerWidget {
           );
         },
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => AppErrorState.of(e,
+        error: (e, _) => AppErrorState.of(context, e,
             onRetry: () => ref.invalidateData.bumpEverything()),
       ),
     );
@@ -314,29 +318,30 @@ class AccountsPage extends ConsumerWidget {
   }
 
   void _showReconcileDialog(BuildContext context, WidgetRef ref, _AccountWithBalance account) {
+    final s = AppStrings.of(context);
     final ctrl = TextEditingController(text: formatAmount(account.balance));
     showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('对账'),
+        title: Text(s.reconcile),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(children: [
-              Text('当前余额: ', style: TextStyle(color: context.colors.inkSecondary)),
+              Text('${s.currentBalance}: ', style: TextStyle(color: context.colors.inkSecondary)),
               AmountWithCurrency(cents: account.balance),
             ]),
             const SizedBox(height: Spacing.md),
             TextField(
               controller: ctrl,
               keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              decoration: const InputDecoration(labelText: '实际余额', border: OutlineInputBorder(), prefixText: '\u00a5'),
+              decoration: InputDecoration(labelText: s.actualBalance, border: const OutlineInputBorder(), prefixText: '\u00a5'),
             ),
           ],
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('取消')),
+          TextButton(onPressed: () => Navigator.pop(ctx), child: Text(s.cancel)),
           FilledButton(
             onPressed: () async {
               final text = ctrl.text.trim();
@@ -363,10 +368,10 @@ class AccountsPage extends ConsumerWidget {
                   source: EntrySource.reconcile,
                   bookId: deps.bookId,
                   deviceId: deps.deviceId,
-                ));
+                ), s: s);
                 if (result.isFailure) {
                   if (ctx.mounted) Navigator.pop(ctx);
-                  if (context.mounted) showAppToast(context, '对账失败：${result.failureOrNull?.code ?? '未知错误'}');
+                  if (context.mounted) showAppToast(context, s.reconcileFailed(result.failureOrNull?.code ?? '未知错误'));
                   return;
                 }
               }
@@ -375,7 +380,7 @@ class AccountsPage extends ConsumerWidget {
               ref.invalidateData.bumpAccountsMutated();
               ref.invalidateData.bumpEntryMutated();
             },
-            child: const Text('对账'),
+            child: Text(s.reconcile),
           ),
         ],
       ),
@@ -395,16 +400,17 @@ class _AccountTile extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final s = AppStrings.of(context);
     final colors = context.colors;
     final typeLabel = switch (account.type) {
-      AccountType.cash => '现金',
-      AccountType.debit => '储蓄卡',
-      AccountType.credit => '信用卡',
-      AccountType.investment => '投资',
-      AccountType.loanIn => '贷款',
-      AccountType.loanOut => '借出',
-      AccountType.goal => '目标',
-      _ => '账户',
+      AccountType.cash => s.cash,
+      AccountType.debit => s.debitCard,
+      AccountType.credit => s.accountTypeCredit,
+      AccountType.investment => s.accountTypeInvestment,
+      AccountType.loanIn => s.accountTypeLoan,
+      AccountType.loanOut => s.entryBorrowOut,
+      AccountType.goal => s.accountTypeGoal,
+      _ => s.account,
     };
     final iconRef = switch (account.type) {
       AccountType.cash => 'wallet',
@@ -480,7 +486,7 @@ class _AccountTile extends ConsumerWidget {
                         child: Padding(
                           padding: const EdgeInsets.symmetric(vertical: 2),
                           child: Text(
-                            '待对账 ${account.pendingReconcile} 笔',
+                            s.pendingReconcileCount(account.pendingReconcile),
                             style: TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.w600,
@@ -646,22 +652,24 @@ class _AddAccountSheetState extends ConsumerState<_AddAccountSheet> {
 
   /// 还款账户的显示名 —— 字段里存的是 id，展示要回查名称。
   String get _repayAccountName {
+    final s = AppStrings.of(context);
     final id = _repayAccountId;
-    if (id == null) return '未选择';
+    if (id == null) return s.notSelected;
     for (final a in _repayCandidates) {
       if (a.id == id) return a.name;
     }
-    return '未选择';
+    return s.notSelected;
   }
 
   /// 利息分类的显示名 —— 字段里存的是 id，展示要回查名称。
   String get _interestCategoryName {
+    final s = AppStrings.of(context);
     final id = _interestCategoryId;
-    if (id == null) return '未选择';
+    if (id == null) return s.notSelected;
     for (final c in _interestCategories) {
       if (c.id == id) return c.name;
     }
-    return '未选择';
+    return s.notSelected;
   }
 
   @override
@@ -685,6 +693,7 @@ class _AddAccountSheetState extends ConsumerState<_AddAccountSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final s = AppStrings.of(context);
     return Padding(
       padding: EdgeInsets.only(left: Spacing.lg, right: Spacing.lg, top: Spacing.lg, bottom: MediaQuery.viewInsetsOf(context).bottom + Spacing.lg),
       child: SingleChildScrollView(
@@ -692,27 +701,27 @@ class _AddAccountSheetState extends ConsumerState<_AddAccountSheet> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text(_isEditing ? '编辑账户' : '添加账户', style: Theme.of(context).textTheme.titleMedium),
+            Text(_isEditing ? s.editAccount : s.addAccount, style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: Spacing.lg),
             Wrap(
             spacing: Spacing.sm,
             runSpacing: Spacing.sm,
             children: [
-              _TypeOption(label: '现金', icon: PlainIconData.amount, selected: _type == AccountType.cash, onTap: () => setState(() => _type = AccountType.cash)),
-              _TypeOption(label: '储蓄卡', icon: PlainIconData.card, selected: _type == AccountType.debit, onTap: () => setState(() => _type = AccountType.debit)),
-              _TypeOption(label: '信用卡', icon: PlainIconData.card, selected: _type == AccountType.credit, onTap: () => setState(() => _type = AccountType.credit)),
-              _TypeOption(label: '投资', icon: PlainIconData.trendUp, selected: _type == AccountType.investment, onTap: () => setState(() => _type = AccountType.investment)),
+              _TypeOption(label: s.cash, icon: PlainIconData.amount, selected: _type == AccountType.cash, onTap: () => setState(() => _type = AccountType.cash)),
+              _TypeOption(label: s.debitCard, icon: PlainIconData.card, selected: _type == AccountType.debit, onTap: () => setState(() => _type = AccountType.debit)),
+              _TypeOption(label: s.accountTypeCredit, icon: PlainIconData.card, selected: _type == AccountType.credit, onTap: () => setState(() => _type = AccountType.credit)),
+              _TypeOption(label: s.accountTypeInvestment, icon: PlainIconData.trendUp, selected: _type == AccountType.investment, onTap: () => setState(() => _type = AccountType.investment)),
               // STORY-10.2：贷款账户（借入 = 负债），带摊销参数
-              _TypeOption(label: '贷款', icon: PlainIconData.chartLine, selected: _type == AccountType.loanIn, onTap: () => setState(() => _type = AccountType.loanIn)),
+              _TypeOption(label: s.accountTypeLoan, icon: PlainIconData.chartLine, selected: _type == AccountType.loanIn, onTap: () => setState(() => _type = AccountType.loanIn)),
             ],
           ),
           const SizedBox(height: Spacing.lg),
-          TextField(controller: _nameCtrl, maxLength: 20, decoration: const InputDecoration(labelText: '名称', hintText: '如：现金', border: OutlineInputBorder())),
+          TextField(controller: _nameCtrl, maxLength: 20, decoration: InputDecoration(labelText: s.nameLabel, hintText: s.nameHintCash, border: OutlineInputBorder())),
           const SizedBox(height: Spacing.md),
           // 本表单的选择项统一走底部弹层（`design_system/picker_sheet.dart`），
           // 不用系统下拉：选项带说明、宽度和高度都可控。
           PickerField(
-            label: '币种',
+            label: s.currency,
             value: '${CurrencyRules.symbolOf(_currency)}  $_currency  '
                 '${CurrencyRules.nameOf(_currency)}',
             onTap: () async {
@@ -731,12 +740,12 @@ class _AddAccountSheetState extends ConsumerState<_AddAccountSheet> {
           if ((_isEditing && _type == AccountType.credit) || _isLoan)
             Text(
               _isLoan
-                  ? '期初余额按 −贷款总额 自动记入（负债为负）'
-                  : '欠款余额由账单与对账页维护，如需修正请到信用卡对账页',
+                  ? s.loanOpeningAutoNote
+                  : s.creditDebtMaintainedNote,
               style: TextStyle(fontSize: 12, color: context.colors.inkTertiary),
             )
           else ...[
-            TextField(controller: _openingCtrl, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: InputDecoration(labelText: _type == AccountType.credit ? '期初欠款' : '期初余额', hintText: '0.00', border: const OutlineInputBorder(), prefixText: '¥')),
+            TextField(controller: _openingCtrl, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: InputDecoration(labelText: _type == AccountType.credit ? s.openingDebt : s.openingBalance, hintText: '0.00', border: const OutlineInputBorder(), prefixText: '¥')),
             // V3.0 口径（外币账户按单币种处理）：账户余额只走本位币口径，
             // 原币期初不并入余额，而是在净值里按锁定汇率折算参与。
             if (_currency != MoneyRules.defaultCurrency)
@@ -754,7 +763,7 @@ class _AddAccountSheetState extends ConsumerState<_AddAccountSheet> {
             TextField(
               controller: _limitCtrl,
               keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              decoration: const InputDecoration(labelText: '总额度', hintText: '0.00', border: OutlineInputBorder(), prefixText: '¥'),
+              decoration: InputDecoration(labelText: s.creditLimit, hintText: '0.00', border: OutlineInputBorder(), prefixText: '¥'),
             ),
             const SizedBox(height: Spacing.md),
             Row(children: [
@@ -762,7 +771,7 @@ class _AddAccountSheetState extends ConsumerState<_AddAccountSheet> {
                 child: TextField(
                   controller: _billDayCtrl,
                   keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(labelText: '账单日 (1–28)', border: OutlineInputBorder()),
+                  decoration: InputDecoration(labelText: s.billDayLabel, border: OutlineInputBorder()),
                 ),
               ),
               const SizedBox(width: Spacing.md),
@@ -770,7 +779,7 @@ class _AddAccountSheetState extends ConsumerState<_AddAccountSheet> {
                 child: TextField(
                   controller: _dueDayCtrl,
                   keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(labelText: '还款日 (1–28)', border: OutlineInputBorder()),
+                  decoration: InputDecoration(labelText: s.dueDayLabel, border: OutlineInputBorder()),
                 ),
               ),
             ]),
@@ -781,8 +790,8 @@ class _AddAccountSheetState extends ConsumerState<_AddAccountSheet> {
                 child: TextField(
                   controller: _minPayCtrl,
                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  decoration: const InputDecoration(
-                      labelText: '最低还款',
+                  decoration: InputDecoration(
+                      labelText: s.minPayment,
                       hintText: '0.00',
                       border: OutlineInputBorder(),
                       prefixText: '¥'),
@@ -793,8 +802,8 @@ class _AddAccountSheetState extends ConsumerState<_AddAccountSheet> {
                 child: TextField(
                   controller: _creditRateCtrl,
                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  decoration: const InputDecoration(
-                      labelText: '循环年利率 %',
+                  decoration: InputDecoration(
+                      labelText: s.creditAnnualRateLabel,
                       hintText: '18',
                       border: OutlineInputBorder()),
                 ),
@@ -807,7 +816,7 @@ class _AddAccountSheetState extends ConsumerState<_AddAccountSheet> {
             TextField(
               controller: _loanPrincipalCtrl,
               keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              decoration: const InputDecoration(labelText: '贷款总额', hintText: '0.00', border: OutlineInputBorder(), prefixText: '¥'),
+              decoration: InputDecoration(labelText: s.loanPrincipal, hintText: '0.00', border: OutlineInputBorder(), prefixText: '¥'),
             ),
             const SizedBox(height: Spacing.md),
             Row(children: [
@@ -815,7 +824,7 @@ class _AddAccountSheetState extends ConsumerState<_AddAccountSheet> {
                 child: TextField(
                   controller: _loanRateCtrl,
                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  decoration: const InputDecoration(labelText: '年利率 %', hintText: '4.9', border: OutlineInputBorder()),
+                  decoration: InputDecoration(labelText: s.annualRateLabel, hintText: '4.9', border: OutlineInputBorder()),
                 ),
               ),
               const SizedBox(width: Spacing.md),
@@ -823,29 +832,29 @@ class _AddAccountSheetState extends ConsumerState<_AddAccountSheet> {
                 child: TextField(
                   controller: _loanTermCtrl,
                   keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(labelText: '期数（月）', hintText: '360', border: OutlineInputBorder()),
+                  decoration: InputDecoration(labelText: s.termMonthsLabel, hintText: '360', border: OutlineInputBorder()),
                 ),
               ),
             ]),
             const SizedBox(height: Spacing.md),
             PickerField(
-              label: '还款方式',
-              value: _loanMethod.label,
+              label: s.repayMethod,
+              value: _loanMethod.label(AppStrings.of(context)),
               onTap: () async {
                 final picked = await showOptionPicker<LoanRepayMethod>(
                   context: context,
-                  title: '还款方式',
+                  title: s.repayMethod,
                   current: _loanMethod,
                   options: [
                     PickerOption(
                       value: LoanRepayMethod.equalInstallment,
-                      label: LoanRepayMethod.equalInstallment.label,
-                      description: '每期还款额一致，前期利息占比高',
+                      label: LoanRepayMethod.equalInstallment.label(AppStrings.of(context)),
+                      description: s.equalInstallmentDesc,
                     ),
                     PickerOption(
                       value: LoanRepayMethod.equalPrincipal,
-                      label: LoanRepayMethod.equalPrincipal.label,
-                      description: '每期本金一致，利息逐期递减，总利息更少',
+                      label: LoanRepayMethod.equalPrincipal.label(AppStrings.of(context)),
+                      description: s.equalPrincipalDesc,
                     ),
                   ],
                 );
@@ -854,9 +863,9 @@ class _AddAccountSheetState extends ConsumerState<_AddAccountSheet> {
             ),
             const SizedBox(height: Spacing.md),
             PlainRow(
-              title: '首次还款日',
+              title: s.firstPaymentDate,
               value: _loanFirstPaymentAt == null
-                  ? '未设置'
+                  ? s.repayNotSet
                   : formatDate(_loanFirstPaymentAt!),
               showChevron: true,
               onTap: () async {
@@ -873,12 +882,12 @@ class _AddAccountSheetState extends ConsumerState<_AddAccountSheet> {
             ),
             const SizedBox(height: Spacing.md),
             PickerField(
-              label: '还款账户',
+              label: s.repayAccount,
               value: _repayAccountName,
               onTap: () async {
                 final picked = await showOptionPicker<String>(
                   context: context,
-                  title: '还款账户',
+                  title: s.repayAccount,
                   current: _repayAccountId,
                   options: [
                     for (final a in _repayCandidates)
@@ -890,12 +899,12 @@ class _AddAccountSheetState extends ConsumerState<_AddAccountSheet> {
             ),
             const SizedBox(height: Spacing.md),
             PickerField(
-              label: '利息分类（计入支出）',
+              label: s.interestCategoryLabel,
               value: _interestCategoryName,
               onTap: () async {
                 final picked = await showOptionPicker<String>(
                   context: context,
-                  title: '利息分类',
+                  title: s.interestCategory,
                   current: _interestCategoryId,
                   options: [
                     for (final c in _interestCategories)
@@ -912,24 +921,24 @@ class _AddAccountSheetState extends ConsumerState<_AddAccountSheet> {
           if (!_isLoan && _type != AccountType.credit) ...[
             const SizedBox(height: Spacing.md),
             PickerField(
-              label: '资产估值方式',
-              value: _valuationMode.label,
+              label: s.valuationMode,
+              value: _valuationMode.label(AppStrings.of(context)),
               onTap: () async {
                 final picked = await showOptionPicker<AssetValuationMode>(
                   context: context,
-                  title: '资产估值方式',
+                  title: s.valuationMode,
                   current: _valuationMode,
                   options: [
                     for (final m in AssetValuationMode.values)
                       PickerOption(
                         value: m,
-                        label: m.label,
+                        label: m.label(AppStrings.of(context)),
                         description: switch (m) {
-                          AssetValuationMode.none => '账户按收支派生余额计入',
-                          AssetValuationMode.fixed => '始终等于你设定的固定金额',
-                          AssetValuationMode.depreciate => '按持有月数复利递减',
-                          AssetValuationMode.appreciate => '按持有月数复利递增',
-                          AssetValuationMode.manual => '等于你手填的当前估值',
+                          AssetValuationMode.none => s.valuationNoneDesc,
+                          AssetValuationMode.fixed => s.valuationFixedDesc,
+                          AssetValuationMode.depreciate => s.valuationDepreciateDesc,
+                          AssetValuationMode.appreciate => s.valuationAppreciateDesc,
+                          AssetValuationMode.manual => s.valuationManualDesc,
                         },
                       ),
                   ],
@@ -946,8 +955,8 @@ class _AddAccountSheetState extends ConsumerState<_AddAccountSheet> {
                     controller: _valBaseCtrl,
                     keyboardType:
                         const TextInputType.numberWithOptions(decimal: true),
-                    decoration: const InputDecoration(
-                        labelText: '原值',
+                    decoration: InputDecoration(
+                        labelText: s.valuationBase,
                         border: OutlineInputBorder(),
                         prefixText: '¥'),
                   ),
@@ -960,8 +969,8 @@ class _AddAccountSheetState extends ConsumerState<_AddAccountSheet> {
                         const TextInputType.numberWithOptions(decimal: true),
                     decoration: InputDecoration(
                       labelText: _valuationMode == AssetValuationMode.depreciate
-                          ? '年折旧率 %'
-                          : '年增值率 %',
+                          ? s.valuationDepreciateRate
+                          : s.valuationAppreciateRate,
                       hintText: _valuationMode == AssetValuationMode.depreciate
                           ? '8'
                           : '3',
@@ -972,9 +981,9 @@ class _AddAccountSheetState extends ConsumerState<_AddAccountSheet> {
               ]),
               const SizedBox(height: Spacing.md),
               PlainRow(
-                title: '持有起始日',
+                title: s.holdingStartDate,
                 value: _valuationStartedAt == null
-                    ? '未设置'
+                    ? s.repayNotSet
                     : formatDate(_valuationStartedAt!),
                 showChevron: true,
                 onTap: () async {
@@ -998,8 +1007,8 @@ class _AddAccountSheetState extends ConsumerState<_AddAccountSheet> {
                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
                 decoration: InputDecoration(
                     labelText: _valuationMode == AssetValuationMode.fixed
-                        ? '固定值'
-                        : '当前估值',
+                        ? s.valuationFixed
+                        : s.currentValuation,
                     hintText: '0.00',
                     border: const OutlineInputBorder(),
                     prefixText: '¥'),
@@ -1007,11 +1016,11 @@ class _AddAccountSheetState extends ConsumerState<_AddAccountSheet> {
             ],
           ],
           const SizedBox(height: Spacing.md),
-          TextField(controller: _noteCtrl, maxLines: 2, maxLength: 100, decoration: const InputDecoration(labelText: '备注（可选）', border: OutlineInputBorder())),
+          TextField(controller: _noteCtrl, maxLines: 2, maxLength: 100, decoration: InputDecoration(labelText: s.noteOptional, border: OutlineInputBorder())),
           const SizedBox(height: Spacing.lg),
           FilledButton(
             onPressed: _saving ? null : _save,
-            child: _saving ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2)) : Text(_isEditing ? '保存修改' : '保存'),
+            child: _saving ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2)) : Text(_isEditing ? s.saveChanges : s.save),
           ),
         ],
         ),
@@ -1020,6 +1029,7 @@ class _AddAccountSheetState extends ConsumerState<_AddAccountSheet> {
   }
 
   Future<void> _save() async {
+    final s = AppStrings.of(context);
     final name = _nameCtrl.text.trim();
     if (name.isEmpty) return;
     setState(() => _saving = true);
@@ -1066,7 +1076,7 @@ class _AddAccountSheetState extends ConsumerState<_AddAccountSheet> {
       final p = double.tryParse(_loanPrincipalCtrl.text.trim());
       if (p == null || p <= 0) {
         setState(() => _saving = false);
-        showAppToast(context, '请填写贷款总额');
+        showAppToast(context, s.fillLoanPrincipal);
         return;
       }
       loanPrincipal = (p * 100).round();
@@ -1075,12 +1085,12 @@ class _AddAccountSheetState extends ConsumerState<_AddAccountSheet> {
       loanMethod = _loanMethod;
       if (loanTerm == null || loanTerm <= 0 || _loanFirstPaymentAt == null) {
         setState(() => _saving = false);
-        showAppToast(context, '请填写期数与首次还款日');
+        showAppToast(context, s.fillTermAndFirstPayment);
         return;
       }
       if (_repayAccountId == null) {
         setState(() => _saving = false);
-        showAppToast(context, '请选择还款账户');
+        showAppToast(context, s.selectRepayAccount);
         return;
       }
     }

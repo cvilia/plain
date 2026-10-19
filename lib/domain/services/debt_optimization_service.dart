@@ -8,14 +8,21 @@
 /// 自动变成「剩余预算」流向下一个目标——这是两种策略真正拉开差距的地方。
 library;
 
+import 'package:plain/app/l10n/app_strings.dart';
+import 'package:plain/app/l10n/strings_domain.dart';
+
 /// 还款策略。
 enum DebtStrategy {
-  snowball('snowball', '雪球法'),
-  avalanche('avalanche', '雪崩法');
+  snowball('snowball'),
+  avalanche('avalanche');
 
-  const DebtStrategy(this.wire, this.label);
+  const DebtStrategy(this.wire);
   final String wire;
-  final String label;
+
+  String label(AppStrings s) => switch (this) {
+        DebtStrategy.snowball => s.debtSnowball,
+        DebtStrategy.avalanche => s.debtAvalanche,
+      };
 }
 
 /// 一笔债务的输入。
@@ -104,10 +111,10 @@ class DebtComparison {
   }
 
   /// AC3 的推荐理由文案。
-  String get reason => savingCents > 0
-      ? '推荐${recommended.label}：总利息比另一种少 '
-          '${(savingCents / 100).toStringAsFixed(2)} 元'
-      : '两种策略总利息相同，任选其一即可';
+  String reason(AppStrings s) => savingCents > 0
+      ? s.debtReasonRecommended(
+          recommended.label(s), (savingCents / 100).toStringAsFixed(2))
+      : s.debtReasonTie;
 }
 
 class DebtOptimizationService {

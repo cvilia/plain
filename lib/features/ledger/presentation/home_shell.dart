@@ -12,6 +12,8 @@ import 'package:plain/app/theme/typography.dart';
 import 'package:plain/design_system/app_toast.dart';
 import 'package:plain/design_system/plain_icons_v3.dart';
 import 'package:plain/domain/services/member_service.dart';
+import 'package:plain/app/l10n/app_strings.dart';
+import 'package:plain/app/l10n/strings_ledger.dart';
 
 class HomeShell extends ConsumerWidget {
   const HomeShell({super.key, required this.navigationShell});
@@ -19,6 +21,7 @@ class HomeShell extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final s = AppStrings.of(context);
     return LayoutBuilder(
       builder: (context, constraints) {
         final sizeClass = Breakpoints.sizeClassFromConstraints(constraints);
@@ -32,22 +35,22 @@ class HomeShell extends ConsumerWidget {
                   selectedIndex: _railIndex(navigationShell.currentIndex),
                   onDestinationSelected: (i) => _onTap(_branchFromRail(i)),
                   labelType: NavigationRailLabelType.all,
-                  destinations: const [
+                  destinations: [
                     NavigationRailDestination(
                       icon: PlainIcon(PlainIconData.navLedger, size: 22),
-                      label: Text('流水'),
+                      label: Text(s.flow),
                     ),
                     NavigationRailDestination(
                       icon: PlainIcon(PlainIconData.navReport, size: 22),
-                      label: Text('报表'),
+                      label: Text(s.reports),
                     ),
                     NavigationRailDestination(
                       icon: PlainIcon(PlainIconData.navAssets, size: 22),
-                      label: Text('资产'),
+                      label: Text(s.accounts),
                     ),
                     NavigationRailDestination(
                       icon: PlainIcon(PlainIconData.navProfile, size: 22),
-                      label: Text('我的'),
+                      label: Text(s.navMine),
                     ),
                   ],
                 ),
@@ -76,7 +79,7 @@ class HomeShell extends ConsumerWidget {
             // 不要等他输完金额再在保存时拦（保存拦截仍在，双保险）。
             onAdd: () {
               if (!ref.read(canWriteLedgerProvider)) {
-                showAppToast(context, '你是「只读」成员，没有记账权限');
+                showAppToast(context, s.readOnlyNoPermission);
                 return;
               }
               context.push('/entry');
@@ -113,6 +116,7 @@ class _QuietNav extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final s = AppStrings.of(context);
     final colors = context.colors;
 
     // 导航条一体：上边框 + 60 内容高 + 安全区，避免 bottom overflow
@@ -146,13 +150,13 @@ class _QuietNav extends StatelessWidget {
             children: [
               _NavItem(
                 icon: PlainIconData.navLedger,
-                label: '流水',
+                label: s.flow,
                 selected: branchIndex == 0,
                 onTap: () => onTap(0),
               ),
               _NavItem(
                 icon: PlainIconData.navReport,
-                label: '报表',
+                label: s.reports,
                 selected: branchIndex == 1,
                 onTap: () => onTap(1),
               ),
@@ -162,13 +166,13 @@ class _QuietNav extends StatelessWidget {
               ),
               _NavItem(
                 icon: PlainIconData.navAssets,
-                label: '资产',
+                label: s.accounts,
                 selected: branchIndex == 2,
                 onTap: () => onTap(2),
               ),
               _NavItem(
                 icon: PlainIconData.navProfile,
-                label: '我的',
+                label: s.navMine,
                 selected: branchIndex == 3,
                 onTap: () => onTap(3),
               ),
@@ -234,6 +238,7 @@ class _NavFab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final s = AppStrings.of(context);
     final colors = context.colors;
     // `.navfab{width:44px;height:44px;border-radius:14px;background:var(--accent);
     //          color:var(--fab-ic);box-shadow:0 2px 8px var(--shadow-accent)}`
@@ -271,7 +276,7 @@ class _NavFab extends StatelessWidget {
               PlainIconData.navAdd,
               size: 22,
               color: colors.fabIc,
-              semanticLabel: '记一笔',
+              semanticLabel: s.recordEntry,
             ),
           ),
         ),

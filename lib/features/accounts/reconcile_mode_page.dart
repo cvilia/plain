@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:plain/app/bootstrap.dart';
 import 'package:plain/app/theme/app_colors.dart';
 import 'package:plain/app/theme/design_tokens.dart';
+import 'package:plain/app/theme/typography.dart';
 import 'package:plain/core/format/amount_formatter.dart';
 import 'package:plain/core/refresh/data_invalidation.dart';
 import 'package:plain/design_system/app_empty_state.dart';
@@ -18,6 +19,8 @@ import 'package:plain/domain/entities/enums.dart';
 import 'package:plain/domain/entities/ledger_entry.dart';
 import 'package:plain/domain/repositories/repositories.dart';
 import 'package:plain/domain/services/reconcile_mode_service.dart';
+import 'package:plain/app/l10n/app_strings.dart';
+import 'package:plain/app/l10n/strings_accounts.dart';
 
 class ReconcileModePage extends ConsumerStatefulWidget {
   const ReconcileModePage({super.key, required this.accountId, required this.accountName});
@@ -60,6 +63,7 @@ class _ReconcileModePageState extends ConsumerState<ReconcileModePage> {
   int get _pendingCount => _entries.where((e) => !e.isReconciled).length;
 
   Future<void> _toggle(LedgerEntry entry) async {
+    final s = AppStrings.of(context);
     final deps = ref.read(appDependenciesProvider);
     final service = ReconcileModeService(repository: deps.ledgerRepository, clock: deps.clock);
     final result = entry.isReconciled
@@ -68,7 +72,7 @@ class _ReconcileModePageState extends ConsumerState<ReconcileModePage> {
     if (!mounted) return;
     final updated = result.successOrNull;
     if (updated == null) {
-      showAppToast(context, '操作失败');
+      showAppToast(context, s.operationFailed);
       return;
     }
     setState(() {
@@ -80,24 +84,32 @@ class _ReconcileModePageState extends ConsumerState<ReconcileModePage> {
 
   @override
   Widget build(BuildContext context) {
+    final s = AppStrings.of(context);
     final pending = _pendingCount;
     final done = _entries.length - pending;
     return Scaffold(
       appBar: PlainTopBar(
-        title: '对账 · ${widget.accountName}',
+        title: s.reconcileWithName(widget.accountName),
         showBack: true,
         actions: [
           if (_entries.isNotEmpty)
-            ConstrainedBox(
-              constraints: const BoxConstraints(minHeight: 44),
-              child: Padding(
-                padding: const EdgeInsets.only(right: Spacing.lg),
-                child: Text(
-                  pending == 0 ? '已对账至 ${_lastReconciledLabel()}' : '待对账 $pending 笔',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: pending == 0 ? context.colors.income : context.colors.accent,
-                    fontWeight: FontWeight.w500,
+            // 顶栏**状态文本**（不可点，故不走 [PlainTopBarTextAction]）。
+            // ⚠️ 别用 `ConstrainedBox(minHeight: 44)` 直接包 `Text`：minHeight 会把文字
+            // 节点撑成 44 高，而段落按**顶部**绘制 → 文字偏上。用「固定高盒子 + Center」
+            // 给子级松约束，Center 在 Row 的无界宽度下会自行 shrinkWrap。
+            SizedBox(
+              height: 44,
+              child: Center(
+                child: Padding(
+                  padding: const EdgeInsets.only(right: Spacing.lg),
+                  child: Text(
+                    pending == 0 ? s.reconciledUpTo(_lastReconciledLabel()) : s.pendingReconcileCount(pending),
+                    style: TextStyle(
+                      fontSize: 14,
+                      height: designLineHeight(14),
+                      color: pending == 0 ? context.colors.income : context.colors.accent,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
                 ),
               ),
@@ -107,10 +119,10 @@ class _ReconcileModePageState extends ConsumerState<ReconcileModePage> {
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _entries.isEmpty
-              ? const AppEmptyState(
+              ? AppEmptyState(
                   icon: PlainIconData.listCheck,
-                  title: '没有账单',
-                  subtitle: '先在流水页记几笔再回来对账',
+                  title: s.noBills,
+                  subtitle: s.reconcileEmptyHint,
                 )
               : ListView.builder(
                   padding: const EdgeInsets.symmetric(vertical: Spacing.sm),
@@ -168,7 +180,7 @@ class _ReconcileModePageState extends ConsumerState<ReconcileModePage> {
                   children: [
                     Expanded(
                       child: Text(
-                        '已核对 $done / ${_entries.length}',
+                        s.checkedCount(done, _entries.length),
                         style: TextStyle(fontSize: 14, color: context.colors.inkSecondary),
                       ),
                     ),
@@ -185,9 +197,9 @@ class _ReconcileModePageState extends ConsumerState<ReconcileModePage> {
                           await _reload();
                           if (!mounted) return;
                           ref.invalidateData.bumpEntryMutated();
-                          showAppToast(this.context, '已全部核对');
+                          showAppToast(this.context, s.allChecked);
                         },
-                        child: const Text('全部勾选'),
+                        child: Text(s.checkAll),
                       ),
                   ],
                 ),

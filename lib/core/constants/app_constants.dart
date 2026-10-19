@@ -193,11 +193,11 @@ class BudgetRatioRules {
 /// STORY-11.3 交叉分析：金额区间的分档边界（分）。
 ///
 /// 分档为「< 上界」的累计口径：`<100 / 100–500 / 500–1000 / 1000–5000 / ≥5000`。
+/// 档位**文案**已收口到 `AppStrings`（`crossAmountUnderLabel` / `crossAmountOverLabel`，
+/// 见 `app/l10n/strings_core.dart`），本类只保留纯数值边界。
 class CrossAnalysisRules {
   CrossAnalysisRules._();
   static const List<int> boundsCents = [10000, 50000, 100000, 500000];
-  static const String underLabel = '100 元以下';
-  static const String overLabel = '5000 元及以上';
 }
 
 /// STORY-2.2 信用卡。
@@ -271,44 +271,6 @@ enum BadgeCategory {
   const BadgeCategory(this.id, this.label);
   final String id;
   final String label;
-}
-
-/// STORY-1.5 账单附件。
-class AttachmentRules {
-  AttachmentRules._();
-
-  /// 单笔账单附件上限（张）。
-  static const int maxPerEntry = 5;
-
-  /// 单张大小上限 10MB。
-  static const int maxBytes = 10 * 1024 * 1024;
-
-  /// 超限压缩：长边压至 2048px。
-  static const int compressLongSide = 2048;
-
-  /// 列表缩略图长边。
-  static const int thumbnailLongSide = 320;
-
-  /// 孤儿附件保留期：删除账单后 30 天内可随回收站恢复，之后巡检物理清理。
-  static const Duration orphanTtl = Duration(days: 30);
-
-  /// 允许的扩展名 → MIME。jpg/png/heic/pdf（PRD 明确列举）。
-  static const Map<String, String> allowedTypes = {
-    'jpg': 'image/jpeg',
-    'jpeg': 'image/jpeg',
-    'png': 'image/png',
-    'heic': 'image/heic',
-    'heif': 'image/heif',
-    'pdf': 'application/pdf',
-  };
-
-  static String? mimeOf(String fileName) {
-    final dot = fileName.lastIndexOf('.');
-    if (dot < 0 || dot == fileName.length - 1) return null;
-    return allowedTypes[fileName.substring(dot + 1).toLowerCase()];
-  }
-
-  static bool isImage(String mime) => mime.startsWith('image/');
 }
 
 /// STORY-8.2 家庭共享（基础）。

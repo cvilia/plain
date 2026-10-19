@@ -4,6 +4,8 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:plain/app/l10n/app_strings.dart';
+import 'package:plain/app/l10n/strings_settings_a.dart';
 import 'package:plain/app/theme/app_colors.dart';
 import 'package:plain/design_system/amount_display.dart';
 import 'package:plain/design_system/plain_icons_v3.dart';
@@ -24,6 +26,7 @@ class OnboardingPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final s = AppStrings.of(context);
     final colors = context.colors;
     return Scaffold(
       backgroundColor: colors.surface,
@@ -35,7 +38,7 @@ class OnboardingPage extends StatelessWidget {
             children: [
               // 1. 字标
               Text(
-                '素记 Plain',
+                s.onboardingWordmark,
                 style: TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.w700,
@@ -46,7 +49,7 @@ class OnboardingPage extends StatelessWidget {
               const SizedBox(height: 30),
               // 2. 主张
               Text(
-                '记账，三秒钟的事',
+                s.onboardingClaim,
                 style: TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.w700,
@@ -56,7 +59,7 @@ class OnboardingPage extends StatelessWidget {
               const SizedBox(height: 8),
               // 3. 副题
               Text(
-                '本地存储 · 无广告 · 无理财',
+                s.onboardingSub,
                 style: TextStyle(
                   fontSize: 14,
                   height: 1.65,
@@ -72,7 +75,7 @@ class OnboardingPage extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      '本月结余',
+                      s.onboardingSampleBalance,
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
@@ -91,34 +94,34 @@ class OnboardingPage extends StatelessWidget {
               Expanded(
                 child: ListView(
                   padding: EdgeInsets.zero,
-                  children: const [
+                  children: [
                     _Feature(
                       icon: PlainIconData.navAdd,
-                      title: '三秒记一笔',
-                      subtitle: '只记数字，不填表格',
+                      title: s.onboardingFeature1Title,
+                      subtitle: s.onboardingFeature1Sub,
                     ),
                     _Feature(
                       icon: PlainIconData.lock,
-                      title: '数据只在你手机里',
-                      subtitle: '没有账号，没有服务器',
+                      title: s.onboardingFeature2Title,
+                      subtitle: s.onboardingFeature2Sub,
                     ),
                     _Feature(
                       icon: PlainIconData.palette,
-                      title: '十套配色，昼夜两态',
-                      subtitle: '冷底暖点，久看不累',
+                      title: s.onboardingFeature3Title,
+                      subtitle: s.onboardingFeature3Sub,
                     ),
                   ],
                 ),
               ),
               // 6. CTA
               PlainPrimaryButton(
-                label: '开始记账',
+                label: s.onboardingCta,
                 onPressed: () => _done(context),
               ),
               const SizedBox(height: 12),
               Center(
                 child: Text(
-                  '数据全部本地存储 · 卸载前请先备份',
+                  s.onboardingFooter,
                   style: TextStyle(fontSize: 12, color: colors.inkFaint),
                 ),
               ),

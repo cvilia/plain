@@ -1,6 +1,7 @@
 /// Trash (recycle bin) tests: list deleted, restore, hard delete, purge expired.
 library;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:plain/app/l10n/strings_core.dart';
 import 'package:plain/core/id/uuid_v7.dart';
 import 'package:plain/core/time/clock.dart';
 import 'package:plain/data/db/database.dart';
@@ -30,7 +31,7 @@ void main() {
       amountExpression: amount, type: EntryType.expense,
       categoryId: 'cat-food', accountId: 'acc-cash',
       bookId: 'book-1', deviceId: 'dev-1',
-    ));
+    ), s: kDefaultAppStrings);
     return r.successOrNull!.id;
   }
 

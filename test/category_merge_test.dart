@@ -1,6 +1,7 @@
 /// STORY-1.3 AC11–13：分类合并。
 library;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:plain/app/l10n/strings_core.dart';
 import 'package:plain/core/id/uuid_v7.dart';
 import 'package:plain/core/time/clock.dart';
 import 'package:plain/data/db/database.dart';
@@ -46,7 +47,7 @@ void main() {
     await createEntry(CreateEntryInput(
       amountExpression: '8', type: EntryType.expense,
       categoryId: 'c-breakfast', bookId: 'book-1', deviceId: 'dev-1',
-    ));
+    ), s: kDefaultAppStrings);
     final r = await catRepo.mergeCategories(sourceId: 'c-breakfast', targetId: 'c-clothes');
     expect(r.isSuccess, true);
     expect(r.successOrNull!.movedEntries, 1);
@@ -63,7 +64,7 @@ void main() {
     await createEntry(CreateEntryInput(
       amountExpression: '3', type: EntryType.expense,
       categoryId: 'c-breakfast', bookId: 'book-1', deviceId: 'dev-1',
-    ));
+    ), s: kDefaultAppStrings);
     final r = await catRepo.mergeCategories(sourceId: 'g-food', targetId: 'g-shop');
     expect(r.isSuccess, true);
     expect(r.successOrNull!.mergedSameNameChildren, 1); // 早餐 → 早餐

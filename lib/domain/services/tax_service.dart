@@ -6,8 +6,10 @@
 /// 年度口径按**自然年**（税务年度即自然年），记账月口径按 G-1 的月起始日。
 library;
 
+import 'package:plain/app/l10n/app_strings.dart';
 import 'package:plain/core/time/clock.dart';
 import 'package:plain/domain/services/accounting_calendar.dart';
+import 'package:plain/app/l10n/strings_domain.dart';
 
 /// 一笔参与汇总的支出。
 class TaxEntry {
@@ -83,6 +85,7 @@ class TaxService {
   ///
   /// [periodKey] 为记账月 `YYYY-MM` 或年度 `YYYY`。
   TaxSummary summarize({
+    required AppStrings s,
     required List<TaxEntry> entries,
     required Map<String, TaxCategoryInfo> categories,
     required String periodKey,
@@ -102,7 +105,7 @@ class TaxService {
       if (id == null) continue;
       if (!isDeductible(id, categories)) continue;
 
-      final name = categories[id]?.name ?? '未知分类';
+      final name = categories[id]?.name ?? s.unknownCategory;
       final prev = byLine[id];
       byLine[id] = TaxLine(
         categoryId: id,
@@ -163,6 +166,7 @@ class TaxService {
 
   /// 可选的申报周期列表（最近 [months] 个记账月 + 涉及到的年度）。
   static List<({String key, String label, bool isYear})> periodOptions({
+    required AppStrings s,
     required DateTime now,
     required int monthStartDay,
     int months = 12,
@@ -179,7 +183,7 @@ class TaxService {
       out.add((key: key, label: key, isYear: false));
     }
     for (final y in years.toList()..sort((a, b) => b.compareTo(a))) {
-      out.add((key: '$y', label: '$y 年度', isYear: true));
+      out.add((key: '$y', label: s.taxYearLabel(y), isYear: true));
     }
     return out;
   }

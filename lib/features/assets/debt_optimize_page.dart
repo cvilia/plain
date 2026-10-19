@@ -21,6 +21,8 @@ import 'package:plain/domain/entities/enums.dart';
 import 'package:plain/domain/repositories/repositories.dart';
 import 'package:plain/domain/services/debt_optimization_service.dart';
 import 'package:plain/domain/services/loan_amortization_service.dart';
+import 'package:plain/app/l10n/app_strings.dart';
+import 'package:plain/app/l10n/strings_accounts.dart';
 
 const _svc = DebtOptimizationService();
 const _loanSvc = LoanAmortizationService();
@@ -135,9 +137,10 @@ class _DebtOptimizePageState extends ConsumerState<DebtOptimizePage> {
 
   @override
   Widget build(BuildContext context) {
+    final s = AppStrings.of(context);
     final colors = context.colors;
     return Scaffold(
-      appBar: const PlainTopBar(title: '债务优化', showBack: true),
+      appBar: PlainTopBar(title: s.debtOptimize, showBack: true),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : ContentWidthConstraint(
@@ -148,13 +151,13 @@ class _DebtOptimizePageState extends ConsumerState<DebtOptimizePage> {
                   if (_debts.isEmpty)
                     AppEmptyState(
                       icon: PlainIconData.chartLine,
-                      title: '没有可测算的债务',
+                      title: s.noDebtsToCalc,
                       subtitle: _incomplete.isEmpty
-                          ? '有欠款的信用卡或贷款账户会出现在这里'
+                          ? s.noDebtsHint
                           : '以下账户缺少年利率/最低还款：${_incomplete.join('、')}',
                     )
                   else ...[
-                    PlainEyebrow('每月额外还款'),
+                    PlainEyebrow(s.extraMonthlyRepay),
                     PlainPanel(
                       children: [
                         Padding(
@@ -164,8 +167,8 @@ class _DebtOptimizePageState extends ConsumerState<DebtOptimizePage> {
                             controller: _extraCtrl,
                             keyboardType: const TextInputType.numberWithOptions(
                                 decimal: true),
-                            decoration: const InputDecoration(
-                              labelText: '在最低还款之外，每月还能多还',
+                            decoration: InputDecoration(
+                              labelText: s.extraBeyondMinLabel,
                               hintText: '0.00',
                               border: OutlineInputBorder(),
                               prefixText: '¥',
@@ -175,7 +178,7 @@ class _DebtOptimizePageState extends ConsumerState<DebtOptimizePage> {
                       ],
                     ),
                     ..._result(colors),
-                    PlainEyebrow('参与测算的债务 · ${_debts.length} 笔'),
+                    PlainEyebrow(s.debtsCount(_debts.length)),
                     PlainPanel(
                       children: [
                         for (var i = 0; i < _debts.length; i++) ...[
@@ -216,7 +219,7 @@ class _DebtOptimizePageState extends ConsumerState<DebtOptimizePage> {
                     lines: [
                       '两种方法都是「每月预算固定 = Σ最低还款 + 额外还款」，'
                           '某笔结清后它让出的最低还款自动滚向下一个目标。',
-                      '雪球法优先清余额最小的（先看到成果），雪崩法优先清利率最高的（总利息更省）。',
+                      s.debtMethodNoteB,
                       if (_extraCents == 0)
                         '当前未填额外还款：此时没有余钱可调度，两种方法的推进方式相同，'
                             '要看出差异请填入额外还款。',
@@ -230,9 +233,10 @@ class _DebtOptimizePageState extends ConsumerState<DebtOptimizePage> {
 
   /// AC1/AC2/AC3：两种策略并列 + 推荐理由。
   List<Widget> _result(AppColors colors) {
+    final s = AppStrings.of(context);
     final cmp = _svc.compare(_debts, extraMonthlyCents: _extraCents);
     return [
-      PlainEyebrow('两种策略对比'),
+      PlainEyebrow(s.strategyCompare),
       PlainPanel(
         children: [
           for (final plan in [cmp.avalanche, cmp.snowball]) ...[
@@ -249,7 +253,7 @@ class _DebtOptimizePageState extends ConsumerState<DebtOptimizePage> {
         Padding(
           padding: const EdgeInsets.only(top: Spacing.sm),
           child: Text(
-            cmp.reason,
+            cmp.reason(AppStrings.of(context)),
             style: TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w600,
@@ -276,6 +280,7 @@ class _PlanBlock extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final s = AppStrings.of(context);
     final orderText = plan.order.isEmpty
         ? '—'
         : plan.order.map((s) => '${s.name}(${s.month}月)').join(' → ');
@@ -286,7 +291,7 @@ class _PlanBlock extends StatelessWidget {
         children: [
           Row(children: [
             Text(
-              plan.strategy.label,
+              plan.strategy.label(AppStrings.of(context)),
               style: TextStyle(
                 fontSize: 15,
                 fontWeight: FontWeight.w600,
@@ -302,7 +307,7 @@ class _PlanBlock extends StatelessWidget {
                   color: colors.income.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(999),
                 ),
-                child: Text('更省',
+                child: Text(s.cheaper,
                     style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
@@ -313,13 +318,13 @@ class _PlanBlock extends StatelessWidget {
           const SizedBox(height: 6),
           Text(
             plan.settled
-                ? '${plan.months} 个月还清 · 总利息 ${formatAmountYuan(plan.totalInterestCents)}'
-                : '月供不足以覆盖利息，${plan.months} 个月内未还清',
+                ? s.settledSummary(plan.months, formatAmountYuan(plan.totalInterestCents))
+                : s.notSettledSummary(plan.months),
             style: TextStyle(fontSize: 14, color: colors.inkSecondary),
           ),
           const SizedBox(height: 4),
           Text(
-            '结清顺序：$orderText',
+            s.orderLabel(orderText),
             style: TextStyle(fontSize: 12, color: colors.inkTertiary),
           ),
         ],

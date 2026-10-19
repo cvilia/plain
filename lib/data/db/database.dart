@@ -6,7 +6,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:plain/core/security/db_passphrase.dart';
 import 'package:sqlite3/sqlite3.dart';
 
-const int kSchemaVersion = 24;
+const int kSchemaVersion = 25;
 
 class AppDatabase {
   AppDatabase._(this._db);
@@ -121,8 +121,8 @@ class AppDatabase {
     _db.execute(_ddlTaxFilings);
     // v20: 锁定汇率（STORY-9.3）。纯追加新表。
     _db.execute(_ddlCurrencyRates);
-    // v21: 账单附件（STORY-1.5）。纯追加新表。
-    _db.execute(_ddlAttachments);
+    // v21 曾为账单附件（STORY-1.5）建 `attachments` 表，该功能已整体移除：
+    // 表在 `_migrate()` 里 DROP，这里不再建。
     // v22: 家庭共享（STORY-8.2）。纯追加新表。
     _db.execute(_ddlMembers);
     _db.execute(_ddlEntryParticipants);
@@ -139,6 +139,17 @@ class AppDatabase {
   }
 
   void _migrate() {
+    // 附件功能已整体移除（原 STORY-1.5）：表与索引一次性 DROP。
+    //
+    // ⚠️ 这是**不可逆**的 —— 老库里 `attachments` 的元数据行在这里被清空，
+    // 文件本体由 `purgeAttachmentDirectory()`（main.dart 首帧后）删除。
+    // 之所以不保留表：功能已下线，留着就是无人读取的死数据，且它会让
+    // 备份包继续把已失效的元数据打进去。DROP 是幂等的（IF EXISTS）。
+    _db.execute('DROP TABLE IF EXISTS attachments');
+    // 自定义分类图标同批下线（原 F1.2）：清空 `categories.icon_asset`。
+    // 列**保留不 DROP** —— SQLite 的 DROP COLUMN 要 3.35+，低版本整库会炸；
+    // 空列不影响任何读写，风险为零。文件本体由 `purgeCustomIconDirectory()` 删。
+    _db.execute('UPDATE categories SET icon_asset = NULL WHERE icon_asset IS NOT NULL');
     final txCols = _db.select('PRAGMA table_info(transactions)');
     if (!txCols.any((r) => r['name'] == 'batch_id')) {
       _db.execute('ALTER TABLE transactions ADD COLUMN batch_id TEXT NULL');
@@ -289,6 +300,16 @@ class AppDatabase {
         _db.execute('ALTER TABLE recurring_rules ADD COLUMN goal_id TEXT NULL');
       }
     }
+    // v25: `uq_category_name` 漏了 kind，收入侧「其他」与支出侧「其他」撞名 →
+    // 空库上 `preset_income_other`（收入兜底分类）从来没建成过；而 App 的重名
+    // 校验按 kind 分域，于是「校验通过的名字」写库时被索引拒掉（静默丢行）。
+    // 只在旧定义还在时重建一次，之后由 `_indexes` 维护。
+    final uqCat = _db.select(
+        "SELECT sql FROM sqlite_master WHERE type='index' AND name='uq_category_name'");
+    final uqSql = uqCat.isEmpty ? null : uqCat.first['sql'] as String?;
+    if (uqSql != null && !uqSql.contains('kind')) {
+      _db.execute('DROP INDEX uq_category_name');
+    }
   }
 
   /// Runs [action] inside a BEGIN/COMMIT transaction.
@@ -373,9 +394,7 @@ class AppDatabase {
         'saved_reports',
         'tax_filings',
         'currency_rates',
-        // v21 新增表：附件元数据。文件本体在附件目录里，随备份包一起打包
-        // （STORY-1.5 AC4），所以这里必须并进来，否则恢复后描述与文件对不上。
-        'attachments',
+        // v21 的 `attachments` 已随附件功能移除，不再进备份包。
         // v22 新增表：家庭成员与 AA 参与人（STORY-8.2）
         'members',
         'entry_participants',
@@ -681,24 +700,6 @@ CREATE TABLE IF NOT EXISTS currency_rates (
   revision INTEGER NOT NULL DEFAULT 1, device_id TEXT NOT NULL, base_revision INTEGER NOT NULL DEFAULT 0
 )''';
 
-/// STORY-1.5 账单附件。
-///
-/// 文件本体存在 App 私有目录 `attachments/` 下（`stored_name` / `thumbnail_name`
-/// 只是文件名）；本表只记录元数据。**附件不进云同步**（整库 WebDAV 同步只上传
-/// 数据库文件，目录天然排除）。
-const String _ddlAttachments = '''
-CREATE TABLE IF NOT EXISTS attachments (
-  id TEXT NOT NULL PRIMARY KEY,
-  entry_id TEXT NOT NULL, book_id TEXT NOT NULL,
-  stored_name TEXT NOT NULL, thumbnail_name TEXT NULL,
-  mime TEXT NOT NULL, size_bytes INTEGER NOT NULL,
-  width INTEGER NULL, height INTEGER NULL,
-  is_orphan INTEGER NOT NULL DEFAULT 0, orphaned_at INTEGER NULL,
-  sort_order INTEGER NOT NULL DEFAULT 0,
-  created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL, deleted_at INTEGER NULL,
-  revision INTEGER NOT NULL DEFAULT 1, device_id TEXT NOT NULL, base_revision INTEGER NOT NULL DEFAULT 0
-)''';
-
 /// STORY-8.2 家庭成员。
 ///
 /// 成员是**软删除**：退出（`status='left'`）后记录保留，历史账单的
@@ -778,7 +779,12 @@ final List<String> _indexes = [
   'CREATE INDEX IF NOT EXISTS idx_entry_to_account ON transactions(to_account_id, occurred_at DESC) WHERE to_account_id IS NOT NULL AND deleted_at IS NULL',
   'CREATE INDEX IF NOT EXISTS idx_entry_batch ON transactions(batch_id) WHERE batch_id IS NOT NULL',
   'CREATE INDEX IF NOT EXISTS idx_entry_parent ON transactions(parent_id, occurred_at DESC) WHERE parent_id IS NOT NULL AND deleted_at IS NULL',
-  "CREATE UNIQUE INDEX IF NOT EXISTS uq_category_name ON categories(COALESCE(parent_id, ''), name) WHERE deleted_at IS NULL",
+  // ⚠️ 唯一性按 **kind 分域**（支出/收入是两套独立命名空间，见
+  // `category_naming.dart` 的 `categoryTitleConflictMessage`）。索引漏了 kind 时，
+  // 收入侧的「其他」与支出侧的「其他」撞名 → 空库上 `preset_income_other`
+  // 从来没建成过；而 App 里的重名校验是按 kind 判的，于是「允许过的名字」
+  // 一到写库就失败（且 `create` 的返回值没人检查，静默丢行）。
+  "CREATE UNIQUE INDEX IF NOT EXISTS uq_category_name ON categories(kind, COALESCE(parent_id, ''), name) WHERE deleted_at IS NULL",
   'CREATE INDEX IF NOT EXISTS idx_category_parent ON categories(parent_id, sort_order) WHERE deleted_at IS NULL',
   'CREATE UNIQUE INDEX IF NOT EXISTS uq_account_name ON accounts(name) WHERE deleted_at IS NULL',
   'CREATE INDEX IF NOT EXISTS idx_account_sort ON accounts(sort_order) WHERE deleted_at IS NULL',
@@ -790,8 +796,6 @@ final List<String> _indexes = [
   'CREATE INDEX IF NOT EXISTS idx_recurring_book ON recurring_rules(book_id) WHERE deleted_at IS NULL',
   'CREATE INDEX IF NOT EXISTS idx_rule_book ON rules(book_id, priority DESC) WHERE deleted_at IS NULL AND is_enabled = 1',
   'CREATE INDEX IF NOT EXISTS idx_holding_account ON holdings(account_id) WHERE deleted_at IS NULL',
-  'CREATE INDEX IF NOT EXISTS idx_attachment_entry ON attachments(entry_id, sort_order) WHERE deleted_at IS NULL',
-  'CREATE INDEX IF NOT EXISTS idx_attachment_orphan ON attachments(is_orphan, orphaned_at) WHERE deleted_at IS NULL',
   'CREATE UNIQUE INDEX IF NOT EXISTS uq_member_name ON members(book_id, name) WHERE deleted_at IS NULL',
   'CREATE INDEX IF NOT EXISTS idx_member_active ON members(book_id, status) WHERE deleted_at IS NULL',
   'CREATE UNIQUE INDEX IF NOT EXISTS uq_entry_participant ON entry_participants(entry_id, member_id) WHERE deleted_at IS NULL',

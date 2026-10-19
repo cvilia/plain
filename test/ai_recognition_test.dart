@@ -2,6 +2,7 @@
 library;
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:plain/app/l10n/strings_core.dart';
 import 'package:plain/core/constants/app_constants.dart';
 import 'package:plain/domain/services/ai_recognition_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -68,7 +69,7 @@ void main() {
           now: DateTime(2026, 1, 15), monthStartDay: 1);
       final q = await AiRecognitionService.getQuota(
           now: DateTime(2026, 1, 15), monthStartDay: 1);
-      expect(q.displayLabel, '1 / 10 次');
+      expect(q.displayLabel(kDefaultAppStrings), '1 / 10 次');
     });
   });
 
@@ -100,7 +101,7 @@ void main() {
       expect(draft.amountCents, 12850);
       expect(draft.occurredAt, DateTime(2026, 1, 15));
       expect(draft.merchant, isNotNull);
-      expect(draft.summary, contains('128.50'));
+      expect(draft.summary(kDefaultAppStrings), contains('128.50'));
     });
 
     test('分类建议只来自学到的商户，没学过就不猜', () {

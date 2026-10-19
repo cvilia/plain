@@ -2,7 +2,6 @@
 library;
 
 import 'package:plain/core/result/result.dart';
-import 'package:plain/domain/entities/attachment.dart';
 import 'package:plain/domain/entities/automation_rule.dart';
 import 'package:plain/domain/entities/budget.dart';
 import 'package:plain/domain/entities/category.dart';
@@ -196,37 +195,6 @@ abstract interface class MerchantRuleRepository {
 
   /// 忘掉某条学习（软删）。
   Future<Result<void>> forget(String id);
-}
-
-/// STORY-1.5 账单附件（元数据；文件本体在附件目录）。
-///
-/// **不写 change_log**：PRD 明确附件不进云同步（体量），
-/// 因此附件元数据只随备份包走，不参与增量同步。
-abstract interface class AttachmentRepository {
-  /// 某笔账单的附件（按 sort_order）。
-  Future<Result<List<Attachment>>> listByEntry(String entryId, {bool includeDeleted = false});
-
-  /// 某笔账单的**有效**附件数（上限判定用）。
-  Future<Result<int>> countByEntry(String entryId);
-
-  Future<Result<Attachment>> getById(String id);
-
-  Future<Result<Attachment>> create(Attachment attachment);
-
-  /// 单张软删（用户在详情页移除）。
-  Future<Result<void>> softDelete(String id);
-
-  /// 账单被删 → 该笔附件全部标记孤儿（30 天内随回收站恢复）。
-  Future<Result<int>> markOrphanedByEntry(String entryId, DateTime at);
-
-  /// 账单被恢复 → 该笔孤儿标记清除。
-  Future<Result<int>> restoreByEntry(String entryId);
-
-  /// 超过保留期的孤儿附件（供巡检物理清理）。
-  Future<Result<List<Attachment>>> listExpiredOrphans(DateTime cutoff);
-
-  /// 物理删除（清理孤儿后调用）。
-  Future<Result<void>> hardDelete(String id);
 }
 
 /// STORY-8.2 家庭共享：成员与 AA 参与人。

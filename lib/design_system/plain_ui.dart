@@ -289,6 +289,64 @@ class PlainSwitch extends StatelessWidget {
   }
 }
 
+/// 描边按钮的**唯一几何**（`.btn2`：44 高 / r12 / 1px 描边 / 图标 18 + 间距 8）。
+///
+/// [PlainDangerButton] 与 [PlainSecondaryButton] 只差颜色，几何必须一致 ——
+/// 各写一遍迟早会在高度或内边距上漂开，同一屏里两个按钮就不一样高。
+class _OutlineButton extends StatelessWidget {
+  const _OutlineButton({
+    required this.label,
+    required this.onPressed,
+    required this.borderColor,
+    required this.inkColor,
+    this.icon,
+  });
+
+  final String label;
+  final VoidCallback onPressed;
+  final Color borderColor;
+  final Color inkColor;
+  final PlainIconData? icon;
+
+  @override
+  Widget build(BuildContext context) {
+    // public 字段不参与类型提升，直接内联 `if (icon != null)` 收窄不了类型。
+    final iconData = icon;
+    return Material(
+      color: const Color(0x00000000),
+      child: InkWell(
+        onTap: onPressed,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          height: 44,
+          width: double.infinity,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: borderColor, width: 1),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              if (iconData != null) ...[
+                PlainIcon(iconData, size: 18, color: inkColor),
+                const SizedBox(width: 8),
+              ],
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w500,
+                  color: inkColor,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 /// Danger outline button (detail delete etc).
 /// Whole button reads as danger — border + text + icon all use income-ink.
 class PlainDangerButton extends StatelessWidget {
@@ -306,39 +364,40 @@ class PlainDangerButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
-    // 提到局部变量：public 字段不参与类型提升，直接内联 `if (icon != null)` 收窄不了类型。
-    final iconData = icon;
-    return Material(
-      color: const Color(0x00000000),
-      child: InkWell(
-        onTap: onPressed,
-        borderRadius: BorderRadius.circular(12),
-        child: Container(
-          height: 44,
-          width: double.infinity,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: colors.incomeLine, width: 1),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              if (iconData != null) ...[
-                PlainIcon(iconData, size: 18, color: colors.incomeInk),
-                const SizedBox(width: 8),
-              ],
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w500,
-                  color: colors.incomeInk,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
+    return _OutlineButton(
+      label: label,
+      onPressed: onPressed,
+      icon: icon,
+      borderColor: colors.incomeLine,
+      inkColor: colors.incomeInk,
+    );
+  }
+}
+
+/// 中性描边按钮：次级动作 —— 与 [PlainDangerButton] 同一几何，只换成 `border` + `ink`。
+///
+/// 用在「这枚按钮确实要做，但不该跟主按钮抢视觉权重」的地方（如详情页的「拆分」）。
+class PlainSecondaryButton extends StatelessWidget {
+  const PlainSecondaryButton({
+    super.key,
+    required this.label,
+    required this.onPressed,
+    this.icon,
+  });
+
+  final String label;
+  final VoidCallback onPressed;
+  final PlainIconData? icon;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    return _OutlineButton(
+      label: label,
+      onPressed: onPressed,
+      icon: icon,
+      borderColor: colors.border,
+      inkColor: colors.ink,
     );
   }
 }
@@ -677,6 +736,83 @@ class PlainTopBarAction extends StatelessWidget {
               icon,
               size: iconSize,
               color: color ?? colors.inkSecondary,
+            ),
+          ),
+        ),
+      ),
+    );
+    final tip = tooltip;
+    return tip == null ? btn : Tooltip(message: tip, child: btn);
+  }
+}
+
+/// 顶栏**文字**动作（「保存」「完成」「清空」「导出 CSV」）。
+///
+/// 对应设计稿 `.textbtn`（`redesign-v3/_build/gen_screens.py`）：
+/// ```css
+/// .textbtn{height:34px;padding:0 10px;border-radius:12px;
+///   font-size:calc(15px*var(--tscale));font-weight:500;color:var(--primary-ink)}
+/// ```
+/// ⚠️ **是 34 高 / 15 号 / w500 / `primaryInk`，不是 [PlainTopBarAction] 的 44/22 那条**：
+/// 图标按钮占 44 的方盒，文字按钮是 34 高的胶囊 —— 两者不是一个规格，别互相照抄。
+///
+/// ⚠️ **不要自己写 `ConstrainedBox(minHeight: 44, child: Text(...))`**：
+/// `minHeight` 会把**文字节点本身**撑成 44 高，而 `Text` 在给定高度里是按
+/// **顶部**绘制段落的 —— 结果是文字偏上（看起来「没垂直居中」）。
+///
+/// 正确做法与 [PlainTopBarAction] 同构：**固定高的盒子 + `Center`**，
+/// 由 `Center` 给子级松约束。`Center` 在 [Row] 的**无界宽度**（`maxWidth == ∞`）
+/// 下会自行 shrinkWrap（`shrinkWrapWidth = constraints.maxWidth == double.infinity`），
+/// 所以这里只定 `height` 就够，宽度仍由文字长度决定。
+///
+/// 另：文字务必显式写 `height`，否则继承 `bodyMedium` 的 1.5714（14 → 22pt）。
+class PlainTopBarTextAction extends StatelessWidget {
+  const PlainTopBarTextAction({
+    super.key,
+    required this.label,
+    this.onTap,
+    this.color,
+    this.tooltip,
+  });
+
+  final String label;
+  final VoidCallback? onTap;
+
+  /// 默认 `primaryInk`（＝设计稿 `--primary-ink`）；破坏性动作（如「清空」）可传 `expense`。
+  final Color? color;
+
+  final String? tooltip;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    final btn = Material(
+      color: const Color(0x00000000),
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: SizedBox(
+          // 设计稿 `.textbtn{height:34}`。文字行盒 20（designLineHeight(15)）< 34，
+          // 由 `Center` 在这 34 内垂直居中。
+          height: 34,
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 10),
+              child: Text(
+                label,
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w500,
+                  // 不写 height 会继承 `bodyMedium` 的 1.5714（15 → 23.57，
+                  // 比设计行高 20 多 3.6pt，且会把 34 的盒子顶到 43+）。
+                  height: designLineHeight(15),
+                  // `onTap == null` 即禁用态：走 `inkFaint`，与各页私有文字按钮口径一致。
+                  color: onTap == null
+                      ? colors.inkFaint
+                      : (color ?? colors.primaryInk),
+                ),
+              ),
             ),
           ),
         ),

@@ -2,6 +2,7 @@
 library;
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:plain/app/l10n/strings_core.dart';
 import 'package:plain/core/constants/app_constants.dart';
 import 'package:plain/domain/entities/reminder.dart';
 import 'package:plain/domain/services/weekly_report_service.dart';
@@ -93,6 +94,7 @@ void main() {
         entryCount: 12,
         topCategories: {'餐饮': 50000, '购物': 40000, '交通': 30000},
         lastWeekExpenseCents: 150000,
+        s: kDefaultAppStrings,
       );
       expect(r.totalExpenseCents, 120000);
       expect(r.entryCount, 12);
@@ -114,6 +116,7 @@ void main() {
         entryCount: 5,
         topCategories: {'餐饮': 50000},
         lastWeekExpenseCents: 0,
+        s: kDefaultAppStrings,
       );
       expect(r.isComparedToLastWeek, isFalse);
       expect(r.expenseChangePercent, 0);
@@ -132,6 +135,7 @@ void main() {
           lastWeekExpenseCents: 100000,
           lastWeekCategories: {'购物': 20000, '餐饮': 80000},
           largestExpenseCents: 30000,
+          s: kDefaultAppStrings,
         );
         for (final h in r.highlights) {
           for (final w in blameWords) {
@@ -151,6 +155,7 @@ void main() {
         topCategories: {'购物': 60000, '餐饮': 40000},
         lastWeekExpenseCents: 100000,
         lastWeekCategories: {'购物': 20000, '餐饮': 80000},
+        s: kDefaultAppStrings,
       );
       expect(r.highlights, contains('「购物」占比 20% → 60%'));
     });
@@ -165,6 +170,7 @@ void main() {
         topCategories: const {},
         lastWeekExpenseCents: 0,
         largestExpenseCents: 30000,
+        s: kDefaultAppStrings,
       );
       expect(r.highlights, contains('本周单笔最大 ¥300.00'));
     });
@@ -178,8 +184,9 @@ void main() {
         entryCount: 12,
         topCategories: {'餐饮': 50000},
         lastWeekExpenseCents: 150000,
+        s: kDefaultAppStrings,
       );
-      final s = r.summary;
+      final s = r.summary(kDefaultAppStrings);
       expect(s, contains('本周消费画像'));
       expect(s, contains('1200.00'));
       expect(s, contains('12 笔'));
@@ -194,9 +201,10 @@ void main() {
         entryCount: 12,
         topCategories: {'餐饮': 50000, '购物': 70000},
         lastWeekExpenseCents: 0,
+        s: kDefaultAppStrings,
       );
-      expect(r.notificationBody, '支出 ¥1200.00 · 主要「购物」 · 12 笔');
-      expect(r.notificationBody.contains('\n'), isFalse);
+      expect(r.notificationBody(kDefaultAppStrings), '支出 ¥1200.00 · 主要「购物」 · 12 笔');
+      expect(r.notificationBody(kDefaultAppStrings).contains('\n'), isFalse);
     });
 
     test('空周不生成噪音文案', () {
@@ -208,6 +216,7 @@ void main() {
         entryCount: 0,
         topCategories: const {},
         lastWeekExpenseCents: 0,
+        s: kDefaultAppStrings,
       );
       expect(r.isEmpty, isTrue);
       expect(r.highlights, isEmpty);

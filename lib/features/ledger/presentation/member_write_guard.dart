@@ -9,15 +9,18 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:plain/app/bootstrap.dart';
+import 'package:plain/app/l10n/app_strings.dart';
+import 'package:plain/app/l10n/strings_ledger.dart';
 import 'package:plain/design_system/app_toast.dart';
 
 /// 返回 false 表示已提示用户「无权限」，调用方直接 return。
 Future<bool> guardCanWriteLedger(BuildContext context, WidgetRef ref) async {
   final deps = ref.read(appDependenciesProvider);
+  final s = AppStrings.of(context);
   // 没有成员记录（单人本地使用）时 canWrite 为 true
   if (await deps.memberService.canWrite(deps.bookId)) return true;
   if (context.mounted) {
-    showAppToast(context, '你是「只读」成员，没有记账权限');
+    showAppToast(context, s.readOnlyNoPermission);
   }
   return false;
 }

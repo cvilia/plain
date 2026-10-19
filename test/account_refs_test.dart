@@ -1,6 +1,7 @@
 /// STORY-2.1 AC6：账户引用检查与迁移。
 library;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:plain/app/l10n/strings_core.dart';
 import 'package:plain/core/id/uuid_v7.dart';
 import 'package:plain/core/time/clock.dart';
 import 'package:plain/data/db/database.dart';
@@ -40,12 +41,12 @@ void main() {
       amountExpression: '10', type: EntryType.expense,
       categoryId: 'cat-food', accountId: 'acc-a',
       bookId: 'book-1', deviceId: 'dev-1',
-    ));
+    ), s: kDefaultAppStrings);
     await createEntry(CreateEntryInput(
       amountExpression: '5', type: EntryType.transfer,
       categoryId: '', accountId: 'acc-a', toAccountId: 'acc-b',
       bookId: 'book-1', deviceId: 'dev-1',
-    ));
+    ), s: kDefaultAppStrings);
 
     final a = await accountRepo.countReferences('acc-a');
     expect(a.successOrNull!.transactions, 2); // expense + transfer out
@@ -58,7 +59,7 @@ void main() {
       amountExpression: '10', type: EntryType.expense,
       categoryId: 'cat-food', accountId: 'acc-a',
       bookId: 'book-1', deviceId: 'dev-1',
-    ));
+    ), s: kDefaultAppStrings);
     final moved = await accountRepo.migrateTransactions(fromId: 'acc-a', toId: 'acc-b');
     expect(moved.isSuccess, true);
     expect(moved.successOrNull, 1);
@@ -71,7 +72,7 @@ void main() {
       amountExpression: '10', type: EntryType.expense,
       categoryId: 'cat-food', accountId: 'acc-a',
       bookId: 'book-1', deviceId: 'dev-1',
-    ));
+    ), s: kDefaultAppStrings);
     final del = await accountRepo.softDelete('acc-a');
     expect(del.isFailure, true);
   });
@@ -86,12 +87,12 @@ void main() {
       amountExpression: '10', type: EntryType.expense,
       categoryId: 'cat-food', accountId: 'acc-a',
       bookId: 'book-1', deviceId: 'dev-1',
-    ));
+    ), s: kDefaultAppStrings);
     await createEntry(CreateEntryInput(
       amountExpression: '5', type: EntryType.transfer,
       categoryId: '', accountId: 'acc-a', toAccountId: 'acc-b',
       bookId: 'book-1', deviceId: 'dev-1',
-    ));
+    ), s: kDefaultAppStrings);
 
     // 有引用时不能直接删
     final del1 = await accountRepo.softDelete('acc-a');

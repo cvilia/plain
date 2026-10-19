@@ -1,6 +1,7 @@
 /// STORY-11.5 税务 / 可抵扣支出报表。
 library;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:plain/app/l10n/strings_core.dart';
 import 'package:plain/data/db/database.dart';
 import 'package:plain/data/repositories/tax_filing_repository.dart';
 import 'package:plain/data/sync/change_log_writer.dart';
@@ -33,6 +34,7 @@ void main() {
         periodKey: '2026-03',
         monthStartDay: 1,
         isFiled: false,
+        s: kDefaultAppStrings,
       );
       // 餐饮不可抵扣，不计入
       expect(s.lines, hasLength(2));
@@ -47,6 +49,7 @@ void main() {
         periodKey: '2026-03',
         monthStartDay: 1,
         isFiled: false,
+        s: kDefaultAppStrings,
       );
       // office_supplies 自身没标，但其根 office 标了
       expect(svc.isDeductible('office_supplies', cats), true);
@@ -61,6 +64,7 @@ void main() {
         periodKey: '2026-03',
         monthStartDay: 1,
         isFiled: false,
+        s: kDefaultAppStrings,
       );
       expect(s.isEmpty, true);
       expect(s.totalCents, 0);
@@ -74,6 +78,7 @@ void main() {
         periodKey: '2026-03',
         monthStartDay: 1,
         isFiled: false,
+        s: kDefaultAppStrings,
       );
       expect(s.isEmpty, true);
     });
@@ -93,6 +98,7 @@ void main() {
         periodKey: '2026',
         monthStartDay: 1,
         isFiled: false,
+        s: kDefaultAppStrings,
       );
       expect(s.totalCents, 30000); // 2025-12 不算
       expect(s.totalCount, 2);
@@ -106,6 +112,7 @@ void main() {
         periodKey: '2025-12',
         monthStartDay: 5,
         isFiled: false,
+        s: kDefaultAppStrings,
       );
       expect(s.totalCents, 7000);
       expect(
@@ -124,6 +131,7 @@ void main() {
         periodKey: '2026-03',
         monthStartDay: 1,
         isFiled: false,
+        s: kDefaultAppStrings,
       );
       expect(s.lines.first.name, '办公用品');
       expect(s.lines.first.cents, 50000);
@@ -134,6 +142,7 @@ void main() {
         now: DateTime(2026, 3, 15),
         monthStartDay: 1,
         months: 3,
+        s: kDefaultAppStrings,
       );
       final keys = opts.map((o) => o.key).toList();
       expect(keys, containsAll(['2026-03', '2026-02', '2026-01']));

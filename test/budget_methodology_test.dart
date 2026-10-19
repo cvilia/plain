@@ -1,6 +1,7 @@
 /// STORY-11.1 预算方法论四套。
 library;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:plain/app/l10n/strings_core.dart';
 import 'package:plain/domain/entities/enums.dart';
 import 'package:plain/domain/services/budget_methodology_service.dart';
 
@@ -23,6 +24,7 @@ void main() {
         from: BudgetMethodology.custom,
         to: BudgetMethodology.envelope,
         categoryBudgetCount: 2,
+        s: kDefaultAppStrings,
       );
       expect(text, contains('分类限额'));
       expect(text, contains('信封'));
@@ -35,14 +37,16 @@ void main() {
         svc.switchPreview(
             from: BudgetMethodology.custom,
             to: BudgetMethodology.zeroBased,
-            categoryBudgetCount: 3),
+            categoryBudgetCount: 3,
+            s: kDefaultAppStrings,),
         contains('待分配'),
       );
       expect(
         svc.switchPreview(
             from: BudgetMethodology.custom,
             to: BudgetMethodology.fiftyThirtyTwenty,
-            categoryBudgetCount: 3),
+            categoryBudgetCount: 3,
+            s: kDefaultAppStrings,),
         contains('需要'),
       );
     });
@@ -55,6 +59,7 @@ void main() {
         categoryName: '娱乐',
         newLimitCents: 100000,
         spentCents: 150000,
+        s: kDefaultAppStrings,
       );
       expect(r.isFailure, true);
       expect(r.failureOrNull!.code, 'budget.envelope_no_borrow');
@@ -70,6 +75,7 @@ void main() {
               categoryName: '娱乐',
               newLimitCents: 150000,
               spentCents: 150000,
+              s: kDefaultAppStrings,
             )
             .isSuccess,
         true,
@@ -89,6 +95,7 @@ void main() {
                 categoryName: '娱乐',
                 newLimitCents: 1000,
                 spentCents: 150000,
+                s: kDefaultAppStrings,
               )
               .isSuccess,
           true,

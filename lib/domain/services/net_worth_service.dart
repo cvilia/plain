@@ -12,26 +12,37 @@
 /// 部分，持仓按**当前市值**计入，并在页面注明——不编造历史价格。
 library;
 
+import 'package:plain/app/l10n/app_strings.dart';
 import 'package:plain/core/constants/app_constants.dart';
 import 'package:plain/domain/entities/category.dart';
 import 'package:plain/domain/entities/enums.dart';
 import 'package:plain/domain/entities/ledger_entry.dart';
 import 'package:plain/domain/services/asset_valuation_service.dart';
+import 'package:plain/app/l10n/strings_domain.dart';
 
 /// 净值的分类（STORY-10.4 的资产/负债分类）。
 enum NetWorthBucket {
-  cash('现金'),
-  debit('储蓄'),
-  investment('投资'),
-  fixed('固定资产'),
-  receivable('借出'),
-  credit('信用卡'),
-  loan('贷款'),
-  payable('借入'),
-  goal('目标预留');
+  cash,
+  debit,
+  investment,
+  fixed,
+  receivable,
+  credit,
+  loan,
+  payable,
+  goal;
 
-  const NetWorthBucket(this.label);
-  final String label;
+  String label(AppStrings s) => switch (this) {
+        NetWorthBucket.cash => s.cash,
+        NetWorthBucket.debit => s.nwSavings,
+        NetWorthBucket.investment => s.accountTypeInvestment,
+        NetWorthBucket.fixed => s.nwFixedAsset,
+        NetWorthBucket.receivable => s.nwReceivable,
+        NetWorthBucket.credit => s.nwCredit,
+        NetWorthBucket.loan => s.nwLoan,
+        NetWorthBucket.payable => s.nwPayable,
+        NetWorthBucket.goal => s.nwGoal,
+      };
 
   bool get isLiability =>
       this == NetWorthBucket.credit ||
@@ -145,6 +156,7 @@ class NetWorthService {
   /// [balances] 是账户派生余额；[holdingsMarketByAccount] 是各投资账户的持仓市值；
   /// [holdingsCountByAccount] 用于下钻说明。
   NetWorthSnapshot snapshot({
+    required AppStrings s,
     required List<Account> accounts,
     required Map<String, int> balances,
     required Map<String, int> holdingsMarketByAccount,
@@ -169,7 +181,7 @@ class NetWorthService {
           cents: v.valueCents,
           bucket: bucket,
           accountId: a.id,
-          detail: '${v.months} 个月',
+          detail: s.nwMonths(v.months),
           costCents: v.costCents,
         ));
         continue;
@@ -184,7 +196,7 @@ class NetWorthService {
           cents: balance + market,
           bucket: bucket,
           accountId: a.id,
-          detail: count > 0 ? '含 $count 个持仓' : null,
+          detail: count > 0 ? s.nwHoldingCount(count) : null,
         ));
         continue;
       }

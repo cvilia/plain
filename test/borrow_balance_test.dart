@@ -4,6 +4,7 @@
 /// 借出是钱离开所选账户、借入是钱进入所选账户（方向与转出/转入一致）。
 library;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:plain/app/l10n/strings_core.dart';
 import 'package:plain/core/id/uuid_v7.dart';
 import 'package:plain/core/money/money.dart';
 import 'package:plain/core/time/clock.dart';
@@ -70,7 +71,7 @@ void main() {
       note: '借给张三',
       bookId: 'book-1',
       deviceId: 'dev-1',
-    ));
+    ), s: kDefaultAppStrings);
     expect(r.isSuccess, true, reason: r.failureOrNull?.toString() ?? '');
 
     final bal = await accountRepo.balanceOf('acc-cash');
@@ -90,7 +91,7 @@ void main() {
       note: '向李四借',
       bookId: 'book-1',
       deviceId: 'dev-1',
-    ));
+    ), s: kDefaultAppStrings);
     final bal = await accountRepo.balanceOf('acc-cash');
     expect(bal.successOrNull!.balanceCents, 500000 + 100000);
     expect(statsExpenseCents(), 0);
@@ -105,7 +106,7 @@ void main() {
       accountId: 'acc-cash',
       bookId: 'book-1',
       deviceId: 'dev-1',
-    ));
+    ), s: kDefaultAppStrings);
     expect(r.isFailure, true);
     expect(r.failureOrNull!.code, 'entry.borrow_counterparty_required');
   });
@@ -119,7 +120,7 @@ void main() {
       note: '借给张三',
       bookId: 'book-1',
       deviceId: 'dev-1',
-    ));
+    ), s: kDefaultAppStrings);
     await ledgerRepo.softDelete(created.successOrNull!.id);
     final bal = await accountRepo.balanceOf('acc-cash');
     expect(bal.successOrNull!.balanceCents, 500000);
@@ -134,7 +135,7 @@ void main() {
       note: '借出',
       bookId: 'book-1',
       deviceId: 'dev-1',
-    ));
+    ), s: kDefaultAppStrings);
     final list = (await accountRepo.listWithBalances()).successOrNull!;
     final cash = list.firstWhere((a) => a.account.id == 'acc-cash');
     expect(cash.balanceCents, 500000 - 70000);
@@ -151,7 +152,7 @@ void main() {
       note: '刷卡借出',
       bookId: 'book-1',
       deviceId: 'dev-1',
-    ));
+    ), s: kDefaultAppStrings);
     final rows = db.raw.select(
         "SELECT credit_debt_cents AS d FROM accounts WHERE id = 'acc-credit'");
     expect(rows.first['d'], 30000);
@@ -169,7 +170,7 @@ void main() {
       note: '借出',
       bookId: 'book-1',
       deviceId: 'dev-1',
-    ));
+    ), s: kDefaultAppStrings);
     final page = await ledgerRepo.listPage(limit: 100);
     final entries = page.successOrNull!.items;
     final account = (await accountRepo.getById('acc-cash')).successOrNull!;

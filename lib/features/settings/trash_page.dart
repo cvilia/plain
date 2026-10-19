@@ -21,6 +21,10 @@ import 'package:plain/core/refresh/data_invalidation.dart';
 import 'package:plain/domain/entities/category.dart' as domain;
 import 'package:plain/domain/entities/enums.dart';
 import 'package:plain/domain/entities/ledger_entry.dart';
+import 'package:plain/app/l10n/app_strings.dart';
+import 'package:plain/app/l10n/strings_ledger.dart';
+import 'package:plain/app/l10n/strings_settings_a.dart';
+import 'package:plain/app/l10n/strings_settings_b.dart';
 
 
 class _TrashData {
@@ -61,6 +65,7 @@ class _TrashPageState extends ConsumerState<TrashPage> {
   }
 
   Future<void> _restore(LedgerEntry entry) async {
+    final s = AppStrings.of(context);
     // STORY-8.2 AC2：恢复 = 让账单重新入账，只读成员不得做
     if (!await guardCanWriteLedger(context, ref)) return;
     try {
@@ -70,23 +75,24 @@ class _TrashPageState extends ConsumerState<TrashPage> {
       if (res.isSuccess) {
         await _reload();
         if (!mounted) return;
-        showAppToast(context, '已恢复');
+        showAppToast(context, s.restored);
       } else {
         showAppToast(context, '恢复失败: ${res.failureOrNull?.code ?? 'unknown'}');
       }
     } on Object catch (e) {
       if (!mounted) return;
-      showAppToast(context, '恢复失败: $e');
+      showAppToast(context, s.restoreFailed(e.toString()));
     }
   }
 
   Future<void> _restoreAll(List<LedgerEntry> entries) async {
+    final s = AppStrings.of(context);
     if (entries.isEmpty) return;
     final confirmed = await showConfirmDialog(
       context,
-      title: '全部恢复',
-      message: '将恢复回收站中的 ${entries.length} 笔账单？',
-      confirmLabel: '全部恢复',
+      title: s.restoreAll,
+      message: s.restoreAllConfirm(entries.length),
+      confirmLabel: s.restoreAll,
     );
     if (confirmed != true || !mounted) return;
 
@@ -112,16 +118,17 @@ class _TrashPageState extends ConsumerState<TrashPage> {
     if (!mounted) return;
     showAppToast(
       context,
-      okCount > 0 ? '已恢复 $okCount 笔账单' : '恢复失败${lastError == null ? '' : ': $lastError'}',
+      okCount > 0 ? s.restoredCount(okCount) : '恢复失败${lastError == null ? '' : ': $lastError'}',
     );
   }
 
   Future<void> _purgeOne(LedgerEntry entry) async {
+    final s = AppStrings.of(context);
     final confirmed = await showConfirmDialog(
       context,
-      title: '彻底删除',
-      message: '彻底删除后无法恢复，确定继续？',
-      confirmLabel: '彻底删除',
+      title: s.purgeForever,
+      message: s.purgeForeverConfirm,
+      confirmLabel: s.purgeForever,
       destructive: true,
     );
     if (confirmed != true || !mounted) return;
@@ -133,24 +140,25 @@ class _TrashPageState extends ConsumerState<TrashPage> {
       if (res.isSuccess) {
         await _reload();
         if (!mounted) return;
-        showAppToast(context, '已彻底删除');
+        showAppToast(context, s.purgedForever);
       } else {
         showAppToast(context, '删除失败: ${res.failureOrNull?.code ?? 'unknown'}');
       }
     } on Object catch (e) {
       if (!mounted) return;
-      showAppToast(context, '删除失败: $e');
+      showAppToast(context, s.categoryDeleteFailed(e.toString()));
     }
   }
 
   Future<void> _purgeAll() async {
+    final s = AppStrings.of(context);
     final entries = ref.read(_trashProvider).value?.entries ?? const <LedgerEntry>[];
     if (entries.isEmpty) return;
     final confirmed = await showConfirmDialog(
       context,
-      title: '清空回收站',
+      title: s.emptyTrashTitle,
       message: '将彻底删除 ${entries.length} 笔账单，删除后无法恢复。确定继续？',
-      confirmLabel: '清空',
+      confirmLabel: s.clearAllAction,
       destructive: true,
     );
     if (confirmed != true || !mounted) return;
@@ -165,33 +173,34 @@ class _TrashPageState extends ConsumerState<TrashPage> {
       if (res.isSuccess) {
         await _reload();
         if (!mounted) return;
-        showAppToast(context, '回收站已清空');
+        showAppToast(context, s.trashEmptied);
       } else {
         showAppToast(context, '清空失败: ${res.failureOrNull?.code ?? 'unknown'}');
       }
     } on Object catch (e) {
       if (!mounted) return;
-      showAppToast(context, '清空失败: $e');
+      showAppToast(context, s.emptyFailed(e.toString()));
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final s = AppStrings.of(context);
     final hide = ref.watch(hideAmountsProvider);
     final async = ref.watch(_trashProvider);
     return Scaffold(
       appBar: PlainTopBar(
-        title: '回收站',
+        title: s.trashTitle,
         showBack: true,
         actions: [
           if (async.value?.entries.isNotEmpty ?? false) ...[
             TextButton(
               onPressed: () => _restoreAll(async.value!.entries),
-              child: const Text('全部恢复'),
+              child: Text(s.restoreAll),
             ),
             TextButton(
               onPressed: _purgeAll,
-              child: Text('清空', style: TextStyle(color: context.colors.expense)),
+              child: Text(s.clearAllAction, style: TextStyle(color: context.colors.expense)),
             ),
           ],
         ],
@@ -199,7 +208,7 @@ class _TrashPageState extends ConsumerState<TrashPage> {
       body: ContentWidthConstraint(
         child: async.when(
           loading: () => const Center(child: CircularProgressIndicator()),
-          error: (e, _) => AppErrorState.of(e, onRetry: () => ref.invalidateData.bumpEverything()),
+          error: (e, _) => AppErrorState.of(context, e, onRetry: () => ref.invalidateData.bumpEverything()),
           data: (data) {
             final entries = data.entries;
             final categoryMap = data.categoryMap;
@@ -212,7 +221,7 @@ class _TrashPageState extends ConsumerState<TrashPage> {
                   return Padding(
                     padding: EdgeInsets.fromLTRB(Spacing.lg, Spacing.md, Spacing.lg, Spacing.sm),
                     child: Text(
-                      '删除的账单保留 30 天，到期自动清除',
+                      s.trashRetentionHint,
                       style: TextStyle(fontSize: 12, color: context.colors.inkTertiary),
                     ),
                   );
@@ -240,6 +249,7 @@ class _EmptyTrash extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final s = AppStrings.of(context);
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -250,9 +260,9 @@ class _EmptyTrash extends StatelessWidget {
             color: context.colors.inkTertiary.withValues(alpha: 0.5),
           ),
           const SizedBox(height: Spacing.lg),
-          Text('回收站是空的', style: Theme.of(context).textTheme.titleMedium?.copyWith(color: context.colors.inkSecondary)),
+          Text(s.trashEmptyTitle, style: Theme.of(context).textTheme.titleMedium?.copyWith(color: context.colors.inkSecondary)),
           const SizedBox(height: Spacing.sm),
-          Text('删除的账单会暂时存放在这里', style: TextStyle(fontSize: 14, color: context.colors.inkTertiary)),
+          Text(s.trashEmptySubtitle, style: TextStyle(fontSize: 14, color: context.colors.inkTertiary)),
         ],
       ),
     );
@@ -274,6 +284,7 @@ class _TrashTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final s = AppStrings.of(context);
     final isExpense = entry.type == EntryType.expense;
     final isIncome = entry.type == EntryType.income;
     final amountColor = isExpense ? context.colors.expense : isIncome ? context.colors.income : context.colors.transfer;
@@ -289,17 +300,17 @@ class _TrashTile extends StatelessWidget {
       margin: const EdgeInsets.symmetric(horizontal: Spacing.lg, vertical: Spacing.xs),
       child: ListTile(
         contentPadding: const EdgeInsets.symmetric(horizontal: Spacing.lg, vertical: Spacing.xs),
-        leading: CategoryAvatar(iconRef: category?.iconRef ?? 'other', iconAsset: category?.iconAsset, color: amountColor),
+        leading: CategoryAvatar(iconRef: category?.iconRef ?? 'other', color: amountColor),
         title: Text(
-          category?.name ?? '未分类',
+          category?.name ?? s.uncategorized,
           maxLines: 1, overflow: TextOverflow.ellipsis,
           style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500),
         ),
         subtitle: Text(
           [
-            '剩余 ${daysLeft.clamp(0, TrashRules.trashTtl.inDays)} 天',
+            s.daysRemaining(daysLeft.clamp(0, TrashRules.trashTtl.inDays)),
             if (entry.note != null && entry.note!.isNotEmpty) entry.note!,
-            '${formatDateTime(entry.occurredAt)} 记账',
+            s.recordedSuffix(formatDateTime(entry.occurredAt)),
           ].join(' · '),
           maxLines: 2, overflow: TextOverflow.ellipsis,
           style: TextStyle(fontSize: 12, color: context.colors.inkTertiary),
@@ -317,7 +328,7 @@ class _TrashTile extends StatelessWidget {
             const SizedBox(width: Spacing.xs),
             IconButton(
               icon: const PlainIcon(PlainIconData.undo, size: 20),
-              tooltip: '恢复',
+              tooltip: s.restore,
               visualDensity: VisualDensity.compact,
               onPressed: onRestore,
             ),
@@ -327,7 +338,7 @@ class _TrashTile extends StatelessWidget {
                 size: 20,
                 color: context.colors.inkTertiary,
               ),
-              tooltip: '彻底删除',
+              tooltip: s.purgeForever,
               visualDensity: VisualDensity.compact,
               onPressed: onPurge,
             ),

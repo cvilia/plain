@@ -12,6 +12,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:plain/app/bootstrap.dart';
 import 'package:plain/app/theme/design_tokens.dart';
+import 'package:plain/app/theme/typography.dart';
 import 'package:plain/core/constants/app_constants.dart';
 import 'package:plain/core/format/amount_formatter.dart';
 import 'package:plain/core/refresh/data_invalidation.dart';
@@ -19,9 +20,12 @@ import 'package:plain/domain/entities/category.dart' as domain;
 import 'package:plain/domain/entities/enums.dart';
 import 'package:plain/domain/entities/ledger_entry.dart';
 import 'package:plain/domain/usecases/split_usecases.dart';
-import 'package:plain/features/ledger/presentation/entry_attachments_section.dart';
 import 'package:plain/features/ledger/presentation/member_write_guard.dart';
 import 'package:plain/features/ledger/presentation/entry_participants_row.dart';
+import 'package:plain/app/l10n/app_strings.dart';
+import 'package:plain/app/l10n/strings_accounts.dart';
+import 'package:plain/app/l10n/strings_domain.dart';
+import 'package:plain/app/l10n/strings_ledger.dart';
 
 
 class _DetailData {
@@ -81,6 +85,7 @@ class EntryDetailPage extends ConsumerStatefulWidget {
 class _EntryDetailPageState extends ConsumerState<EntryDetailPage> {
   @override
   Widget build(BuildContext context) {
+    final s = AppStrings.of(context);
     final async = ref.watch(_detailProvider(widget.entryId));
     final loading = async.isLoading;
     final entry = async.value?.entry;
@@ -89,8 +94,8 @@ class _EntryDetailPageState extends ConsumerState<EntryDetailPage> {
     }
     if (entry == null) {
       return Scaffold(
-        appBar: PlainTopBar(title: '详情', showBack: true),
-        body: const Center(child: Text('账单不存在')),
+        appBar: PlainTopBar(title: s.detail, showBack: true),
+        body: Center(child: Text(s.entryNotFound)),
       );
     }
 
@@ -98,71 +103,27 @@ class _EntryDetailPageState extends ConsumerState<EntryDetailPage> {
     final isIncome = entry.type == EntryType.income;
     final amountColor = isExpense ? context.colors.expense : isIncome ? context.colors.income : context.colors.transfer;
 
+    // 顶栏右侧只放「删除」一枚 44×44 图标按钮。
+    //
+    // 原来这里是「拆分 / 编辑 / 删除」三枚自绘控件：估算宽度 64+64+44+4 = 176pt，
+    // 超过 `PlainTopBar` 居中判据允许的侧边预留，于是标题静默退回「占满剩余空间」
+    // 的老布局 —— 表现为「账单详情」左偏。三个动作也偏离了设计稿
+    //（`08-SCREENS-SPEC/04-detail.md` §2：右侧仅「编辑」文字按钮）。
+    //
+    // 另外那枚自绘删除按钮把 `PlainIcon` 直接塞进 `SizedBox(44,44)`：SvgPicture 的
+    // `width/height` 只在松约束下生效，紧约束把它拉到 44×44 —— 所以图标看着比别处大。
+    // [PlainTopBarAction] 内部那句「Center 给 child 松约束」正是为此而写。
     return Scaffold(
       appBar: PlainTopBar(
-        title: '账单详情',
+        title: s.entryDetailTitle,
         showBack: true,
         actions: [
-          if (entry.splitRole == SplitRole.normal &&
-              (isExpense || isIncome))
-            Material(
-              color: const Color(0x00000000),
-              borderRadius: BorderRadius.circular(12),
-              child: InkWell(
-                onTap: () => _showSplitSheet(context, entry),
-                borderRadius: BorderRadius.circular(12),
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(minHeight: 44),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 8),
-                    child: Text('拆分', style: TextStyle(fontSize: 14, color: context.colors.primary)),
-                  ),
-                ),
-              ),
-            ),
-          if (entry.isSplitParent)
-            Material(
-              color: const Color(0x00000000),
-              borderRadius: BorderRadius.circular(12),
-              child: InkWell(
-                onTap: () => _mergeSplit(context, entry),
-                borderRadius: BorderRadius.circular(12),
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(minHeight: 44),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 8),
-                    child: Text('合并', style: TextStyle(fontSize: 14, color: context.colors.primary)),
-                  ),
-                ),
-              ),
-            ),
-          Material(
-            color: const Color(0x00000000),
-            borderRadius: BorderRadius.circular(12),
-            child: InkWell(
-              onTap: () => _edit(context),
-              borderRadius: BorderRadius.circular(12),
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(minHeight: 44),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
-                  child: Text('编辑', style: TextStyle(fontSize: 14, color: context.colors.primary)),
-                ),
-              ),
-            ),
-          ),
-          Material(
-            color: const Color(0x00000000),
-            borderRadius: BorderRadius.circular(12),
-            child: InkWell(
-              onTap: () => _confirmDelete(context),
-              borderRadius: BorderRadius.circular(12),
-              child: const SizedBox(
-                width: 44,
-                height: 44,
-                child: PlainIcon(PlainIconData.delete, size: 20),
-              ),
-            ),
+          PlainTopBarAction(
+            icon: PlainIconData.delete,
+            // 破坏性动作压到最轻的一档：它不该比标题更响，误触还有二次确认兜底。
+            color: context.colors.inkTertiary,
+            tooltip: s.delete,
+            onTap: () => _confirmDelete(context),
           ),
         ],
       ),
@@ -174,7 +135,7 @@ class _EntryDetailPageState extends ConsumerState<EntryDetailPage> {
             child: Column(
               children: [
                 Text(
-                  '金额',
+                  s.amountFieldLabel,
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
@@ -196,7 +157,7 @@ class _EntryDetailPageState extends ConsumerState<EntryDetailPage> {
                     CategoryDot(color: amountColor),
                     const SizedBox(width: 8),
                     Text(
-                      '${async.value?.category?.name ?? '未分类'} · ${async.value?.accountName ?? '招行储蓄卡'}',
+                      '${async.value?.category?.name ?? s.uncategorized} · ${async.value?.accountName ?? s.noAccount}',
                       style: TextStyle(fontSize: 14, color: context.colors.inkSecondary),
                     ),
                   ],
@@ -205,50 +166,68 @@ class _EntryDetailPageState extends ConsumerState<EntryDetailPage> {
             ),
           ),
           const SizedBox(height: 28),
-          _DetailRow(label: '分类', value: async.value?.category?.name ?? '未分类'),
-          _DetailRow(label: '账户', value: async.value?.accountName ?? '招行储蓄卡'),
+          _DetailRow(label: s.category, value: async.value?.category?.name ?? s.uncategorized),
+          _DetailRow(label: s.account, value: async.value?.accountName ?? s.noAccount),
           // STORY-9.3：原币 / 本位币双显示（同币种时这里不出现）
           if (entry.originalAmountCents != null)
             _DetailRow(
-              label: '原币金额',
+              label: s.originalAmountFieldLabel,
               value: _dualCurrencyLabel(entry, async.value?.accountCurrency),
             ),
           if (entry.exchangeRate != null)
-            _DetailRow(label: '锁定汇率', value: _rateLabel(entry.exchangeRate!)),
-          // 报销状态：可点击切换（none ↔ pending）
-          _ReimburseToggleRow(entry: entry),
+            _DetailRow(label: s.entityCurrencyRate, value: _rateLabel(entry.exchangeRate!)),
+          // 报销 / 收支：本页只做**只读展示**——这两项原来各带一个就地切换的
+          // Switch（点一下立刻写库），现按页面职责划分，改值统一去编辑页
+          //（见 `entry_input_page.dart::_AttrBar` 的两个 chip）。
+          _DetailRow(label: s.reimburseFieldTitle, value: _reimburseLabel(entry.reimburseStatus)),
           // G-2：「不计入收支」只对手动录入的普通收支开放
-          if (entry.canMarkExcluded) _ExcludeFromStatsToggleRow(entry: entry),
+          if (entry.canMarkExcluded)
+            _DetailRow(
+              label: s.statsRowLabel,
+              value: entry.excludeFromStats ? s.notInStats : s.countedInStats,
+            ),
           // STORY-8.2 AC5：AA 分摊（标记参与人自动平均分摊）
           if (isExpense || isIncome)
             EntryParticipantsRow(entryId: widget.entryId, amountCents: entry.amount.cents),
-          _DetailRow(label: '日期', value: formatDate(entry.occurredAt)),
+          _DetailRow(label: s.date, value: formatDate(entry.occurredAt)),
           if (entry.note != null && entry.note!.isNotEmpty)
-            _DetailRow(label: '备注', value: entry.note!),
-          _DetailRow(label: '来源', value: _sourceLabel(entry.source)),
+            _DetailRow(label: s.note, value: entry.note!),
+          _DetailRow(label: s.source, value: _sourceLabel(entry.source)),
           if (entry.splitRole != SplitRole.normal)
             _DetailRow(
-              label: '分割',
-              value: entry.isSplitParent ? '父笔（不进分类统计）' : '子笔',
+              label: s.splitRowLabel,
+              value: entry.isSplitParent ? s.splitParentValue : s.splitChildValue,
             ),
-          _DetailRow(label: '创建时间', value: formatDateTime(entry.createdAt)),
-          _DetailRow(label: '更新时间', value: formatDateTime(entry.updatedAt)),
-          const SizedBox(height: Spacing.md),
-          // STORY-1.5：附件（详情页与编辑态都可增删）
-          EntryAttachmentsSection(entryId: widget.entryId),
-          const SizedBox(height: 16),
-          // ── 危险区 ──
-          PlainDangerButton(
-            label: '删除这笔账单',
-            onPressed: () => _confirmDelete(context),
+          _DetailRow(label: s.created, value: formatDateTime(entry.createdAt)),
+          _DetailRow(label: s.updated, value: formatDateTime(entry.updatedAt)),
+          const SizedBox(height: Spacing.lg),
+          // ── 动作区 ──
+          // 「编辑」是本页的主操作，「拆分 / 合并」是罕见的进阶操作（会改写数据结构、
+          // 产生子笔），所以主按钮在前、次级描边按钮在后，两者都不再占顶栏。
+          PlainPrimaryButton(
+            label: s.edit,
+            icon: PlainIconData.edit,
+            onPressed: () => _edit(context),
           ),
-          const SizedBox(height: 12),
-          Center(
-            child: Text(
-              '删除后不可恢复',
-              style: TextStyle(fontSize: 12, color: context.colors.inkFaint),
+          if (entry.splitRole == SplitRole.normal && (isExpense || isIncome)) ...[
+            const SizedBox(height: Spacing.sm),
+            // 图标集里没有「拆分」，就不给它编一个（`ic_merge` 是合并的方向，反着用会误导）。
+            PlainSecondaryButton(
+              label: s.splitActionLabel,
+              onPressed: () => _showSplitSheet(context, entry),
             ),
-          ),
+          ],
+          if (entry.isSplitParent) ...[
+            const SizedBox(height: Spacing.sm),
+            PlainSecondaryButton(
+              label: s.mergeBackParent,
+              icon: PlainIconData.merge,
+              onPressed: () => _mergeSplit(context, entry),
+            ),
+          ],
+          // ⚠️ 这里原本还有一枚 `PlainDangerButton`「删除这笔账单」+「删除后不可恢复」脚注
+          //（`04-detail.md` §5 的危险区）。按产品口径撤掉了：同一动作不在同屏出现两次，
+          // 删除只保留顶栏那一枚；确认弹窗里写明的是**真实语义**（软删 → 回收站可恢复）。
         ],
       ),
     );
@@ -260,6 +239,15 @@ class _EntryDetailPageState extends ConsumerState<EntryDetailPage> {
         EntrySource.import => '导入',
         EntrySource.recurring => '周期',
         _ => source.wire,
+      };
+
+  static String _reimburseLabel(ReimburseStatus s) => switch (s) {
+        ReimburseStatus.none => '不报销',
+        ReimburseStatus.pending => '待报销',
+        ReimburseStatus.submitted => '已提交',
+        ReimburseStatus.partial => '部分回款',
+        ReimburseStatus.reimbursed => '已回款',
+        ReimburseStatus.abandoned => '已放弃',
       };
 
   /// STORY-9.3 AC1：`$100.00 ≈ ¥720.00`（本位币金额是库里的 amount）。
@@ -288,6 +276,7 @@ class _EntryDetailPageState extends ConsumerState<EntryDetailPage> {
   }
 
   Future<void> _showSplitSheet(BuildContext context, LedgerEntry entry) async {
+    final s = AppStrings.of(context);
     // STORY-8.2 AC2：拆分会产生子笔（= 写账单），只读成员不得做
     if (!await guardCanWriteLedger(context, ref)) return;
     if (!context.mounted) return;
@@ -311,7 +300,7 @@ class _EntryDetailPageState extends ConsumerState<EntryDetailPage> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Text(
-                '拆分 ${formatAmount(entry.amount.cents)}（合计需对平）',
+                s.splitSheetTitle(formatAmount(entry.amount.cents)),
                 style: Theme.of(ctx).textTheme.titleMedium,
               ),
               const SizedBox(height: Spacing.md),
@@ -322,7 +311,7 @@ class _EntryDetailPageState extends ConsumerState<EntryDetailPage> {
                       controller: rows[i].amountCtrl,
                       keyboardType: const TextInputType.numberWithOptions(decimal: true),
                       decoration: InputDecoration(
-                        labelText: '子笔 ${i + 1} 金额',
+                        labelText: s.childAmountFieldLabel(i + 1),
                         border: const OutlineInputBorder(),
                       ),
                     ),
@@ -331,8 +320,8 @@ class _EntryDetailPageState extends ConsumerState<EntryDetailPage> {
                   Expanded(
                     child: TextField(
                       controller: rows[i].catCtrl,
-                      decoration: const InputDecoration(
-                        labelText: '分类 ID',
+                      decoration: InputDecoration(
+                        labelText: s.categoryIdFieldLabel,
                         border: OutlineInputBorder(),
                       ),
                     ),
@@ -349,7 +338,7 @@ class _EntryDetailPageState extends ConsumerState<EntryDetailPage> {
                             catCtrl: TextEditingController(),
                           ))),
                   icon: const PlainIcon(PlainIconData.plus, size: 18),
-                  label: const Text('加子笔'),
+                  label: Text(s.addChildAction),
                 ),
                 const Spacer(),
                 FilledButton(
@@ -378,13 +367,13 @@ class _EntryDetailPageState extends ConsumerState<EntryDetailPage> {
                     result.when(
                       success: (_) {
                         ref.invalidateData.bumpEntryMutated();
-                        showAppToast(context, '已拆分');
+                        showAppToast(context, s.splitDone);
                         setState(() {});
                       },
                       failure: (f) => showAppToast(context, '拆分失败: ${f.code}'),
                     );
                   },
-                  child: const Text('保存拆分'),
+                  child: Text(s.saveSplitAction),
                 ),
               ]),
             ],
@@ -395,6 +384,7 @@ class _EntryDetailPageState extends ConsumerState<EntryDetailPage> {
   }
 
   Future<void> _mergeSplit(BuildContext context, LedgerEntry parent) async {
+    final s = AppStrings.of(context);
     // STORY-8.2 AC2：合并会改写账单，只读成员不得做
     if (!await guardCanWriteLedger(context, ref)) return;
     final deps = ref.read(appDependenciesProvider);
@@ -406,7 +396,7 @@ class _EntryDetailPageState extends ConsumerState<EntryDetailPage> {
     result.when(
       success: (_) {
         ref.invalidateData.bumpEntryMutated();
-        showAppToast(context, '已合并回父笔，请补充分类');
+        showAppToast(context, s.mergeDone);
         setState(() {});
       },
       failure: (f) => showAppToast(context, '合并失败: ${f.code}'),
@@ -414,13 +404,18 @@ class _EntryDetailPageState extends ConsumerState<EntryDetailPage> {
   }
 
   void _confirmDelete(BuildContext context) {
+    final s = AppStrings.of(context);
     showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('删除这笔账单'),
-        content: const Text('删除后不可恢复，确定删除？'),
+        title: Text(s.deleteThisEntry),
+        // ⚠️ 别写「不可恢复」：账单是**软删除**（`deleted_at`），
+        // 「设置 › 回收站」里有恢复入口，30 天内（`TrashRules.trashTtl`）
+        // 都能捞回来。文案必须和落库语义一致 —— 这一条设计稿 §5 自己
+        // 也点了出来（`04-detail.md` 的「文案与实现需一致」）。
+        content: Text(s.deleteTrashContent),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('取消')),
+          TextButton(onPressed: () => Navigator.pop(ctx), child: Text(s.cancel)),
           FilledButton(
             onPressed: () async {
               Navigator.pop(ctx);
@@ -429,10 +424,10 @@ class _EntryDetailPageState extends ConsumerState<EntryDetailPage> {
               if (result.isSuccess && context.mounted) {
                 ref.invalidateData.bumpEntryMutated();
                 Navigator.pop(context);
-                showAppToast(context, '已删除');
+                showAppToast(context, s.deleted);
               }
             },
-            child: const Text('删除'),
+            child: Text(s.delete),
           ),
         ],
       ),
@@ -451,21 +446,32 @@ class _DetailRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
+    // ⚠️ 高度：设计稿 `.drow{min-height:56px;padding:10px 16px}`，但详情页是**连续十来行**
+    // 的「标签—值」事实表，56 在这个密度下整页太松。按全库通用列表行高收口到 **44**
+    //（= `.crow` / `.attrrow`，也是触控底线）；`Text` 必须显式写 `height`，否则继承
+    // `bodyMedium` 的 1.5714（14 → 22pt），比设计行高 19 多 3pt 且不再受字号控制。
+    // 内容 1(border) + 12 + 19 + 12 = 44，与 `minHeight` 恰好齐平。
+    //
+    // ⚠️ **不要加水平内边距**。设计稿 `.drow{padding:10px 16px}` 的 16 是相对
+    // `.panel`（白卡）算的；本页是 Quiet Ledger **无卡片**，`.scroll` 的 16 就是
+    // 全页唯一的左右基准 —— 再缩 16 会让标签列/值列比满宽分隔线、「附件 0/5」、
+    // 「＋ 添加」多缩一格，两条竖线全断。去掉后标签左边缘、值右边缘都落在 16。
     return Container(
-      constraints: const BoxConstraints(minHeight: 52),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      constraints: const BoxConstraints(minHeight: 44),
+      padding: const EdgeInsets.symmetric(vertical: 12),
       decoration: BoxDecoration(
         border: Border(
           top: BorderSide(color: colors.divider, width: 1),
         ),
       ),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           Text(
             label,
             style: TextStyle(
               fontSize: 14,
+              height: designLineHeight(14),
               fontWeight: FontWeight.w500,
               color: colors.inkTertiary,
             ),
@@ -477,6 +483,7 @@ class _DetailRow extends StatelessWidget {
               textAlign: TextAlign.right,
               style: TextStyle(
                 fontSize: 14,
+                height: designLineHeight(14),
                 fontWeight: FontWeight.w500,
                 color: colors.ink,
               ),
@@ -488,124 +495,3 @@ class _DetailRow extends StatelessWidget {
   }
 }
 
-/// G-2：手动标记「不计入收支」。
-///
-/// 开启后该笔不进收支合计、分类统计与预算，**但仍计入账户余额**——它是一笔
-/// 真实发生的账单。只有手动录入的普通收支可改（[LedgerEntry.canMarkExcluded]），
-/// 对账调整/转账/借贷/拆分子笔的计入口径由 G-2 定死。
-class _ExcludeFromStatsToggleRow extends ConsumerWidget {
-  const _ExcludeFromStatsToggleRow({required this.entry});
-  final LedgerEntry entry;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final isOn = entry.excludeFromStats;
-    Future<void> toggle() async {
-      final deps = ref.read(appDependenciesProvider);
-      final updated = entry.copyWith(
-        excludeFromStats: !isOn,
-        updatedAt: deps.clock.now(),
-        revision: entry.revision + 1,
-        baseRevision: entry.revision,
-      );
-      await deps.ledgerRepository.update(updated);
-      ref.invalidateData.bumpEntryMutated();
-    }
-
-    return InkWell(
-      onTap: toggle,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: Spacing.md),
-        child: Row(
-          children: [
-            PlainIcon(
-              PlainIconData.eyeOff,
-              size: 20,
-              color: context.colors.inkTertiary,
-            ),
-            const SizedBox(width: Spacing.md),
-            SizedBox(
-              width: 64,
-              child: Text('收支',
-                  style: TextStyle(fontSize: 14, color: context.colors.inkSecondary)),
-            ),
-            const SizedBox(width: Spacing.md),
-            Expanded(
-              child: Text(
-                isOn ? '不计入收支' : '计入收支',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: isOn ? context.colors.accent : context.colors.ink,
-                ),
-              ),
-            ),
-            Switch(value: isOn, onChanged: (_) => toggle()),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _ReimburseToggleRow extends ConsumerWidget {
-  const _ReimburseToggleRow({required this.entry});
-  final LedgerEntry entry;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final label = switch (entry.reimburseStatus) {
-      ReimburseStatus.none => '不报销',
-      ReimburseStatus.pending => '待报销',
-      ReimburseStatus.submitted => '已提交',
-      ReimburseStatus.partial => '部分回款',
-      ReimburseStatus.reimbursed => '已回款',
-      ReimburseStatus.abandoned => '已放弃',
-    };
-    final isOn = entry.reimburseStatus == ReimburseStatus.pending;
-    return InkWell(
-      onTap: () async {
-        final deps = ref.read(appDependenciesProvider);
-        final next = isOn ? ReimburseStatus.none : ReimburseStatus.pending;
-        final updated = entry.copyWith(
-          reimburseStatus: next,
-          updatedAt: deps.clock.now(),
-          revision: entry.revision + 1,
-          baseRevision: entry.revision,
-        );
-        await deps.ledgerRepository.update(updated);
-        ref.invalidateData.bumpEntryMutated();
-      },
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: Spacing.md),
-        child: Row(
-          children: [
-            PlainIcon(
-              PlainIconData.receipt,
-              size: 20,
-              color: context.colors.inkTertiary,
-            ),
-            const SizedBox(width: Spacing.md),
-            SizedBox(width: 64, child: Text('报销', style: TextStyle(fontSize: 14, color: context.colors.inkSecondary))),
-            const SizedBox(width: Spacing.md),
-            Expanded(child: Text(label, style: TextStyle(fontSize: 14, color: isOn ? context.colors.accent : context.colors.ink))),
-            Switch(
-              value: isOn,
-              onChanged: (_) {
-                final deps = ref.read(appDependenciesProvider);
-                final next = isOn ? ReimburseStatus.none : ReimburseStatus.pending;
-                final updated = entry.copyWith(
-                  reimburseStatus: next,
-                  updatedAt: deps.clock.now(),
-                  revision: entry.revision + 1,
-                  baseRevision: entry.revision,
-                );
-                deps.ledgerRepository.update(updated);
-                ref.invalidateData.bumpEntryMutated();
-              },
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}

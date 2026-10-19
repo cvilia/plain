@@ -25,6 +25,10 @@ import 'package:plain/domain/entities/category.dart';
 import 'package:plain/domain/entities/enums.dart';
 import 'package:plain/domain/services/budget_methodology_service.dart';
 import 'package:plain/domain/services/gamification_service.dart';
+import 'package:plain/app/l10n/app_strings.dart';
+import 'package:plain/app/l10n/strings_domain.dart';
+import 'package:plain/app/l10n/strings_settings_a.dart';
+import 'package:plain/app/l10n/strings_settings_b.dart';
 
 class _BudgetData {
   const _BudgetData({
@@ -78,6 +82,7 @@ class _BudgetPageState extends ConsumerState<BudgetPage> {
   ];
 
   Future<void> _switchMethodology(BudgetMethodology to) async {
+    final s = AppStrings.of(context);
     final settings = ref.read(ledgerSettingsProvider);
     final from = settings.budgetMethodology;
     if (from == to) return;
@@ -85,10 +90,14 @@ class _BudgetPageState extends ConsumerState<BudgetPage> {
     // AC1：切换前给出「同一份数据，看法不同」的对照预览
     final ok = await showConfirmDialog(
       context,
-      title: '切换到${to.label}',
+      title: s.switchTo(to.label(s)),
       message: const BudgetMethodologyService()
-          .switchPreview(from: from, to: to, categoryBudgetCount: count),
-      confirmLabel: '切换',
+          .switchPreview(
+              s: AppStrings.of(context),
+              from: from,
+              to: to,
+              categoryBudgetCount: count),
+      confirmLabel: s.switchAction,
     );
     if (ok != true) return;
     // AC5：只改呈现与校验，不触碰任何账单/报表数据
@@ -97,12 +106,13 @@ class _BudgetPageState extends ConsumerState<BudgetPage> {
 
   @override
   Widget build(BuildContext context) {
+    final s = AppStrings.of(context);
     final hide = ref.watch(hideAmountsProvider);
     final async = ref.watch(_budgetDataProvider);
     final methodology = ref.watch(ledgerSettingsProvider).budgetMethodology;
     return Scaffold(
       appBar: PlainTopBar(
-        title: '预算',
+        title: s.entityBudget,
         showBack: true,
         actions: [
           Material(
@@ -115,7 +125,7 @@ class _BudgetPageState extends ConsumerState<BudgetPage> {
                 width: 52,
                 height: 44,
                 child: Center(
-                  child: Text('新建', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500, color: context.colors.primary)),
+                  child: Text(s.newAction, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500, color: context.colors.primary)),
                 ),
               ),
             ),
@@ -125,7 +135,7 @@ class _BudgetPageState extends ConsumerState<BudgetPage> {
       body: ContentWidthConstraint(
         child: async.when(
           loading: () => const Center(child: CircularProgressIndicator()),
-          error: (e, _) => AppErrorState.of(e, onRetry: () => ref.invalidateData.bumpEverything()),
+          error: (e, _) => AppErrorState.of(context, e, onRetry: () => ref.invalidateData.bumpEverything()),
           data: (data) {
             final totalStatus = data.totalStatus;
             final categoryStatuses = data.categoryStatuses;
@@ -136,7 +146,7 @@ class _BudgetPageState extends ConsumerState<BudgetPage> {
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: Spacing.lg, vertical: Spacing.sm),
                   child: PlainSeg(
-                    items: [for (final m in _methodologies) m.label],
+                    items: [for (final m in _methodologies) m.label(AppStrings.of(context))],
                     selectedIndex: _methodologies.indexOf(methodology),
                     onChanged: (i) => _switchMethodology(_methodologies[i]),
                   ),
@@ -147,12 +157,12 @@ class _BudgetPageState extends ConsumerState<BudgetPage> {
                     padding: const EdgeInsets.symmetric(horizontal: Spacing.lg),
                     child: AppEmptyState(
                       icon: PlainIconData.chartLine,
-                      title: '还没有分类限额',
-                      subtitle: '给常超支的分类设一个上限',
+                      title: s.noCategoryLimits,
+                      subtitle: s.noCategoryLimitsHint,
                       action: FilledButton.icon(
                         onPressed: _addCategoryBudget,
                         icon: const PlainIcon(PlainIconData.plus),
-                        label: const Text('添加限额'),
+                        label: Text(s.addLimit),
                       ),
                     ),
                   )
@@ -419,7 +429,7 @@ class _BudgetPageState extends ConsumerState<BudgetPage> {
                   children: [
                     Row(children: [
                       Expanded(
-                        child: Text(b.kind.label,
+                        child: Text(b.kind.label(AppStrings.of(context)),
                             style: const TextStyle(
                                 fontSize: 15, fontWeight: FontWeight.w500)),
                       ),
@@ -458,15 +468,16 @@ class _BudgetPageState extends ConsumerState<BudgetPage> {
     );
   }
 
-  String _categoryNameOf(BudgetStatus s) {
-    final id = s.budget.categoryId;
-    if (id == null) return '总预算';
+  String _categoryNameOf(BudgetStatus st) {
+    final s = AppStrings.of(context);
+    final id = st.budget.categoryId;
+    if (id == null) return s.remTotalBudget;
     final cats = ref.read(_budgetDataProvider).value?.expenseCategories ??
         const <Category>[];
     for (final c in cats) {
       if (c.id == id) return c.name;
     }
-    return '未命名分类';
+    return s.unnamedCategory;
   }
 
   Future<void> _editTotal() async {
@@ -515,6 +526,7 @@ class _BudgetPageState extends ConsumerState<BudgetPage> {
     final methodology =
         ref.read(ledgerSettingsProvider).budgetMethodology;
     final guard = const BudgetMethodologyService().validateEnvelopeLimitChange(
+      s: AppStrings.of(context),
       methodology: methodology,
       categoryName: _categoryNameOf(status),
       newLimitCents: picked.amount.cents,
@@ -536,11 +548,12 @@ class _BudgetPageState extends ConsumerState<BudgetPage> {
   }
 
   Future<void> _deleteBudget(Budget budget) async {
+    final s = AppStrings.of(context);
     final okDel = await showConfirmDialog(
       context,
       title: '删除预算',
       message: '删除后不可恢复，确定删除这笔预算？',
-      confirmLabel: '删除',
+      confirmLabel: s.delete,
       destructive: true,
     );
     if (okDel != true || !mounted) return;
@@ -621,6 +634,7 @@ class _Hero extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final s = AppStrings.of(context);
     final colors = context.colors;
     final spent = status?.spentCents ?? 0;
     final limit = status?.limitCents ?? 0;
@@ -635,7 +649,7 @@ class _Hero extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.only(top: 12, bottom: 8, left: 2),
             child: Text(
-              '本月预算已用',
+              s.budgetUsedThisMonth,
               style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, letterSpacing: 0.08 * 12, color: colors.inkTertiary),
             ),
           ),
@@ -678,11 +692,11 @@ class _Hero extends StatelessWidget {
           const SizedBox(height: 16),
           Row(
             children: [
-              _Split(label: '已花', text: formatAmountYuan(spent, hide: hide)),
+              _Split(label: s.spentLabel, text: formatAmountYuan(spent, hide: hide)),
               const SizedBox(width: 20),
-              _Split(label: '预算', text: formatAmountYuan(limit, hide: hide)),
+              _Split(label: s.entityBudget, text: formatAmountYuan(limit, hide: hide)),
               const SizedBox(width: 20),
-              _Split(label: '剩余', text: formatAmountYuan(remaining, hide: hide)),
+              _Split(label: s.remainingLabel, text: formatAmountYuan(remaining, hide: hide)),
             ],
           ),
           const SizedBox(height: 16),
@@ -728,18 +742,19 @@ class _CategoryProgressRow extends StatelessWidget {
   final VoidCallback onEdit;
   final VoidCallback onDelete;
 
-  String get _title {
+  String _title(AppStrings s) {
     final id = status.budget.categoryId;
-    if (id == null) return '分类';
+    if (id == null) return s.category;
     for (final c in categories) {
       if (c.id == id) return c.name;
     }
-    return '分类';
+    return s.category;
   }
 
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
+    final appS = AppStrings.of(context);
     final s = status;
     final ratio = s.ratio.clamp(0.0, 1.0).toDouble();
     final tone = switch (s.level) {
@@ -753,8 +768,8 @@ class _CategoryProgressRow extends StatelessWidget {
       BudgetLevel.ok => colors.primary,
     };
     final footnote = s.isOver
-        ? '已超支 ${formatAmountYuan(s.spentCents - s.limitCents, hide: hide)}'
-        : '剩余 ${formatAmountYuan(s.remainingCents, hide: hide)}';
+        ? appS.overSpent(formatAmountYuan(s.spentCents - s.limitCents, hide: hide))
+        : appS.remainingAmount(formatAmountYuan(s.remainingCents, hide: hide));
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: Spacing.md),
       child: Column(
@@ -767,7 +782,7 @@ class _CategoryProgressRow extends StatelessWidget {
                 decoration: BoxDecoration(color: barColor, shape: BoxShape.circle),
               ),
               const SizedBox(width: 8),
-              Expanded(child: Text(_title, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500))),
+              Expanded(child: Text(_title(AppStrings.of(context)), style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500))),
               Text(
                 '${formatAmountYuan(s.spentCents, hide: hide)} / ${formatAmountYuan(s.limitCents, hide: hide)}',
                 style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: colors.ink),
@@ -792,8 +807,8 @@ class _CategoryProgressRow extends StatelessWidget {
                   ),
                 ),
               ),
-              TextButton(onPressed: onEdit, child: const Text('修改')),
-              TextButton(onPressed: onDelete, child: const Text('删除')),
+              TextButton(onPressed: onEdit, child: Text(appS.actionLogOpUpdate)),
+              TextButton(onPressed: onDelete, child: Text(appS.delete)),
             ],
           ),
         ],
@@ -864,6 +879,7 @@ class _ProgressBar extends StatelessWidget {
 class _NotePanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
+    final s = AppStrings.of(context);
     final colors = context.colors;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: Spacing.lg),
@@ -879,19 +895,19 @@ class _NotePanel extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _RichPara(
-              plain: '信封（每类一个信封，花完即止） / 零基（收入全部预先分配，余额为 0） / 50-30-20（必要 50 · 想要 30 · 储蓄 20） / 分类限额（最轻量）。',
-              parts: const [
-                (true, '四套方法论：'),
-                (false, '信封（每类一个信封，花完即止） / 零基（收入全部预先分配，余额为 0） / 50-30-20（必要 50 · 想要 30 · 储蓄 20） / 分类限额（最轻量）。'),
+              plain: s.budgetNote1Body,
+              parts: [
+                (true, s.budgetNote1Title),
+                (false, s.budgetNote1Body),
               ],
             ),
             const SizedBox(height: Spacing.sm),
             _RichPara(
-              plain: '进度条三级着色与「是否响铃通知」绑定（G-3）： ，但两者都不阻挡你继续记账。',
-              parts: const [
-                (false, '进度条三级着色与「是否响铃通知」绑定（G-3）： '),
-                (true, '90% 静默提醒、100% 响铃通知'),
-                (false, '，但两者都不阻挡你继续记账。'),
+              plain: s.budgetNote2Plain,
+              parts: [
+                (false, s.budgetNote2A),
+                (true, s.budgetNote2B),
+                (false, s.budgetNote2C),
               ],
             ),
           ],
@@ -937,6 +953,7 @@ class _CategoryPickerSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final s = AppStrings.of(context);
     final maxH = MediaQuery.sizeOf(context).height * 0.55;
     return Material(
       color: const Color(0x00000000),
@@ -958,7 +975,7 @@ class _CategoryPickerSheet extends StatelessWidget {
               decoration: BoxDecoration(color: context.colors.border, borderRadius: BorderRadius.circular(2)),
             ),
             const SizedBox(height: 16),
-            Text('选择分类', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: context.colors.ink)),
+            Text(s.pickCategory, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: context.colors.ink)),
             const SizedBox(height: 8),
             Flexible(
               child: ListView.separated(

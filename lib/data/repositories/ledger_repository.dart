@@ -19,19 +19,13 @@ import 'package:plain/domain/repositories/repositories.dart';
 class LedgerRepositoryImpl implements LedgerRepository {
   LedgerRepositoryImpl({
     required AppDatabase db, required ChangeLogWriter changeLogWriter,
-    required Clock clock, AppLog? log, AttachmentRepository? attachments,
-  })  : _db = db, _changeLog = changeLogWriter, _clock = clock, _log = log,
-        _attachments = attachments;
+    required Clock clock, AppLog? log,
+  })  : _db = db, _changeLog = changeLogWriter, _clock = clock, _log = log;
 
   final AppDatabase _db;
   final ChangeLogWriter _changeLog;
   final Clock _clock;
   final AppLog? _log;
-
-  /// STORY-1.5：账单进/出回收站时同步附件孤儿标记。
-  /// 跨仓储写在事务之后（两者都在同一连接上，失败窗口只有一次函数调用，
-  /// 而孤儿附件有 30 天保留期 + 启动巡检兜底）。
-  final AttachmentRepository? _attachments;
 
   @override
   Future<Result<LedgerEntry>> create(LedgerEntry entry) async {
@@ -93,8 +87,6 @@ class LedgerRepositoryImpl implements LedgerRepository {
           before: _payload(old), after: const {},
         );
       });
-      // STORY-1.5：账单进回收站 → 附件标记孤儿（30 天内随恢复复原）
-      await _attachments?.markOrphanedByEntry(id, now);
       return ok(null);
     } on Object catch (e) {
       return err(StorageFailure('db.delete_failed', e.toString(), isRetryable: true));
@@ -289,8 +281,6 @@ class LedgerRepositoryImpl implements LedgerRepository {
           before: _payload(old), after: _payload(restored),
         );
       });
-      // STORY-1.5 AC2：账单恢复 → 附件孤儿标记复原
-      await _attachments?.restoreByEntry(id);
       return ok(restored);
     } on Object catch (e) {
       return err(StorageFailure('db.restore_failed', e.toString(), isRetryable: true));
@@ -548,10 +538,6 @@ class LedgerRepositoryImpl implements LedgerRepository {
           );
         }
       });
-      // STORY-1.5：批次删除（周期撤销）同样要把附件标记为孤儿
-      for (final e in old) {
-        await _attachments?.markOrphanedByEntry(e.id, at);
-      }
       return ok(old.length);
     } on Object catch (e) {
       return err(StorageFailure('db.undo_failed', e.toString(), isRetryable: true));

@@ -11,6 +11,9 @@
 /// - 年龄**越大越从容**：说明钱在手里待得久，不靠当月工资过日子（AC4 的文案方向）。
 library;
 
+import 'package:plain/app/l10n/app_strings.dart';
+import 'package:plain/app/l10n/strings_domain.dart';
+
 /// 一笔收入或支出（只取计算所需字段）。
 class MoneyLot {
   const MoneyLot({required this.at, required this.cents});
@@ -62,23 +65,21 @@ class MoneyAgeResult {
   /// AC4：年龄变大 = 更从容。
   ///
   /// 返回一句话解读；数据不足或无对比基准时给出相应说明。
-  String get interpretation {
+  String interpretation(AppStrings s) {
     final cur = currentAgeDays;
     final prev = previousAgeDays;
-    if (!hasEnoughData || cur == null) return '数据积累中';
+    if (!hasEnoughData || cur == null) return s.maAccumulating;
     if (prev == null) {
-      return '当前约 ${cur.round()} 天：这笔钱从进账到花掉平均等了这么久。';
+      return s.maCurrentOnly(cur.round());
     }
     final diff = cur - prev;
     if (diff.abs() < 1) {
-      return '与上月基本持平（约 ${cur.round()} 天），节奏很稳。';
+      return s.maStable(cur.round());
     }
     if (diff > 0) {
-      return '比上月更从容：${prev.round()} 天 → ${cur.round()} 天，'
-          '钱在手里多留了约 ${diff.round()} 天。';
+      return s.maMoreRelaxed(prev.round(), cur.round(), diff.round());
     }
-    return '比上月吃紧：${prev.round()} 天 → ${cur.round()} 天，'
-        '钱花得比上个月快约 ${(-diff).round()} 天。';
+    return s.maTighter(prev.round(), cur.round(), (-diff).round());
   }
 }
 

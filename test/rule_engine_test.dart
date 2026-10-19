@@ -1,6 +1,7 @@
 /// STORY-6.1 规则引擎单测。
 library;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:plain/app/l10n/strings_core.dart';
 import 'package:plain/core/money/money.dart';
 import 'package:plain/domain/entities/automation_rule.dart';
 import 'package:plain/domain/entities/enums.dart';
@@ -89,7 +90,7 @@ void main() {
       conditions: const [],
       actions: const [RuleAction(type: RuleActionType.setCategory, value: 'cat-drink')],
     );
-    final (out, hits) = engine.applyAll(entry(), [a, b]);
+    final (out, hits) = engine.applyAll(entry(), [a, b], s: kDefaultAppStrings);
     expect(out.categoryId, 'cat-drink');
     expect(hits.length, 2);
   });
@@ -103,7 +104,7 @@ void main() {
       ],
       actions: const [RuleAction(type: RuleActionType.setCategory, value: 'c1')],
     );
-    final results = engine.dryRun([e], r);
+    final results = engine.dryRun([e], r, s: kDefaultAppStrings);
     expect(results.length, 1);
     expect(results.first.entry.categoryId, isNull);
     expect(results.first.summaries, isNotEmpty);
@@ -116,7 +117,7 @@ void main() {
       conditions: const [],
       actions: const [RuleAction(type: RuleActionType.setCategory, value: 'c1')],
     );
-    final (out, hits) = engine.applyAll(entry(), [r], scope: RuleScope.manual);
+    final (out, hits) = engine.applyAll(entry(), [r], scope: RuleScope.manual, s: kDefaultAppStrings);
     expect(hits, isEmpty);
     expect(out.categoryId, isNull);
   });
@@ -124,13 +125,14 @@ void main() {
   test('AC5 invalid regex rejected with message', () {
     final err = RuleEngine.validateConditions(const [
       RuleCondition(field: RuleField.note, op: RuleOp.regex, value: '('),
-    ]);
+    ], s: kDefaultAppStrings);
     expect(err, isNotNull);
     expect(err, contains('条件 1'));
     expect(
       RuleEngine.validateConditions(const [
         RuleCondition(field: RuleField.note, op: RuleOp.regex, value: r'星.*克'),
-      ]),
+      ],
+      s: kDefaultAppStrings,),
       isNull,
     );
   });

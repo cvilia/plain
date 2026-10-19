@@ -13,6 +13,9 @@
 /// 识别结果只用于预填，**不直接入库**（AC1/AC2）。
 library;
 
+import 'package:plain/app/l10n/app_strings.dart';
+import 'package:plain/app/l10n/strings_domain.dart';
+
 class OcrDraft {
   const OcrDraft({
     this.amountCents,
@@ -38,18 +41,18 @@ class OcrDraft {
   bool get isUsable => amountCents != null;
 
   /// 抽取到了什么（用于给用户一句「识别到 X」的反馈）。
-  String get summary {
+  String summary(AppStrings s) {
     final parts = <String>[];
     if (amountCents != null) {
-      parts.add('金额 ${(amountCents! / 100).toStringAsFixed(2)}');
+      parts.add(s.ocrAmount((amountCents! / 100).toStringAsFixed(2)));
     }
-    if (merchant != null) parts.add('商户「$merchant」');
+    if (merchant != null) parts.add(s.ocrMerchant(merchant!));
     if (occurredAt != null) {
       final d = occurredAt!;
-      parts.add('日期 ${d.year}-${d.month.toString().padLeft(2, '0')}-'
-          '${d.day.toString().padLeft(2, '0')}');
+      parts.add(s.ocrDate('${d.year}-${d.month.toString().padLeft(2, '0')}-'
+          '${d.day.toString().padLeft(2, '0')}'));
     }
-    return parts.isEmpty ? '没有识别到可用信息' : '识别到：${parts.join(' · ')}';
+    return parts.isEmpty ? s.ocrEmpty : s.ocrRecognized(parts.join(' · '));
   }
 }
 

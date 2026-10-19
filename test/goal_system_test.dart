@@ -2,6 +2,7 @@
 library;
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:plain/app/l10n/strings_core.dart';
 import 'package:plain/core/id/uuid_v7.dart';
 import 'package:plain/core/money/money.dart';
 import 'package:plain/core/time/clock.dart';
@@ -63,7 +64,7 @@ void main() {
       accountId: 'acc-cash',
       bookId: bookId,
       deviceId: deviceId,
-    ));
+    ), s: kDefaultAppStrings);
     expect(res.isSuccess, isTrue, reason: '${res.failureOrNull}');
   }
 
@@ -76,6 +77,7 @@ void main() {
       from: DateTime.utc(2026, 10, 1),
       to: DateTime.utc(2026, 11, 1),
       categoryNames: const {'cat-food': '餐饮'},
+      s: kDefaultAppStrings,
     );
     expect(res.isSuccess, isTrue, reason: '${res.failureOrNull}');
     return res.requireValue;
@@ -216,10 +218,12 @@ void main() {
       );
       final zero = GoalSystemService.buildViews(
         budgets: [budget], spentByCategory: const {}, categoryNames: const {'cat-food': '餐饮'},
+        s: kDefaultAppStrings,
       ).single;
       expect(zero.progress, 0);
       final full = GoalSystemService.buildViews(
         budgets: [budget], spentByCategory: const {'cat-food': 20000}, categoryNames: const {'cat-food': '餐饮'},
+        s: kDefaultAppStrings,
       ).single;
       expect(full.progress, 1.0);
       expect(full.isOver, isFalse, reason: '刚好用满不算超支');
@@ -235,6 +239,7 @@ void main() {
         budgets: [b('b1', 'c1', 10000), b('b2', 'c2', 10000)],
         spentByCategory: const {'c1': 1000, 'c2': 9000},
         categoryNames: const {'c1': 'A', 'c2': 'B'},
+        s: kDefaultAppStrings,
       );
       expect(views.first.categoryName, 'B');
     });

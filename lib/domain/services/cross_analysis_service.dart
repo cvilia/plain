@@ -6,10 +6,13 @@
 /// 只支持**当前真有数据**的维度：分类 / 账户 / 月份 / 商户 / 金额区间。
 library;
 
+import 'package:plain/app/l10n/app_strings.dart';
 import 'package:plain/core/constants/app_constants.dart';
 import 'package:plain/core/time/clock.dart';
 import 'package:plain/domain/entities/enums.dart';
 import 'package:plain/domain/services/accounting_calendar.dart';
+import 'package:plain/app/l10n/strings_domain.dart';
+import 'package:plain/app/l10n/strings_core.dart';
 
 /// 参与聚合的一笔账单。
 class CrossEntry {
@@ -102,6 +105,7 @@ class CrossAnalysisService {
   const CrossAnalysisService();
 
   CrossTable build({
+    required AppStrings s,
     required List<CrossEntry> entries,
     required CrossDimension rowDim,
     required CrossDimension colDim,
@@ -120,13 +124,13 @@ class CrossAnalysisService {
     for (final e in entries) {
       if (e.cents <= 0) continue;
       final row = _keyOf(
-        e, rowDim,
+        e, rowDim, s,
         categoryNames: categoryNames,
         accountNames: accountNames,
         monthStartDay: monthStartDay,
       );
       final col = _keyOf(
-        e, colDim,
+        e, colDim, s,
         categoryNames: categoryNames,
         accountNames: accountNames,
         monthStartDay: monthStartDay,
@@ -188,7 +192,8 @@ class CrossAnalysisService {
 
   ({String key, String label}) _keyOf(
     CrossEntry e,
-    CrossDimension dim, {
+    CrossDimension dim,
+    AppStrings s, {
     required Map<String, String> categoryNames,
     required Map<String, String> accountNames,
     required int monthStartDay,
@@ -196,24 +201,24 @@ class CrossAnalysisService {
     switch (dim) {
       case CrossDimension.category:
         final id = e.categoryId;
-        if (id == null) return (key: '__none__', label: '未分类');
-        return (key: id, label: categoryNames[id] ?? '未知分类');
+        if (id == null) return (key: '__none__', label: s.uncategorized);
+        return (key: id, label: categoryNames[id] ?? s.unknownCategory);
       case CrossDimension.account:
         final id = e.accountId;
-        if (id == null) return (key: '__none__', label: '未指定账户');
-        return (key: id, label: accountNames[id] ?? '未知账户');
+        if (id == null) return (key: '__none__', label: s.noAccount);
+        return (key: id, label: accountNames[id] ?? s.unknownAccount);
       case CrossDimension.month:
         // G-1：月份维度一律走记账月唯一入口
         final key = AccountingCalendar.labelFor(e.at, monthStartDay);
         return (key: key, label: key);
       case CrossDimension.merchant:
         final note = (e.note ?? '').trim();
-        if (note.isEmpty) return (key: '__none__', label: '未填商户');
+        if (note.isEmpty) return (key: '__none__', label: s.noMerchant);
         return (key: note, label: note);
       case CrossDimension.amountRange:
         final idx = _rangeIndexOf(e.cents);
         // 键用档位序号，保证列序与档位一致
-        return (key: '$idx', label: _rangeLabel(idx));
+        return (key: '$idx', label: _rangeLabel(idx, s));
     }
   }
 
@@ -226,11 +231,11 @@ class CrossAnalysisService {
     return b.length;
   }
 
-  String _rangeLabel(int index) {
+  String _rangeLabel(int index, AppStrings s) {
     final b = CrossAnalysisRules.boundsCents;
-    if (index == 0) return CrossAnalysisRules.underLabel;
-    if (index >= b.length) return CrossAnalysisRules.overLabel;
-    return '${b[index - 1] ~/ 100}–${b[index] ~/ 100} 元';
+    if (index == 0) return s.crossAmountUnderLabel;
+    if (index >= b.length) return s.crossAmountOverLabel;
+    return s.crossRangeLabel(b[index - 1] ~/ 100, b[index] ~/ 100);
   }
 
   /// 便捷：月份标签（G-1 唯一入口）。

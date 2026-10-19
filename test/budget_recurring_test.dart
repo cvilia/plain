@@ -1,6 +1,7 @@
 /// Budget status and recurring engine tests (in-memory DB).
 library;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:plain/app/l10n/strings_core.dart';
 import 'package:plain/core/id/uuid_v7.dart';
 import 'package:plain/core/money/money.dart';
 import 'package:plain/core/time/clock.dart';
@@ -75,7 +76,7 @@ void main() {
         categoryId: 'cat-food', accountId: 'acc-1',
         bookId: 'book-1', deviceId: 'dev-1',
         occurredAt: DateTime.utc(2026, 9, 20),
-      ));
+      ), s: kDefaultAppStrings);
 
       final useCase = ResolveBudgetStatusUseCase(repository: budgetRepo, clock: clock);
       final statusRes = await useCase.totalStatus('book-1');
@@ -95,7 +96,7 @@ void main() {
         amountExpression: '80', type: EntryType.expense,
         categoryId: 'cat-food', bookId: 'book-1', deviceId: 'dev-1',
         occurredAt: DateTime.utc(2026, 9, 10),
-      ));
+      ), s: kDefaultAppStrings);
       final useCase = ResolveBudgetStatusUseCase(repository: budgetRepo, clock: clock);
       var status = (await useCase.totalStatus('book-1')).successOrNull!;
       expect(status.level, BudgetLevel.warn);
@@ -104,7 +105,7 @@ void main() {
         amountExpression: '30', type: EntryType.expense,
         categoryId: 'cat-food', bookId: 'book-1', deviceId: 'dev-1',
         occurredAt: DateTime.utc(2026, 9, 11),
-      ));
+      ), s: kDefaultAppStrings);
       status = (await useCase.totalStatus('book-1')).successOrNull!;
       expect(status.level, BudgetLevel.over);
       expect(status.isOver, true);
@@ -142,7 +143,7 @@ void main() {
         amountExpression: '50', type: EntryType.expense,
         categoryId: 'cat-child', bookId: 'book-1', deviceId: 'dev-1',
         occurredAt: DateTime.utc(2026, 9, 5),
-      ));
+      ), s: kDefaultAppStrings);
       final spent = await budgetRepo.spentCents(
         bookId: 'book-1', categoryId: 'cat-parent',
         fromMs: DateTime.utc(2026, 9, 1).millisecondsSinceEpoch,
@@ -222,7 +223,7 @@ void main() {
       final generate = GenerateDueRecurringUseCase(
         recurringRepository: recurringRepo, ledgerRepository: ledgerRepo,
         clock: clock, idGen: idGen);
-      final result = await generate();
+      final result = await generate(s: kDefaultAppStrings);
       expect(result.isSuccess, true);
       final gen = result.requireValue;
       expect(gen.created.length, 1);
@@ -247,7 +248,7 @@ void main() {
       final generate = GenerateDueRecurringUseCase(
         recurringRepository: recurringRepo, ledgerRepository: ledgerRepo,
         clock: clock, idGen: idGen);
-      final gen = (await generate()).requireValue;
+      final gen = (await generate(s: kDefaultAppStrings)).requireValue;
       final batchId = gen.created.first.batchId!;
 
       final undo = UndoRecurringBatchUseCase(repository: ledgerRepo, clock: clock);
@@ -270,7 +271,7 @@ void main() {
       final generate = GenerateDueRecurringUseCase(
         recurringRepository: recurringRepo, ledgerRepository: ledgerRepo,
         clock: clock, idGen: idGen);
-      await generate();
+      await generate(s: kDefaultAppStrings);
 
       final updated = rule.copyWith(amount: Money(99900));
       await recurringRepo.update(updated);

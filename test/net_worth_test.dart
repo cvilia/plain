@@ -1,6 +1,7 @@
 /// STORY-10.4 净值追踪：构成可下钻、历史序列按账本回算。
 library;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:plain/app/l10n/strings_core.dart';
 import 'package:plain/core/money/money.dart';
 import 'package:plain/domain/entities/category.dart';
 import 'package:plain/domain/entities/enums.dart';
@@ -67,6 +68,7 @@ void main() {
         holdingsMarketByAccount: {'投资': 30000},
         holdingsCountByAccount: {'投资': 2},
         now: now,
+        s: kDefaultAppStrings,
       );
 
       // 投资账户计入「现金 + 持仓市值」
@@ -94,6 +96,7 @@ void main() {
         holdingsMarketByAccount: {'投资': 0},
         holdingsCountByAccount: {'投资': 3},
         now: now,
+        s: kDefaultAppStrings,
       );
       expect(snapshot.unpricedHoldings, 1);
     });
@@ -112,6 +115,7 @@ void main() {
         holdingsMarketByAccount: const {},
         holdingsCountByAccount: const {},
         now: now,
+        s: kDefaultAppStrings,
       );
       final car = snapshot.assets.single;
       expect(car.bucket, NetWorthBucket.fixed);

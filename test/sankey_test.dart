@@ -1,6 +1,7 @@
 /// STORY-11.2 Sankey 图数据派生。
 library;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:plain/app/l10n/strings_core.dart';
 import 'package:plain/domain/services/sankey_service.dart';
 
 void main() {
@@ -30,6 +31,7 @@ void main() {
           SankeyEntry(isIncome: false, cents: 20000, categoryId: 'food_dinner'),
           SankeyEntry(isIncome: false, cents: 50000, categoryId: 'life'),
         ],
+        s: kDefaultAppStrings,
       );
       // 收入未指定分类 → 归「未分类」
       expect(g.sources, hasLength(1));
@@ -55,6 +57,7 @@ void main() {
           SankeyEntry(isIncome: false, cents: 30000, categoryId: 'food_lunch'),
           SankeyEntry(isIncome: false, cents: 20000, categoryId: 'food_dinner'),
         ],
+        s: kDefaultAppStrings,
       );
       expect(g.targets.map((n) => n.label).toList(), ['午餐', '晚餐']);
     });
@@ -70,6 +73,7 @@ void main() {
           SankeyEntry(isIncome: false, cents: 10000, accountId: 'acc-b'),
           SankeyEntry(isIncome: false, cents: 5000),
         ],
+        s: kDefaultAppStrings,
       );
       expect(g.targets, hasLength(2));
       expect(g.targets.first.label, '招行信用卡');
@@ -86,6 +90,7 @@ void main() {
         entries: const [
           SankeyEntry(isIncome: false, cents: 10000, categoryId: 'life'),
         ],
+        s: kDefaultAppStrings,
       );
       expect(g.hasNoIncome, true);
       expect(g.hasNoExpense, false);
@@ -95,6 +100,7 @@ void main() {
       final g = svc.build(
         dimension: SankeyDimension.topCategory,
         entries: const [SankeyEntry(isIncome: true, cents: 10000)],
+        s: kDefaultAppStrings,
       );
       expect(g.hasNoExpense, true);
       expect(g.hasNoIncome, false);
@@ -102,7 +108,7 @@ void main() {
 
     test('完全没有账目时图为空', () {
       final g = svc.build(
-          entries: const [], dimension: SankeyDimension.topCategory);
+          entries: const [], dimension: SankeyDimension.topCategory, s: kDefaultAppStrings);
       expect(g.isEmpty, true);
       expect(g.hasNoIncome, true);
       expect(g.hasNoExpense, true);
@@ -119,6 +125,7 @@ void main() {
           SankeyEntry(isIncome: false, cents: 20000, categoryId: 'life'),
           SankeyEntry(isIncome: false, cents: 99, categoryId: 'food_lunch'),
         ],
+        s: kDefaultAppStrings,
       );
       expect(g.targets.map((n) => n.label).toList(), ['生活', '其他']);
       final other = g.targets.last;
@@ -138,6 +145,7 @@ void main() {
           SankeyEntry(isIncome: false, cents: 99000, categoryId: 'life'),
           SankeyEntry(isIncome: false, cents: 1000, categoryId: 'food_lunch'),
         ],
+        s: kDefaultAppStrings,
       );
       expect(g.targets.map((n) => n.label).toList(), ['生活', '午餐']);
       expect(g.targets.any((n) => n.isOther), false);
@@ -159,6 +167,7 @@ void main() {
         dimension: SankeyDimension.topCategory,
         entries: entries,
         categories: cats,
+        s: kDefaultAppStrings,
       );
       sw.stop();
       expect(g.targets, hasLength(2));

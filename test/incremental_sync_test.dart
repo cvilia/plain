@@ -4,12 +4,12 @@ library;
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:plain/app/l10n/strings_core.dart';
 import 'package:plain/core/id/uuid_v7.dart';
 import 'package:plain/core/money/money.dart';
 import 'package:plain/core/time/clock.dart';
 import 'package:plain/data/db/database.dart';
 import 'package:plain/data/repositories/account_repository.dart';
-import 'package:plain/data/repositories/attachment_repository.dart';
 import 'package:plain/data/repositories/ledger_repository.dart';
 import 'package:plain/data/repositories/sync_conflict_repository.dart';
 import 'package:plain/data/sync/change_log_writer.dart';
@@ -17,7 +17,6 @@ import 'package:plain/data/sync/incremental_sync_service.dart';
 import 'package:plain/data/sync/sync_applier.dart';
 import 'package:plain/data/sync/sync_wire.dart';
 import 'package:plain/data/sync/webdav_client.dart';
-import 'package:plain/domain/entities/attachment.dart';
 import 'package:plain/domain/entities/category.dart';
 import 'package:plain/domain/entities/enums.dart';
 import 'package:plain/domain/services/merge_engine.dart';
@@ -54,8 +53,6 @@ class _Device {
     idGen = UuidV7();
     ledger = LedgerRepositoryImpl(db: db, changeLogWriter: changeLog, clock: clock);
     accountRepo = AccountRepositoryImpl(db: db, changeLogWriter: changeLog, clock: clock);
-    attachmentRepo = AttachmentRepositoryImpl(
-      db: db, clock: clock, changeLogWriter: changeLog, deviceId: name);
     conflicts = SyncConflictRepositoryImpl(db: db);
     applier = SyncApplier(
       db: db,
@@ -83,7 +80,6 @@ class _Device {
   late final UuidV7 idGen;
   late final LedgerRepositoryImpl ledger;
   late final AccountRepositoryImpl accountRepo;
-  late final AttachmentRepositoryImpl attachmentRepo;
   late final SyncConflictRepositoryImpl conflicts;
   late final SyncApplier applier;
   late final IncrementalSyncService sync;
@@ -106,7 +102,7 @@ class _Device {
       note: note,
       bookId: 'book-1',
       deviceId: name,
-    ));
+    ), s: kDefaultAppStrings);
     expect(res.isSuccess, isTrue, reason: '${res.failureOrNull}');
     return res.requireValue.id;
   }
@@ -206,13 +202,12 @@ void main() {
       final filtered = SyncWire.filterSyncable([
         rec('transaction'),
         rec('member'),
-        rec('attachment'),
         rec('theme'),
         rec('pref'),
         rec('homeCardLayout'),
       ]);
       expect(filtered.map((r) => r.entityType).toList(),
-          ['transaction', 'member', 'attachment']);
+          ['transaction', 'member']);
     });
 
     test('AC5：上传内容里不出现本地偏好键', () {
@@ -386,36 +381,6 @@ void main() {
       expect(await expenseOf(b), 0);
     });
 
-    test('AC6：附件元数据同步、文件不同步', () async {
-      final entryId = await a.addExpense(3000);
-      // A 上挂一张附件（只落元数据，元数据才进同步范围）
-      final now = a.clock.now();
-      final created = await a.attachmentRepo.create(Attachment(
-        id: 'att-1',
-        entryId: entryId,
-        bookId: 'book-1',
-        storedName: 'att-1.jpg',
-        mime: 'image/jpeg',
-        sizeBytes: 1024,
-        createdAt: now,
-        updatedAt: now,
-        deviceId: 'dev-a',
-      ));
-      expect(created.isSuccess, isTrue, reason: '${created.failureOrNull}');
-      await a.sync.push(WebDavConfig(baseUrl: 'x', username: '', password: ''));
-
-      final pulled = await b.sync.pull(WebDavConfig(baseUrl: 'x', username: '', password: ''));
-      expect(pulled.pulled, greaterThan(0));
-
-      final onB = (await b.attachmentRepo.listByEntry(entryId)).requireValue;
-      expect(onB.length, 1, reason: '元数据要能同步过去');
-      expect(onB.first.mime, 'image/jpeg');
-      // 文件名过来了，但 B 上没有这个文件 → 界面据此标「未同步（仅在原设备）」
-      final rows = b.db.raw.select(
-          "SELECT COUNT(*) AS c FROM attachments WHERE id='att-1'");
-      expect(rows.first['c'], 1);
-      expect(onB.first.storedName, 'att-1.jpg');
-    });
 
     test('清空类改动能同步过去（远端置 null 也是改动）', () async {
       final id = await a.addExpense(3000, note: '午饭');

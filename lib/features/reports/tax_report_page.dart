@@ -31,6 +31,10 @@ import 'package:plain/domain/entities/ledger_entry.dart';
 import 'package:plain/domain/entities/tax_filing.dart';
 import 'package:plain/domain/services/tax_service.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:plain/app/l10n/app_strings.dart';
+import 'package:plain/app/l10n/strings_reports.dart';
+import 'package:plain/app/l10n/strings_accounts.dart';
+import 'package:plain/app/l10n/strings_domain.dart';
 
 const _svc = TaxService();
 
@@ -59,6 +63,7 @@ class _TaxReportPageState extends ConsumerState<TaxReportPage> {
 
   List<({String key, String label, bool isYear})> _options() =>
       TaxService.periodOptions(
+        s: AppStrings.of(context),
         now: ref.read(appDependenciesProvider).clock.now(),
         monthStartDay: ref.read(monthStartDayProvider),
       );
@@ -111,6 +116,7 @@ class _TaxReportPageState extends ConsumerState<TaxReportPage> {
       _deductibleEntries = mine;
       _filings = filingList;
       _summary = _svc.summarize(
+        s: AppStrings.of(context),
         entries: [
           for (final e in mine)
             TaxEntry(cents: e.amount.cents, at: e.occurredAt, categoryId: e.categoryId),
@@ -129,6 +135,7 @@ class _TaxReportPageState extends ConsumerState<TaxReportPage> {
 
   @override
   Widget build(BuildContext context) {
+    final s = AppStrings.of(context);
     final colors = context.colors;
     final options = _options();
     // 申报周期候选随「记账月 / 年度」切换。
@@ -137,12 +144,12 @@ class _TaxReportPageState extends ConsumerState<TaxReportPage> {
         .toList();
     return Scaffold(
       appBar: PlainTopBar(
-        title: '税务报表',
+        title: s.reportTaxTitle,
         showBack: true,
         actions: [
           PlainTopBarAction(
             icon: PlainIconData.export,
-            tooltip: '导出明细',
+            tooltip: s.taxExportTooltip,
             onTap: _exportCsv,
           ),
         ],
@@ -155,7 +162,7 @@ class _TaxReportPageState extends ConsumerState<TaxReportPage> {
                     Spacing.lg, Spacing.sm, Spacing.lg, Spacing.xl),
                 children: [
                   PlainSeg(
-                    items: const ['记账月', '年度'],
+                    items: [s.taxPeriodMonth, s.taxPeriodYear],
                     selectedIndex: _kind == TaxPeriodKind.month ? 0 : 1,
                     onChanged: (i) {
                       setState(() {
@@ -169,17 +176,17 @@ class _TaxReportPageState extends ConsumerState<TaxReportPage> {
                   ),
                   const SizedBox(height: Spacing.sm),
                   PickerField(
-                    label: '申报周期',
+                    label: s.taxPeriodLabel,
                     value: () {
                       for (final o in periodOptions) {
                         if (o.key == _periodKey) return o.label;
                       }
-                      return '请选择';
+                      return s.pleaseSelect;
                     }(),
                     onTap: () async {
                       final picked = await showOptionPicker<String>(
                         context: context,
-                        title: '申报周期',
+                        title: s.taxPeriodLabel,
                         current: _periodKey,
                         options: [
                           for (final o in periodOptions)
@@ -197,7 +204,7 @@ class _TaxReportPageState extends ConsumerState<TaxReportPage> {
                     Text(
                       _summary.isFiled
                           ? '已申报（${_summary.filedAt == null ? '' : _fmtDay(_summary.filedAt!)}）'
-                          : '未申报',
+                          : s.taxUnfiledStatus,
                       style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
@@ -216,12 +223,12 @@ class _TaxReportPageState extends ConsumerState<TaxReportPage> {
                   if (_summary.isEmpty)
                     AppEmptyState(
                       icon: PlainIconData.receipt,
-                      title: '该周期没有可抵扣支出',
+                      title: s.taxEmptyTitle,
                       subtitle: '在分类管理里把相关分类标为「可抵扣」后，'
                           '它们的支出会自动汇总到这里',
                     )
                   else ...[
-                    PlainEyebrow('可抵扣明细 · ${_summary.lines.length} 类'),
+                    PlainEyebrow(s.taxLinesEyebrow(_summary.lines.length)),
                     PlainPanel(children: [
                       for (var i = 0; i < _summary.lines.length; i++) ...[
                         if (i > 0)
@@ -236,7 +243,7 @@ class _TaxReportPageState extends ConsumerState<TaxReportPage> {
                     const SizedBox(height: Spacing.sm),
                     PlainPanel(children: [
                       PlainRow(
-                        title: '合计（${_summary.totalCount} 笔）',
+                        title: s.taxTotalRow(_summary.totalCount),
                         trailing: Text(
                           formatAmountYuan(_summary.totalCents),
                           style: TextStyle(
@@ -263,6 +270,7 @@ class _TaxReportPageState extends ConsumerState<TaxReportPage> {
   }
 
   Future<void> _toggleFiled() async {
+    final s = AppStrings.of(context);
     final deps = ref.read(appDependenciesProvider);
     final key = _periodKey;
     if (key == null) return;
@@ -272,14 +280,14 @@ class _TaxReportPageState extends ConsumerState<TaxReportPage> {
       if (filing == null) return;
       final ok = await showConfirmDialog(
         context,
-        title: '取消申报',
-        message: '取消「$key」的已申报标记？',
-        confirmLabel: '取消申报',
+        title: s.taxUnfileTitle,
+        message: s.taxUnfileConfirm(key),
+        confirmLabel: s.taxUnfileTitle,
         destructive: true,
       );
       if (ok != true || !mounted) return;
       await deps.taxFilingRepository.unmarkFiled(filing.id);
-      if (mounted) showAppToast(context, '已取消申报');
+      if (mounted) showAppToast(context, s.taxUnfiledToast);
     } else {
       final r = await deps.taxFilingRepository.markFiled(
         id: deps.idGen.generate(),
@@ -289,15 +297,16 @@ class _TaxReportPageState extends ConsumerState<TaxReportPage> {
         deviceId: deps.deviceId,
       );
       if (!mounted) return;
-      showAppToast(context, r.isSuccess ? '已标记申报' : '标记失败');
+      showAppToast(context, r.isSuccess ? s.taxFiledToast : s.taxMarkFailed);
     }
     await _load();
   }
 
   /// 导出该周期的可抵扣明细（CSV，走系统分享，与「高级筛选」同一套做法）。
   Future<void> _exportCsv() async {
+    final s = AppStrings.of(context);
     if (_summary.isEmpty) {
-      showAppToast(context, '该周期没有可导出的明细');
+      showAppToast(context, s.taxNoExport);
       return;
     }
     final key = _periodKey ?? '';
@@ -327,9 +336,9 @@ class _TaxReportPageState extends ConsumerState<TaxReportPage> {
       await file.writeAsString(buf.toString(), flush: true);
       if (!mounted) return;
       await Share.shareXFiles([XFile(file.path)],
-          subject: '可抵扣支出明细 $key（${mine.length} 笔）');
+          subject: s.taxShareSubject(key, mine.length));
     } catch (_) {
-      if (mounted) showAppToast(context, '导出失败');
+      if (mounted) showAppToast(context, s.exportFailed);
     }
   }
 
@@ -354,6 +363,7 @@ class _LineRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final s = AppStrings.of(context);
     final colors = context.colors;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -366,7 +376,7 @@ class _LineRow extends StatelessWidget {
                   style: const TextStyle(
                       fontSize: 15, fontWeight: FontWeight.w500)),
               const SizedBox(height: 2),
-              Text('${line.count} 笔',
+              Text(s.entriesCount(line.count),
                   style: TextStyle(fontSize: 12, color: colors.inkTertiary)),
             ],
           ),
@@ -383,14 +393,15 @@ class _NotePanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final s = AppStrings.of(context);
     final colors = context.colors;
     final lines = <String>[
-      '「可抵扣」是分类上的标记：在分类管理里标记后，该分类的支出会自动汇总到这里。',
-      '二级分类继承其根分类的标记，不用逐个设置。',
-      '年度汇总按自然年；记账月汇总按你在设置里定的月起始日。',
+      s.taxNote1,
+      s.taxNote2,
+      s.taxNote3,
       isFiled
-          ? '该周期已标记申报，取消后可以重新汇总。'
-          : '汇总无误后可以标记「已申报」，标记只记录状态，不影响账单。',
+          ? s.taxNoteFiled
+          : s.taxNoteUnfiled,
     ];
     return PlainPanel(
       padding: const EdgeInsets.all(Spacing.lg),

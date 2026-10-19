@@ -98,7 +98,9 @@ class CurrencyRateRepositoryImpl implements CurrencyRateRepository {
         changedAt: now,
       );
       return ok(saved);
-    } on Exception catch (e) {
+    } on Object catch (e) {
+      // 捕 Object 而不是 Exception：sqlite3 的 TypeError/StateError 等 Error
+      // 会漏过 `on Exception`，一路逃到界面 —— 表现为「点保存没反应」（真机反馈）。
       return err(StorageFailure('db.insert_failed', e.toString(), isRetryable: true));
     }
   }

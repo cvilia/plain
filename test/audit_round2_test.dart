@@ -11,6 +11,7 @@ import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:plain/app/bootstrap.dart';
+import 'package:plain/app/l10n/strings_core.dart';
 import 'package:plain/core/id/uuid_v7.dart';
 import 'package:plain/core/money/money.dart';
 import 'package:plain/core/constants/app_constants.dart';
@@ -18,7 +19,6 @@ import 'package:plain/core/time/clock.dart';
 import 'package:plain/data/db/column_writer.dart';
 import 'package:plain/data/db/database.dart';
 import 'package:plain/data/repositories/account_repository.dart';
-import 'package:plain/data/repositories/attachment_repository.dart';
 import 'package:plain/data/repositories/currency_rate_repository.dart';
 import 'package:plain/data/repositories/ledger_repository.dart';
 import 'package:plain/data/repositories/recurring_repository.dart';
@@ -27,7 +27,6 @@ import 'package:plain/data/repositories/sync_conflict_repository.dart';
 import 'package:plain/data/sync/change_log_writer.dart';
 import 'package:plain/data/sync/sync_applier.dart';
 import 'package:plain/data/sync/sync_wire.dart';
-import 'package:plain/domain/entities/attachment.dart';
 import 'package:plain/domain/entities/category.dart';
 import 'package:plain/domain/entities/enums.dart';
 import 'package:plain/domain/entities/ledger_entry.dart';
@@ -254,70 +253,6 @@ void main() {
     });
   });
 
-  // ③ ── 附件孤儿生命周期补 change_log ──
-  group('③ 附件清理写 change_log', () {
-    Future<AttachmentRepositoryImpl> setUpAttachment({String id = 'att-1'}) async {
-      final repo = AttachmentRepositoryImpl(
-          db: db, clock: clock, changeLogWriter: changeLog, deviceId: kDevice);
-      await repo.create(Attachment(
-        id: id, entryId: 'entry-1', bookId: kBook,
-        storedName: '$id.jpg', mime: 'image/jpeg', sizeBytes: 1024,
-        createdAt: clock.now(), updatedAt: clock.now(), deviceId: kDevice,
-      ));
-      return repo;
-    }
-
-    test('账单删除 → 标孤儿；恢复 → 清标记；清理 → delete（三条都写日志）', () async {
-      final repo = await setUpAttachment();
-      // create 自己也记一条 insert
-      var logs = db.raw.select(
-          "SELECT op FROM change_log WHERE entity_type = 'attachment' ORDER BY local_revision");
-      expect(logs, hasLength(1));
-      expect(logs.first['op'], 'insert');
-
-      final marked = await repo.markOrphanedByEntry('entry-1', clock.now());
-      expect(marked.requireValue, 1);
-      logs = db.raw.select(
-          "SELECT op, payload FROM change_log WHERE entity_type = 'attachment' "
-          'ORDER BY local_revision');
-      expect(logs, hasLength(2), reason: '孤儿标记要跨端');
-      expect(logs.last['op'], 'update');
-      var payload = jsonDecode(logs.last['payload']! as String) as Map<String, Object?>;
-      expect((payload['after']! as Map<String, Object?>)['is_orphan'], 1);
-      expect((payload['before']! as Map<String, Object?>)['is_orphan'], 0);
-
-      final restored = await repo.restoreByEntry('entry-1');
-      expect(restored.requireValue, 1);
-      logs = db.raw.select(
-          "SELECT op, payload FROM change_log WHERE entity_type = 'attachment' "
-          'ORDER BY local_revision');
-      expect(logs, hasLength(3));
-      payload = jsonDecode(logs.last['payload']! as String) as Map<String, Object?>;
-      expect((payload['before']! as Map<String, Object?>)['is_orphan'], 1);
-      expect((payload['after']! as Map<String, Object?>)['is_orphan'], 0);
-
-      // 巡检超期清理 → 物理删本地 + delete 变更（对端不能留幽灵附件）
-      await repo.hardDelete('att-1');
-      logs = db.raw.select(
-          "SELECT op, payload FROM change_log WHERE entity_type = 'attachment' "
-          'ORDER BY local_revision');
-      expect(logs, hasLength(4));
-      expect(logs.last['op'], 'delete');
-      payload = jsonDecode(logs.last['payload']! as String) as Map<String, Object?>;
-      expect((payload['before']! as Map<String, Object?>)['id'], 'att-1');
-      expect(db.raw.select('SELECT COUNT(*) AS c FROM attachments').first['c'], 0);
-    });
-
-    test('没有变化时不写空变更（已孤儿的行再标一次不产生日志）', () async {
-      final repo = await setUpAttachment();
-      await repo.markOrphanedByEntry('entry-1', clock.now());
-      await repo.markOrphanedByEntry('entry-1', clock.now());
-      final logs = db.raw.select(
-          "SELECT COUNT(*) AS c FROM change_log WHERE entity_type = 'attachment'");
-      expect(logs.first['c'], 2, reason: 'insert + 一次真正生效的 update');
-    });
-  });
-
   // ④ ── 撤销周期批次回滚目标进度 ──
   group('④ 撤销储蓄划拨批次', () {
     const monthStartDay = 5;
@@ -340,7 +275,7 @@ void main() {
       final generate = GenerateDueRecurringUseCase(
         recurringRepository: recurringRepo, ledgerRepository: ledgerRepo,
         clock: clock, idGen: UuidV7(), savingsGoalRepository: goalRepo);
-      final gen = await generate();
+      final gen = await generate(s: kDefaultAppStrings);
       expect(gen.isSuccess, isTrue, reason: gen.failureOrNull?.toString() ?? '');
       final updated = (await recurringRepo.getById(rule.id)).requireValue;
       return (batchId: updated.lastBatchId!, rule: updated);
@@ -398,7 +333,7 @@ void main() {
       final generate = GenerateDueRecurringUseCase(
         recurringRepository: recurringRepo, ledgerRepository: ledgerRepo,
         clock: clock, idGen: UuidV7(), savingsGoalRepository: goalRepo);
-      final gen = await generate();
+      final gen = await generate(s: kDefaultAppStrings);
       expect(gen.successOrNull!.created, hasLength(1));
       final batchId = (await recurringRepo.getById('rr-1')).requireValue.lastBatchId!;
 

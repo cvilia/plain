@@ -12,6 +12,8 @@ import 'package:plain/design_system/app_toast.dart';
 import 'package:plain/design_system/plain_icons_v3.dart';
 import 'package:plain/domain/entities/member.dart';
 import 'package:plain/domain/services/member_service.dart';
+import 'package:plain/app/l10n/app_strings.dart';
+import 'package:plain/app/l10n/strings_ledger.dart';
 
 /// 详情页的「参与分摊」行。
 class EntryParticipantsRow extends ConsumerStatefulWidget {
@@ -54,6 +56,7 @@ class _EntryParticipantsRowState extends ConsumerState<EntryParticipantsRow> {
   }
 
   Future<void> _edit() async {
+    final s = AppStrings.of(context);
     final deps = ref.read(appDependenciesProvider);
     // 只列**在册**成员（已退出者不再出现在选择器里，PRD 8.2 生命周期）；
     // 但若该笔已标记了已退出成员，仍要显示出来，避免「标记凭空消失」
@@ -71,10 +74,10 @@ class _EntryParticipantsRowState extends ConsumerState<EntryParticipantsRow> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Text('谁一起花的', style: Theme.of(ctx).textTheme.titleMedium),
+                Text(s.whoSpentTogether, style: Theme.of(ctx).textTheme.titleMedium),
                 const SizedBox(height: Spacing.sm),
                 Text(
-                  '选中的每个人平均分摊（共 ¥${formatAmount(widget.amountCents, hide: false)}）',
+                  s.splitEquallyPrompt(formatAmount(widget.amountCents, hide: false)),
                   style: TextStyle(
                     fontSize: 12,
                     height: designLineHeight(12),
@@ -90,7 +93,7 @@ class _EntryParticipantsRowState extends ConsumerState<EntryParticipantsRow> {
                           CheckboxListTile(
                             value: selected.contains(m.id),
                             title: Text(m.name),
-                            subtitle: Text(m.role.label),
+                            subtitle: Text(m.role.label(AppStrings.of(context))),
                             onChanged: (v) => setSheet(() {
                               if (v == true) {
                                 selected.add(m.id);
@@ -115,7 +118,7 @@ class _EntryParticipantsRowState extends ConsumerState<EntryParticipantsRow> {
                     if (!ctx.mounted) return;
                     Navigator.pop(ctx, res.isSuccess);
                   },
-                  child: const Text('保存'),
+                  child: Text(s.save),
                 ),
               ],
             ),
@@ -126,30 +129,37 @@ class _EntryParticipantsRowState extends ConsumerState<EntryParticipantsRow> {
 
     if (saved == true) {
       await _load();
-      if (mounted) showAppToast(context, '已更新参与人');
+      if (mounted) showAppToast(context, s.participantsUpdated);
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final s = AppStrings.of(context);
     final colors = context.colors;
     final byId = {for (final m in _members) m.id: m};
     final shares = MemberService.splitEqually(widget.amountCents, _participantIds);
     final label = _loading
         ? '…'
         : _participantIds.isEmpty
-            ? '未标记'
-            : '${_participantIds.map((id) => MemberService.labelOf(id, byId)).join('、')}'
-                ' · 每人 ¥${formatAmount(shares.isEmpty ? 0 : shares.first.cents, hide: false)}';
+            ? s.notMarked
+            : '${_participantIds.map((id) => MemberService.labelOf(id, byId, AppStrings.of(context))).join('、')}'
+                '${s.eachPersonShare(formatAmount(shares.isEmpty ? 0 : shares.first.cents, hide: false))}';
 
+    // 行高与左右基准都对齐同页 `_DetailRow`：
+    //  · 高度 —— 原来 vertical 14 + 19 = 47，比相邻事实行高 3pt，连续看会「凸」出来；
+    //    统一 `minHeight 44`（别写死高度，多行备注时不至于截断）。
+    //  · 水平 —— 原来 `horizontal: 4` 让「参与分摊」比其它标签左移 4pt，右列 chevron
+    //    也压不进同一条竖线。归零后标签左边缘、chevron 右边缘都落在 16pt 基准上。
     return InkWell(
       onTap: _loading ? null : _edit,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 14),
+      child: Container(
+        constraints: const BoxConstraints(minHeight: 44),
+        padding: const EdgeInsets.symmetric(vertical: 12),
         child: Row(
           children: [
             Text(
-              '参与分摊',
+              s.participantsRowLabel,
               style: TextStyle(
                 fontSize: 14,
                 height: designLineHeight(14),

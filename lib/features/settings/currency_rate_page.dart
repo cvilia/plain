@@ -10,6 +10,7 @@ import 'package:plain/app/bootstrap.dart';
 import 'package:plain/app/breakpoints.dart';
 import 'package:plain/app/theme/app_colors.dart';
 import 'package:plain/app/theme/design_tokens.dart';
+import 'package:plain/app/theme/typography.dart';
 import 'package:plain/core/constants/app_constants.dart';
 import 'package:plain/design_system/app_empty_state.dart';
 import 'package:plain/design_system/app_toast.dart';
@@ -18,6 +19,9 @@ import 'package:plain/design_system/picker_sheet.dart';
 import 'package:plain/design_system/plain_icons_v3.dart';
 import 'package:plain/design_system/plain_ui.dart';
 import 'package:plain/domain/entities/currency_rate.dart';
+import 'package:plain/app/l10n/app_strings.dart';
+import 'package:plain/app/l10n/strings_settings_a.dart';
+import 'package:plain/app/l10n/strings_settings_b.dart';
 
 class CurrencyRatePage extends ConsumerStatefulWidget {
   const CurrencyRatePage({super.key});
@@ -49,16 +53,17 @@ class _CurrencyRatePageState extends ConsumerState<CurrencyRatePage> {
 
   @override
   Widget build(BuildContext context) {
+    final s = AppStrings.of(context);
     final colors = context.colors;
     final base = MoneyRules.defaultCurrency;
     return Scaffold(
       appBar: PlainTopBar(
-        title: '汇率锁定',
+        title: s.currencyRateTitle,
         showBack: true,
         actions: [
           PlainTopBarAction(
             icon: PlainIconData.plus,
-            tooltip: '新增汇率',
+            tooltip: s.addRate,
             onTap: () => _edit(null),
           ),
         ],
@@ -73,13 +78,13 @@ class _CurrencyRatePageState extends ConsumerState<CurrencyRatePage> {
                   if (_rates.isEmpty)
                     AppEmptyState(
                       icon: PlainIconData.cloud,
-                      title: '还没有锁定汇率',
+                      title: s.noLockedRate,
                       subtitle: '给外币账户设定「1 单位外币 = 多少 $base」后，'
                           '用该账户记账时会自动折算成本位币',
                       action: FilledButton.icon(
                         onPressed: () => _edit(null),
                         icon: const PlainIcon(PlainIconData.plus),
-                        label: const Text('新增汇率'),
+                        label: Text(s.addRate),
                       ),
                     )
                   else
@@ -107,6 +112,7 @@ class _CurrencyRatePageState extends ConsumerState<CurrencyRatePage> {
   }
 
   Future<void> _edit(CurrencyRate? existing) async {
+    final s = AppStrings.of(context);
     final currencies = CurrencyRules.symbols.keys
         .where((c) => c != MoneyRules.defaultCurrency)
         .toList();
@@ -123,17 +129,18 @@ class _CurrencyRatePageState extends ConsumerState<CurrencyRatePage> {
     );
     if (!mounted) return;
     if (saved == true) {
-      showAppToast(context, '已锁定汇率');
+      showAppToast(context, s.rateLocked);
       await _load();
     }
   }
 
   Future<void> _remove(CurrencyRate r) async {
+    final s = AppStrings.of(context);
     final ok = await showConfirmDialog(
       context,
-      title: '解除锁定',
-      message: '解除 ${r.pairKey} 的锁定？已记的账单不受影响。',
-      confirmLabel: '解除',
+      title: s.unlockRate,
+      message: s.unlockRateConfirm(r.pairKey),
+      confirmLabel: s.unlockRelation,
       destructive: true,
     );
     if (ok != true || !mounted) return;
@@ -177,6 +184,10 @@ class _RateEditDialogState extends ConsumerState<_RateEditDialog> {
       text: widget.existing == null ? '' : formatRate(widget.existing!.rate));
   bool _saving = false;
 
+  /// 内联错误文案。**不再用 toast 报失败**：弹窗的模态遮罩会把它盖住，
+  /// 用户看到的就是「点了保存没反应」（真机反馈 2026-10-15）。
+  String? _error;
+
   @override
   void dispose() {
     _rateCtrl.dispose();
@@ -184,48 +195,68 @@ class _RateEditDialogState extends ConsumerState<_RateEditDialog> {
   }
 
   Future<void> _pick() async {
+    final s = AppStrings.of(context);
     final picked = await showCurrencyPicker(
       context: context,
       currencies: widget.currencies,
       current: _from,
-      title: '选择外币',
+      title: s.selectForeignCurrency,
     );
     if (picked != null && mounted) setState(() => _from = picked);
   }
 
   Future<void> _save() async {
+    final s = AppStrings.of(context);
     final rate = double.tryParse(_rateCtrl.text.trim());
     if (rate == null || rate <= 0) {
-      showAppToast(context, '请输入大于 0 的汇率');
+      setState(() => _error = s.rateMustBePositive);
       return;
     }
-    setState(() => _saving = true);
-    final deps = ref.read(appDependenciesProvider);
-    final r = await deps.currencyRateRepository.setRate(
-      bookId: deps.bookId,
-      fromCurrency: _from,
-      toCurrency: MoneyRules.defaultCurrency,
-      rate: rate,
-      deviceId: deps.deviceId,
-    );
-    if (!mounted) return;
-    setState(() => _saving = false);
-    if (r.isFailure) {
-      // 失败时不关弹窗，用户可直接改数重试。
-      showAppToast(context, '保存失败：${r.failureOrNull?.code ?? ''}');
-      return;
+    setState(() {
+      _saving = true;
+      _error = null;
+    });
+    try {
+      final deps = ref.read(appDependenciesProvider);
+      final r = await deps.currencyRateRepository.setRate(
+        bookId: deps.bookId,
+        fromCurrency: _from,
+        toCurrency: MoneyRules.defaultCurrency,
+        rate: rate,
+        deviceId: deps.deviceId,
+      );
+      if (!mounted) return;
+      if (r.isFailure) {
+        // 失败时不关弹窗，用户可直接改数重试。
+        setState(() {
+          _saving = false;
+          _error = '保存失败：${r.failureOrNull?.code ?? 'unknown'}';
+        });
+        return;
+      }
+      Navigator.pop(context, true);
+    } catch (e) {
+      // ⚠️ 这里必须捕 `Object` 而不是 `Exception`：仓储只 catch Exception，
+      // `TypeError` / `StateError` 这类 Error 会一路逃出来 —— 原先的后果是
+      // 「保存中…」永久卡住（按钮被 `_saving ? null` 置灰，之后怎么点都没反应），
+      // 且界面没有任何提示。现在无论如何都复位并把原因显示出来。
+      if (!mounted) return;
+      setState(() {
+        _saving = false;
+        _error = s.saveFailedDetail(e.toString());
+      });
     }
-    Navigator.pop(context, true);
   }
 
   @override
   Widget build(BuildContext context) {
+    final s = AppStrings.of(context);
     final colors = context.colors;
     final existing = widget.existing;
     return AlertDialog(
       // 键盘弹起时内容可滚动，避免定型高度不够而溢出。
       scrollable: true,
-      title: Text(existing == null ? '新增锁定汇率' : '修改锁定汇率'),
+      title: Text(existing == null ? s.addLockedRateTitle : s.editLockedRateTitle),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -235,8 +266,8 @@ class _RateEditDialogState extends ConsumerState<_RateEditDialog> {
             // 已存在的汇率不允许改币种（改币种等于换一条记录）。
             onTap: existing != null ? null : _pick,
             child: InputDecorator(
-              decoration: const InputDecoration(
-                  labelText: '外币', border: OutlineInputBorder()),
+              decoration: InputDecoration(
+                  labelText: s.foreignCurrency, border: OutlineInputBorder()),
               child: Row(children: [
                 Expanded(
                   child: Text(
@@ -268,15 +299,27 @@ class _RateEditDialogState extends ConsumerState<_RateEditDialog> {
               border: const OutlineInputBorder(),
             ),
           ),
+          // 失败原因就在输入框下面，用户看得见（toast 会被弹窗遮罩盖住）
+          if (_error != null) ...[
+            const SizedBox(height: Spacing.sm),
+            Text(
+              _error!,
+              style: TextStyle(
+                fontSize: 12,
+                height: designLineHeight(12),
+                color: colors.expense,
+              ),
+            ),
+          ],
         ],
       ),
       actions: [
         TextButton(
             onPressed: _saving ? null : () => Navigator.pop(context, false),
-            child: const Text('取消')),
+            child: Text(s.cancel)),
         FilledButton(
           onPressed: _saving ? null : _save,
-          child: Text(_saving ? '保存中…' : '保存'),
+          child: Text(_saving ? s.recurringSaving : s.save),
         ),
       ],
     );
@@ -305,6 +348,7 @@ class _RateRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final s = AppStrings.of(context);
     final colors = context.colors;
     return InkWell(
       onTap: onTap,
@@ -321,14 +365,14 @@ class _RateRow extends StatelessWidget {
                       fontSize: 15, fontWeight: FontWeight.w500),
                 ),
                 const SizedBox(height: 2),
-                Text('已锁定', style: TextStyle(fontSize: 12, color: colors.income)),
+                Text(s.rateLockedBadge, style: TextStyle(fontSize: 12, color: colors.income)),
               ],
             ),
           ),
           IconButton(
             onPressed: onDelete,
             icon: const PlainIcon(PlainIconData.delete, size: 20),
-            tooltip: '删除锁定汇率',
+            tooltip: s.deleteLockedRate,
           ),
         ]),
       ),
@@ -342,12 +386,13 @@ class _NotePanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final s = AppStrings.of(context);
     final colors = context.colors;
     final lines = <String>[
-      '汇率只有这一个来源：你手动设定的值。本项目不接外部行情，不会发起任何网络请求。',
+      s.rateNoteSource,
       '锁定后，用该外币账户记账时按此汇率折成本位币 $base；'
           '本位币金额用于所有统计，原币金额单独保留并双显示。',
-      '某笔账单也可以带自己的汇率（记在账单上），它优先于这里的锁定值。',
+      s.rateNotePerEntry,
     ];
     return PlainPanel(
       padding: const EdgeInsets.all(Spacing.lg),

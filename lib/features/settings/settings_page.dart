@@ -34,6 +34,13 @@ import 'package:plain/features/settings/savings_goals_page.dart';
 import 'package:plain/features/settings/sync_page.dart';
 import 'package:plain/features/settings/theme_page.dart';
 import 'package:plain/features/settings/trash_page.dart';
+import 'package:plain/app/l10n/app_strings.dart';
+import 'package:plain/app/l10n/strings_core.dart';
+import 'package:plain/app/l10n/strings_accounts.dart';
+import 'package:plain/app/l10n/strings_domain.dart';
+import 'package:plain/app/l10n/strings_settings_a.dart';
+import 'package:plain/app/l10n/strings_settings_b.dart';
+import 'package:plain/app/l10n/strings_ledger.dart';
 
 class SettingsPage extends ConsumerWidget {
   const SettingsPage({super.key});
@@ -46,6 +53,7 @@ class SettingsPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final s = AppStrings.of(context);
     final hideAmounts = ref.watch(hideAmountsProvider);
     final appLockEnabled = ref.watch(appLockEnabledProvider);
     final prefs = ref.watch(themePrefsProvider);
@@ -55,7 +63,7 @@ class SettingsPage extends ConsumerWidget {
 
     return Scaffold(
       // Tab 页是导航终点：无返回箭头（标题居中走 PlainTopBar 默认行为）
-      appBar: const PlainTopBar(title: '我的'),
+      appBar: PlainTopBar(title: s.navMine),
       body: ContentWidthConstraint(
         child: ListView(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
@@ -77,7 +85,7 @@ class SettingsPage extends ConsumerWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            '隐私承诺',
+                            s.privacyPledge,
                             style: TextStyle(
                               fontSize: 15,
                               fontWeight: FontWeight.w600,
@@ -86,7 +94,7 @@ class SettingsPage extends ConsumerWidget {
                           ),
                           const SizedBox(height: 2),
                           Text(
-                            '无广告、无外联、无埋点上报',
+                            s.privacyPledgeDesc,
                             style: TextStyle(fontSize: 14, color: colors.income),
                           ),
                         ],
@@ -98,19 +106,19 @@ class SettingsPage extends ConsumerWidget {
             ),
 
             // 记账
-            PlainEyebrow('记账'),
+            PlainEyebrow(s.secLedger),
             PlainPanel(children: [
               PlainRow(
-                title: '月起始日',
-                value: '$monthStartDay 日',
+                title: s.monthStartDay,
+                value: s.monthStartDayValue(monthStartDay),
                 showChevron: true,
                 onTap: () async {
                   final d = await showPlainPickerSheet<int>(
                     context: context,
-                    title: '月起始日',
+                    title: s.monthStartDay,
                     selected: monthStartDay,
                     options: [
-                      for (var i = 1; i <= 28; i++) (i, '每月 $i 日'),
+                      for (var i = 1; i <= 28; i++) (i, s.recurringMonthlyOnDay(i)),
                     ],
                   );
                   if (d == null) return;
@@ -118,17 +126,24 @@ class SettingsPage extends ConsumerWidget {
                 },
               ),
               PlainRow(
-                title: '字体大小',
-                value: kFontScaleLabels[display.fontScaleIndex],
+                title: s.fontSize,
+                value: [s.fontScaleSmall, s.fontScaleStandard, s.fontScaleLarge][display.fontScaleIndex],
                 showChevron: true,
                 onTap: () async {
                   final i = await showPlainPickerSheet<int>(
                     context: context,
-                    title: '字体大小',
+                    title: s.fontSize,
                     selected: display.fontScaleIndex,
                     options: [
-                      for (var j = 0; j < kFontScaleLabels.length; j++)
-                        (j, kFontScaleLabels[j]),
+                      for (var j = 0; j < 3; j++)
+                        (
+                          j,
+                          [
+                            s.fontScaleSmall,
+                            s.fontScaleStandard,
+                            s.fontScaleLarge
+                          ][j]
+                        ),
                     ],
                   );
                   if (i == null) return;
@@ -136,7 +151,7 @@ class SettingsPage extends ConsumerWidget {
                 },
               ),
               PlainRow(
-                title: '记账确认音效',
+                title: s.soundOnSave,
                 trailing: PlainSwitch(
                   value: display.soundEnabled,
                   onChanged: (v) =>
@@ -144,7 +159,7 @@ class SettingsPage extends ConsumerWidget {
                 ),
               ),
               PlainRow(
-                title: '保存后停留在记账页',
+                title: s.stayAfterSave,
                 trailing: PlainSwitch(
                   value: display.stayAfterSave,
                   onChanged: (v) => ref
@@ -154,17 +169,17 @@ class SettingsPage extends ConsumerWidget {
               ),
               // STORY-9.3：外币账户记账用的锁定汇率
               PlainRow(
-                title: '汇率锁定',
+                title: s.currencyRateTitle,
                 showChevron: true,
                 onTap: () => _open(context, const CurrencyRatePage()),
               ),
             ]),
 
             // 安全
-            PlainEyebrow('安全'),
+            PlainEyebrow(s.security),
             PlainPanel(children: [
               PlainRow(
-                title: '应用锁',
+                title: s.appLock,
                 trailing: PlainSwitch(
                   value: appLockEnabled,
                   onChanged: (v) async {
@@ -183,7 +198,7 @@ class SettingsPage extends ConsumerWidget {
                 ),
               ),
               PlainRow(
-                title: '隐藏金额',
+                title: s.hideAmounts,
                 trailing: PlainSwitch(
                   value: hideAmounts,
                   onChanged: (v) =>
@@ -193,22 +208,22 @@ class SettingsPage extends ConsumerWidget {
             ]),
 
             // 外观
-            PlainEyebrow('外观'),
+            PlainEyebrow(s.appearance),
             PlainPanel(children: [
               PlainRow(
-                title: '主题',
+                title: s.theme,
                 value: prefs.themeId.name,
                 showChevron: true,
                 onTap: () => _open(context, const ThemePage()),
               ),
               PlainRow(
-                title: '外观模式',
-                value: '跟随系统',
+                title: s.appearanceMode,
+                value: s.themeSystem,
                 showChevron: true,
                 onTap: () => _open(context, const ThemePage()),
               ),
               PlainRow(
-                title: '首页卡片',
+                title: s.homeCards,
                 value: '',
                 showChevron: true,
                 onTap: () => _open(context, const HomeLayoutPage()),
@@ -216,87 +231,87 @@ class SettingsPage extends ConsumerWidget {
             ]),
 
             // 数据
-            PlainEyebrow('数据'),
+            PlainEyebrow(s.data),
             PlainPanel(children: [
               PlainRow(
-                title: '分类管理',
+                title: s.categories,
                 showChevron: true,
                 onTap: () => _open(context, const CategoryManagePage()),
               ),
               PlainRow(
-                title: '预算',
+                title: s.entityBudget,
                 showChevron: true,
                 onTap: () => _open(context, const BudgetPage()),
               ),
               PlainRow(
-                title: '周期记账',
+                title: s.actionLogEntityRecurring,
                 showChevron: true,
                 onTap: () => _open(context, const RecurringPage()),
               ),
               PlainRow(
-                title: '备份与恢复',
+                title: s.backupRestore,
                 showChevron: true,
                 onTap: () => _open(context, const BackupPage()),
               ),
               PlainRow(
-                title: '批量导入',
+                title: s.bulkImport,
                 showChevron: true,
                 onTap: () => _open(context, const ImportPage()),
               ),
               PlainRow(
                 // STORY-7.2：目标体系 = 储蓄 / 还债 / 限额（限额复用分类预算）
-                title: '目标体系',
+                title: s.goalSystemTitle,
                 showChevron: true,
                 onTap: () => _open(context, const SavingsGoalsPage()),
               ),
               PlainRow(
-                title: '报销中心',
+                title: s.reimburseCenter,
                 showChevron: true,
                 onTap: () => _open(context, const ReimburseCenterPage()),
               ),
               PlainRow(
-                title: '提醒',
+                title: s.remindersEntry,
                 showChevron: true,
                 onTap: () => _open(context, const RemindersPage()),
               ),
               PlainRow(
-                title: '自动化规则',
+                title: s.automationRules,
                 showChevron: true,
                 onTap: () => _open(context, const AutomationRulesPage()),
               ),
               PlainRow(
-                title: 'WebDAV 同步',
+                title: s.webdavSync,
                 showChevron: true,
                 onTap: () => _open(context, const SyncPage()),
               ),
               PlainRow(
                 // STORY-8.2：成员管理在本机可用；跨设备加入等云同步
-                title: '家庭与成员',
+                title: s.familyTitle,
                 showChevron: true,
                 onTap: () => _open(context, const FamilyPage()),
               ),
               PlainRow(
-                title: '回收站',
+                title: s.trashTitle,
                 showChevron: true,
                 onTap: () => _open(context, const TrashPage()),
               ),
               PlainRow(
-                title: '操作日志',
+                title: s.actionLogTitle,
                 showChevron: true,
                 onTap: () => _open(context, const ActionLogPage()),
               ),
               PlainRow(
-                title: '我的成就',
+                title: s.myAchievements,
                 showChevron: true,
                 onTap: () => _open(context, const AchievementsPage()),
               ),
             ]),
 
             // 其它
-            PlainEyebrow('其它'),
+            PlainEyebrow(s.otherSection),
             PlainPanel(children: [
               PlainRow(
-                title: '情绪反馈',
+                title: s.emotionFeedback,
                 trailing: PlainSwitch(
                   value: ref.watch(emotionEnabledProvider),
                   onChanged: (v) =>
@@ -304,7 +319,7 @@ class SettingsPage extends ConsumerWidget {
                 ),
               ),
               PlainRow(
-                title: '消费周报',
+                title: s.weeklyReport,
                 trailing: PlainSwitch(
                   value: ref.watch(weeklyReportEnabledProvider),
                   onChanged: (v) =>
@@ -314,20 +329,20 @@ class SettingsPage extends ConsumerWidget {
             ]),
 
             // 关于
-            PlainEyebrow('关于'),
+            PlainEyebrow(s.about),
             PlainPanel(children: [
               PlainRow(
-                title: '隐私承诺',
+                title: s.privacyPledge,
                 showChevron: true,
                 onTap: () => _open(context, const PrivacyPolicyPage()),
               ),
-              const PlainRow(title: '版本', value: 'V1.0.0'),
+              PlainRow(title: s.version, value: 'V1.0.0'),
               PlainRow(
-                title: '开源许可',
+                title: s.openSource,
                 showChevron: true,
                 onTap: () => showLicensePage(
                   context: context,
-                  applicationName: '素记',
+                  applicationName: s.appTitle,
                 ),
               ),
             ]),

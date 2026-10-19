@@ -2,11 +2,13 @@
 /// Dedup fingerprint = date + amount + merchant/note. See PRD F7.5.
 library;
 
+import 'package:plain/app/l10n/app_strings.dart';
 import 'package:plain/core/time/clock.dart';
 import 'package:plain/core/constants/app_constants.dart';
 import 'package:plain/core/money/money.dart';
 import 'package:plain/domain/entities/enums.dart';
 import 'package:plain/domain/entities/ledger_entry.dart';
+import 'package:plain/app/l10n/strings_domain.dart';
 
 /// Column mapping for a CSV source. Indices are 0-based into each row.
 class CsvColumnMapping {
@@ -244,6 +246,7 @@ String composeLabel({String? merchant, String? note}) {
   List<List<String>> rows,
   CsvColumnMapping mapping, {
   int skipHeaderRows = 1,
+  required AppStrings s,
 }) {
   final entries = <ParsedEntry>[];
   final errors = <String>[];
@@ -254,19 +257,19 @@ String composeLabel({String? merchant, String? note}) {
 
     final lineNo = i + 1;
     if (row.length <= mapping.amountCol || row.length <= mapping.dateCol) {
-      errors.add('第 $lineNo 行: 列数不足');
+      errors.add(s.csvErrTooFewColumns(lineNo));
       continue;
     }
 
     final date = parseDate(row[mapping.dateCol]);
     if (date == null) {
-      errors.add('第 $lineNo 行: 无法解析日期 "${row[mapping.dateCol]}"');
+      errors.add(s.csvErrBadDate(lineNo, row[mapping.dateCol]));
       continue;
     }
 
     final amountCents = parseAmountCents(row[mapping.amountCol]);
     if (amountCents == null || amountCents == 0) {
-      errors.add('第 $lineNo 行: 无法解析金额 "${row[mapping.amountCol]}"');
+      errors.add(s.csvErrBadAmount(lineNo, row[mapping.amountCol]));
       continue;
     }
 

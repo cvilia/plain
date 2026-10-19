@@ -16,6 +16,9 @@ import 'package:plain/design_system/plain_icons_v3.dart';
 import 'package:plain/design_system/plain_ui.dart';
 import 'package:plain/domain/entities/sync_conflict.dart';
 import 'package:plain/domain/services/sync_conflict_service.dart';
+import 'package:plain/app/l10n/app_strings.dart';
+import 'package:plain/app/l10n/strings_domain.dart';
+import 'package:plain/app/l10n/strings_settings_a.dart';
 
 final _conflictsProvider = FutureProvider<List<SyncConflict>>((ref) async {
   ref.watch(ledgerVersionProvider);
@@ -36,19 +39,20 @@ class ConflictCenterPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final s = AppStrings.of(context);
     final async = ref.watch(_conflictsProvider);
     return Scaffold(
-      appBar: const PlainTopBar(title: '冲突中心', showBack: true),
+      appBar: PlainTopBar(title: s.conflictCenterTitle, showBack: true),
       body: async.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => AppErrorState.of(e, onRetry: () => ref.invalidateData.bumpEverything()),
+        error: (e, _) => AppErrorState.of(context, e, onRetry: () => ref.invalidateData.bumpEverything()),
         data: (conflicts) {
           if (conflicts.isEmpty) {
-            return const ContentWidthConstraint(
+            return ContentWidthConstraint(
               child: AppEmptyState(
                 icon: PlainIconData.check,
-                title: '没有待裁决的冲突',
-                subtitle: '两端改到同一个字段的不同值时，才会在这里出现。',
+                title: s.conflictEmptyTitle,
+                subtitle: s.conflictEmptySubtitle,
               ),
             );
           }
@@ -86,6 +90,7 @@ class _ConflictCardState extends ConsumerState<_ConflictCard> {
   bool _busy = false;
 
   Future<void> _resolve(ConflictResolution choice) async {
+    final s = AppStrings.of(context);
     final deps = ref.read(appDependenciesProvider);
     final service = SyncConflictService(
       repository: deps.syncConflictRepository,
@@ -103,13 +108,14 @@ class _ConflictCardState extends ConsumerState<_ConflictCard> {
       showAppToast(context, '裁决失败：${res.failureOrNull!.code}');
       return;
     }
-    showAppToast(context, '已${choice.label}');
+    showAppToast(context, s.conflictResolved(choice.label(s)));
     ref.invalidate(_conflictsProvider);
     ref.invalidateData.bumpEntryMutated();
   }
 
   @override
   Widget build(BuildContext context) {
+    final s = AppStrings.of(context);
     final c = widget.conflict;
     final colors = context.colors;
     return Container(
@@ -140,14 +146,14 @@ class _ConflictCardState extends ConsumerState<_ConflictCard> {
           ),
           const SizedBox(height: Spacing.sm),
           _Side(
-            label: '本机',
+            label: s.conflictLocal,
             value: c.localValue,
             at: c.localChangedAt,
             highlight: c.winner == 'local',
           ),
           const SizedBox(height: 6),
           _Side(
-            label: '远端',
+            label: s.conflictRemote,
             value: c.remoteValue,
             at: c.remoteChangedAt,
             highlight: c.winner == 'remote',
@@ -157,18 +163,18 @@ class _ConflictCardState extends ConsumerState<_ConflictCard> {
             spacing: Spacing.sm,
             children: [
               _ChoiceButton(
-                label: '保留本机',
+                label: s.conflictKeepLocalAction,
                 busy: _busy,
                 onPressed: () => _resolve(ConflictResolution.keepLocal),
               ),
               _ChoiceButton(
-                label: '保留远端',
+                label: s.conflictKeepRemoteAction,
                 busy: _busy,
                 onPressed: () => _resolve(ConflictResolution.keepRemote),
               ),
               if (c.entityType == 'transaction')
                 _ChoiceButton(
-                  label: '都保留',
+                  label: s.conflictKeepBoth,
                   busy: _busy,
                   onPressed: () => _resolve(ConflictResolution.keepBoth),
                 ),

@@ -1,6 +1,7 @@
 /// CSV importer tests: parsing, date/amount formats, dedup, fingerprint.
 library;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:plain/app/l10n/strings_core.dart';
 import 'package:plain/domain/entities/enums.dart';
 import 'package:plain/domain/services/csv_importer.dart';
 
@@ -137,7 +138,7 @@ void main() {
         '2024-01-15,25.00,餐饮,午餐\n'
         '2024-01-16,30.00,交通,打车\n',
       );
-      final result = parseRows(rows, mapping);
+      final result = parseRows(rows, mapping, s: kDefaultAppStrings);
       expect(result.entries.length, 2);
       expect(result.errors, isEmpty);
       expect(result.entries[0].amountCents, 2500);
@@ -147,21 +148,21 @@ void main() {
 
     test('reports unparseable date', () {
       final rows = parseCsv('日期,金额\nbad,25.00\n');
-      final result = parseRows(rows, const CsvColumnMapping(dateCol: 0, amountCol: 1));
+      final result = parseRows(rows, const CsvColumnMapping(dateCol: 0, amountCol: 1), s: kDefaultAppStrings);
       expect(result.entries, isEmpty);
       expect(result.errors.length, 1);
     });
 
     test('reports unparseable amount', () {
       final rows = parseCsv('日期,金额\n2024-01-15,abc\n');
-      final result = parseRows(rows, const CsvColumnMapping(dateCol: 0, amountCol: 1));
+      final result = parseRows(rows, const CsvColumnMapping(dateCol: 0, amountCol: 1), s: kDefaultAppStrings);
       expect(result.entries, isEmpty);
       expect(result.errors.length, 1);
     });
 
     test('skips empty rows', () {
       final rows = parseCsv('日期,金额\n2024-01-15,25.00\n,\n2024-01-16,30.00\n');
-      final result = parseRows(rows, const CsvColumnMapping(dateCol: 0, amountCol: 1));
+      final result = parseRows(rows, const CsvColumnMapping(dateCol: 0, amountCol: 1), s: kDefaultAppStrings);
       expect(result.entries.length, 2);
     });
   });

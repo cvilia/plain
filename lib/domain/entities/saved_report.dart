@@ -1,7 +1,9 @@
 /// STORY-11.3「我的报表」——保存下来的交叉分析配置。
 library;
 
+import 'package:plain/app/l10n/app_strings.dart';
 import 'package:plain/domain/entities/enums.dart';
+import 'package:plain/app/l10n/strings_domain.dart';
 
 class SavedReport {
   const SavedReport({
@@ -49,8 +51,8 @@ class SavedReport {
   DateTime get to => DateTime.fromMillisecondsSinceEpoch(toMs, isUtc: true);
 
   /// 一句话描述这个组合（列表里直接可读）。
-  String get describe =>
-      '行 ${rowDim.label} × 列 ${colDim.label} · ${entryFilter.label}';
+  String describe(AppStrings s) =>
+      s.reportDescribe(rowDim.label(s), colDim.label(s), entryFilter.label(s));
 
   SavedReport copyWith({
     String? name,

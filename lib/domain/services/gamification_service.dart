@@ -3,7 +3,9 @@
 library;
 
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:plain/app/l10n/app_strings.dart';
 import 'package:plain/core/constants/app_constants.dart';
+import 'package:plain/app/l10n/strings_domain.dart';
 
 /// 徽章定义。
 class Badge {
@@ -63,7 +65,7 @@ class GamificationService {
   }
 
   /// 记一笔后更新连续天数，返回是否有里程碑奖励。
-  static Future<List<String>> recordEntry(DateTime now) async {
+  static Future<List<String>> recordEntry(DateTime now, AppStrings s) async {
     final rewards = <String>[];
     try {
       final sp = await SharedPreferences.getInstance();
@@ -99,11 +101,11 @@ class GamificationService {
       final milestone = GamificationRules.streakVoucherMilestones[days];
       if (milestone != null && milestone > 0) {
         for (var i = 0; i < milestone; i++) {
-          await _grantVoucher(sp, now, '连续 $days 天');
+          await _grantVoucher(sp, now, s.streakMilestone(days));
         }
-        rewards.add('连续 $days 天');
+        rewards.add(s.streakMilestone(days));
       } else if (milestone == 0 && days == 100) {
-        rewards.add('连续 100 天 · 终身卡抽奖资格');
+        rewards.add(s.streak100);
       }
       // 坚持类徽章：原先只发券**没点亮徽章** → 成就页三个坚持徽章永远灰着
       if (GamificationRules.streakBadgeMilestones.contains(days)) {
@@ -112,7 +114,7 @@ class GamificationService {
 
       // 累计笔数徽章
       if (GamificationRules.entryCountMilestones.contains(total)) {
-        rewards.add('累计 $total 笔');
+        rewards.add(s.accumulateMilestone(total));
         await _addBadge(sp, 'accum_$total');
       }
     } catch (_) {}

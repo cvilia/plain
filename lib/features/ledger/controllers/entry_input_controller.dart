@@ -25,6 +25,9 @@ import 'package:plain/domain/usecases/entry_usecases.dart';
 import 'package:plain/features/ledger/controllers/draft_store.dart';
 import 'package:plain/features/ledger/controllers/flow_list_controller.dart';
 import 'package:plain/features/ledger/controllers/recent_categories.dart';
+import 'package:plain/app/l10n/strings_core.dart';
+import 'package:plain/app/l10n/strings_ledger.dart';
+import 'package:plain/app/l10n/app_strings.dart';
 
 class EntryInputState {
   const EntryInputState({
@@ -41,6 +44,8 @@ class EntryInputState {
     this.toastMessage,
     this.emotionFeedback,
     this.reimburseStatus = ReimburseStatus.none,
+    this.excludeFromStats = false,
+    this.canMarkExcluded = true,
     this.wasIncompleteExpression = false,
     this.isSubmitting = false,
     this.errorMessage,
@@ -65,6 +70,13 @@ class EntryInputState {
 
   /// STORY-1.8：报销状态。
   final ReimburseStatus reimburseStatus;
+
+  /// G-2：手动标记「不计入收支」（只改统计口径，不改账户余额）。
+  final bool excludeFromStats;
+
+  /// 是否允许改「不计入收支」：编辑已有账单时取自 `entry.canMarkExcluded`，
+  /// 新建态默认允许（是否显示仍要看类型）。
+  final bool canMarkExcluded;
   final bool wasIncompleteExpression;
   final bool isSubmitting;
   final String? errorMessage;
@@ -95,6 +107,8 @@ class EntryInputState {
     String? toastMessage,
     EmotionFeedback? emotionFeedback,
     ReimburseStatus? reimburseStatus,
+    bool? excludeFromStats,
+    bool? canMarkExcluded,
     bool? wasIncompleteExpression,
     bool? isSubmitting,
     String? errorMessage,
@@ -122,6 +136,8 @@ class EntryInputState {
       toastMessage: clearToast ? null : (toastMessage ?? this.toastMessage),
       emotionFeedback: clearEmotion ? null : (emotionFeedback ?? this.emotionFeedback),
       reimburseStatus: reimburseStatus ?? this.reimburseStatus,
+      excludeFromStats: excludeFromStats ?? this.excludeFromStats,
+      canMarkExcluded: canMarkExcluded ?? this.canMarkExcluded,
       wasIncompleteExpression: wasIncompleteExpression ?? this.wasIncompleteExpression,
       isSubmitting: isSubmitting ?? this.isSubmitting,
       errorMessage: clearError ? null : (errorMessage ?? this.errorMessage),
@@ -166,6 +182,8 @@ class EntryInputController extends Notifier<EntryInputState> {
   UpdateEntryUseCase get _updateEntry => ref.read(appDependenciesProvider).updateEntry;
   DeleteEntryUseCase get _deleteEntry => ref.read(appDependenciesProvider).deleteEntry;
   Clock get _clock => ref.read(appDependenciesProvider).clock;
+
+  AppStrings get _strings => ref.read(appStringsProvider);
   String get _bookId => ref.read(appDependenciesProvider).bookId;
   String get _deviceId => ref.read(appDependenciesProvider).deviceId;
 
@@ -293,11 +311,18 @@ class EntryInputController extends Notifier<EntryInputState> {
   }
 
   /// Select category without saving (for picker page).
-  void selectCategory(String categoryId) {
+  ///
+  /// [alreadyVisible]：该分类是否已在宫格展示的 11 格里 —— 由宫格算好传进来
+  /// （只有它知道"现在显示哪 11 个"）。在的话不重排宫格顺序（用户口径
+  /// 2026-10-16），不在的才顶到第一格，好在返回后能看见它。
+  void selectCategory(String categoryId, {bool alreadyVisible = false}) {
     state = state.copyWith(selectedCategoryId: categoryId);
-    // Pin to recent list immediately so the grid shows it first after 返回.
     if (categoryId.isNotEmpty) {
-      ref.read(recentCategoriesProvider.notifier).use(state.type.wire, categoryId);
+      ref.read(recentCategoriesProvider.notifier).use(
+            state.type.wire,
+            categoryId,
+            alreadyVisible: alreadyVisible,
+          );
     }
     _saveDraft();
   }
@@ -406,6 +431,8 @@ class EntryInputController extends Notifier<EntryInputState> {
     );
     final hint = categoryHint;
     if (hint != null && hint.isNotEmpty) {
+      // OCR 预填**保留**「顶到第一格」：这不是用户挑的，识别出来的分类往往
+      // 不在宫格前 11 格里，不顶上第一格用户就完全看不到系统替他选了什么。
       selectCategory(hint);
     }
   }
@@ -437,15 +464,25 @@ class EntryInputController extends Notifier<EntryInputState> {
       occurredAt: entry.occurredAt,
       isEditing: true,
       editingId: entry.id,
+      reimburseStatus: entry.reimburseStatus,
+      excludeFromStats: entry.excludeFromStats,
+      canMarkExcluded: entry.canMarkExcluded,
     );
     refreshCurrencyContext();
   }
 
   /// Category tap only selects — save is an explicit OK action (PRD / UX fix).
+  ///
+  /// 点的是宫格里的格子 ⇒ 它本来就在展示的 11 格里 ⇒ **不动顺序**（口径
+  /// 2026-10-16：点已显示的分类不重排，只有从「更多」选的才顶到第一格）。
   void submitOnCategoryTap(String categoryId) {
     state = state.copyWith(selectedCategoryId: categoryId);
     if (categoryId.isNotEmpty) {
-      ref.read(recentCategoriesProvider.notifier).use(state.type.wire, categoryId);
+      ref.read(recentCategoriesProvider.notifier).use(
+            state.type.wire,
+            categoryId,
+            alreadyVisible: true,
+          );
     }
     _saveDraft();
   }
@@ -534,6 +571,8 @@ class EntryInputController extends Notifier<EntryInputState> {
         clearNote: state.note == null,
         occurredAt: state.occurredAt,
         type: state.type,
+        reimburseStatus: state.reimburseStatus,
+        excludeFromStats: state.excludeFromStats,
       );
       return result.when(
         success: (entry) {
@@ -568,17 +607,18 @@ class EntryInputController extends Notifier<EntryInputState> {
       bookId: _bookId,
       deviceId: _deviceId,
       reimburseStatus: state.reimburseStatus,
+      excludeFromStats: state.excludeFromStats,
       // 原币记账：把输入金额当原币，用例折算出本位币
       exchangeRate: fxRate,
       originalCurrency: fxCurrency,
-    ));
+    ), s: _strings);
 
     return result.when(
       success: (entry) {
         final amt = entry.amount.toYuanString();
         final toast = eval.wasIncomplete
-            ? '已记 ¥$amt（前缀）'
-            : '已记 ¥$amt';
+            ? _strings.savedAmountPrefix(amt)
+            : _strings.savedAmount(amt);
         lastSavedEntryId = entry.id;
         state = state.copyWith(
           amountExpression: '',
@@ -594,13 +634,14 @@ class EntryInputController extends Notifier<EntryInputState> {
         unawaited(_learnMerchantFrom(entry));
         _updateWidgetSnapshot();
         _notifyEntryChanged();
-        ref.read(recentCategoriesProvider.notifier).use(
-          state.type.wire, state.selectedCategoryId ?? '',
-        );
+        // 这里**不再** pin 分类：宫格顺序已经由「选中那一刻」决定
+        // （submitOnCategoryTap / selectCategory，口径见 RecentCategoriesNotifier.use）。
+        // 保存时再 pin 一次，会把「编辑旧账单、分类根本没动」也当成一次选择，
+        // 白白重排宫格 —— 用户 2026-10-16 要的正是别乱动位置。
         // STORY-5.4：异步评估情绪反馈
         _evaluateEmotion(entry);
         // STORY-5.5：游戏化连续记账
-        GamificationService.recordEntry(_clock.now());
+        GamificationService.recordEntry(_clock.now(), _strings);
         return true;
       },
       failure: (f) {
@@ -616,6 +657,16 @@ class EntryInputController extends Notifier<EntryInputState> {
         ? ReimburseStatus.pending
         : ReimburseStatus.none;
     state = state.copyWith(reimburseStatus: next);
+  }
+
+  /// 编辑页 chip 走选择弹层，直接设定报销状态。
+  void setReimburse(ReimburseStatus value) {
+    state = state.copyWith(reimburseStatus: value);
+  }
+
+  /// G-2：设定「不计入收支」。
+  void setExcludeFromStats(bool value) {
+    state = state.copyWith(excludeFromStats: value);
   }
 
   /// STORY-5.4：清除情绪反馈（UI 层展示后调用）。
@@ -669,6 +720,7 @@ class EntryInputController extends Notifier<EntryInputState> {
       final isOverBudget = overBudget > 0;
 
       final feedback = await EmotionFeedbackPrefs.evaluate(
+        s: _strings,
         amountCents: entry.amount.cents,
         categoryAmountsCents: amounts,
         isMonthFirstEntry: isMonthFirst,

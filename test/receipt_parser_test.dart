@@ -1,6 +1,7 @@
 /// STORY-9.2 票据文本解析（离线结构化抽取）。
 library;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:plain/app/l10n/strings_core.dart';
 import 'package:plain/domain/services/receipt_parser.dart';
 
 void main() {
@@ -92,8 +93,8 @@ void main() {
 
   test('summary 只说抽到了什么', () {
     final d = ReceiptParser.parseText('星巴克\n2026-09-29\n合计 ¥128.50');
-    expect(d.summary, contains('128.50'));
-    expect(d.summary, contains('星巴克'));
-    expect(ReceiptParser.parseText('').summary, '没有识别到可用信息');
+    expect(d.summary(kDefaultAppStrings), contains('128.50'));
+    expect(d.summary(kDefaultAppStrings), contains('星巴克'));
+    expect(ReceiptParser.parseText('').summary(kDefaultAppStrings), '没有识别到可用信息');
   });
 }

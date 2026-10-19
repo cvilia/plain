@@ -1,6 +1,7 @@
 /// Entry use case integration tests (in-memory DB).
 library;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:plain/app/l10n/strings_core.dart';
 import 'package:plain/core/id/uuid_v7.dart';
 import 'package:plain/core/time/clock.dart';
 import 'package:plain/data/db/database.dart';
@@ -30,7 +31,7 @@ void main() {
       amountExpression: '25', type: EntryType.expense,
       categoryId: 'cat-food', accountId: 'acc-cash',
       bookId: 'book-1', deviceId: 'dev-1',
-    ));
+    ), s: kDefaultAppStrings);
     expect(result.isSuccess, true);
     final entry = result.successOrNull!;
     expect(entry.amount.cents, 2500);
@@ -43,7 +44,7 @@ void main() {
     final result = await createEntry(CreateEntryInput(
       amountExpression: '12.5+7.5', type: EntryType.expense,
       categoryId: 'cat-food', bookId: 'book-1', deviceId: 'dev-1',
-    ));
+    ), s: kDefaultAppStrings);
     expect(result.successOrNull!.amount.toYuanString(), '20.00');
   });
 
@@ -51,7 +52,7 @@ void main() {
     final result = await createEntry(CreateEntryInput(
       amountExpression: '0', type: EntryType.expense,
       categoryId: 'cat-food', bookId: 'book-1', deviceId: 'dev-1',
-    ));
+    ), s: kDefaultAppStrings);
     expect(result.isFailure, true);
   });
 
@@ -60,7 +61,7 @@ void main() {
       amountExpression: '10', type: EntryType.transfer,
       categoryId: '', bookId: 'book-1', deviceId: 'dev-1',
       accountId: 'acc-a', toAccountId: 'acc-a',
-    ));
+    ), s: kDefaultAppStrings);
     expect(result.isFailure, true);
     expect(result.failureOrNull?.code, 'entry.transfer_same_account');
   });
@@ -70,13 +71,13 @@ void main() {
       amountExpression: '10', type: EntryType.borrowOut,
       categoryId: '', bookId: 'book-1', deviceId: 'dev-1',
       accountId: 'acc-a',
-    ));
+    ), s: kDefaultAppStrings);
     expect(r.isFailure, true);
     final ok = await createEntry(CreateEntryInput(
       amountExpression: '10', type: EntryType.borrowOut,
       categoryId: '', bookId: 'book-1', deviceId: 'dev-1',
       accountId: 'acc-a', note: '张三',
-    ));
+    ), s: kDefaultAppStrings);
     expect(ok.isSuccess, true);
   });
 
@@ -84,7 +85,7 @@ void main() {
     final created = await createEntry(CreateEntryInput(
       amountExpression: '25', type: EntryType.expense,
       categoryId: 'cat-food', bookId: 'book-1', deviceId: 'dev-1',
-    ));
+    ), s: kDefaultAppStrings);
     final deleted = await repo.softDelete(created.successOrNull!.id);
     expect(deleted.isSuccess, true);
     final page = await repo.listPage(limit: 10);
@@ -95,7 +96,7 @@ void main() {
     await createEntry(CreateEntryInput(
       amountExpression: '25', type: EntryType.expense,
       categoryId: 'cat-food', bookId: 'book-1', deviceId: 'dev-1',
-    ));
+    ), s: kDefaultAppStrings);
     final rows = db.raw.select('SELECT COUNT(*) AS c FROM change_log');
     expect(rows.first['c'], 1);
   });
@@ -105,7 +106,7 @@ void main() {
       amountExpression: '25', type: EntryType.expense,
       categoryId: 'cat-food', accountId: 'acc-cash',
       bookId: 'book-1', deviceId: 'dev-1',
-    ));
+    ), s: kDefaultAppStrings);
     final summary = await repo.monthSummary(bookId: 'book-1', dayFrom: '2026-09-01', dayTo: '2026-09-30');
     expect(summary.successOrNull!.expenseCents, 2500);
     expect(summary.successOrNull!.txCount, 1);

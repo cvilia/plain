@@ -3,6 +3,7 @@ library;
 
 import 'dart:convert';
 
+import 'package:plain/app/l10n/app_strings.dart';
 import 'package:plain/core/result/result.dart';
 import 'package:plain/core/time/clock.dart';
 import 'package:plain/data/repositories/sync_conflict_repository.dart';
@@ -10,6 +11,7 @@ import 'package:plain/data/sync/sync_applier.dart';
 import 'package:plain/domain/entities/enums.dart';
 import 'package:plain/domain/entities/sync_conflict.dart';
 import 'package:plain/domain/usecases/entry_usecases.dart';
+import 'package:plain/app/l10n/strings_core.dart';
 
 class SyncConflictService {
   SyncConflictService({
@@ -19,12 +21,14 @@ class SyncConflictService {
     required Clock clock,
     required String bookId,
     required String deviceId,
+    AppStrings? strings,
   })  : _repository = repository,
         _applier = applier,
         _createEntry = createEntry,
         _clock = clock,
         _bookId = bookId,
-        _deviceId = deviceId;
+        _deviceId = deviceId,
+        _strings = strings ?? kDefaultAppStrings;
 
   final SyncConflictRepositoryImpl _repository;
   final SyncApplier _applier;
@@ -32,6 +36,7 @@ class SyncConflictService {
   final Clock _clock;
   final String _bookId;
   final String _deviceId;
+  final AppStrings _strings;
 
   Future<Result<List<SyncConflict>>> openConflicts() => _repository.listOpen(bookId: _bookId);
 
@@ -112,7 +117,7 @@ class SyncConflictService {
           : DateTime.fromMillisecondsSinceEpoch(occurredMs, isUtc: true),
       bookId: _bookId,
       deviceId: _deviceId,
-    ));
+    ), s: _strings);
     if (res.isFailure) return err(res.failureOrNull!);
     return ok(null);
   }

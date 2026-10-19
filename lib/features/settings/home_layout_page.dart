@@ -8,6 +8,8 @@ import 'package:plain/app/theme/app_colors.dart';
 import 'package:plain/app/theme/design_tokens.dart';
 import 'package:plain/core/refresh/data_invalidation.dart';
 import 'package:plain/design_system/plain_ui.dart';
+import 'package:plain/app/l10n/app_strings.dart';
+import 'package:plain/app/l10n/strings_settings_a.dart';
 
 class HomeLayoutPage extends ConsumerStatefulWidget {
   const HomeLayoutPage({super.key});
@@ -49,23 +51,24 @@ class _HomeLayoutPageState extends ConsumerState<HomeLayoutPage> {
 
   @override
   Widget build(BuildContext context) {
+    final s = AppStrings.of(context);
     return Scaffold(
-      appBar: const PlainTopBar(title: '首页卡片自定义', showBack: true),
+      appBar: PlainTopBar(title: s.homeLayoutTitle, showBack: true),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : ListView(
               padding: const EdgeInsets.all(Spacing.lg),
               children: [
                 _NotePanel(
-                  plain: '勾选要常驻首页的卡片。，长按可拖动排序。',
-                  parts: const [
-                    (false, '勾选要常驻首页的卡片。'),
-                    (true, '至少保留 1 张、最多 4 张'),
-                    (false, '，长按可拖动排序。'),
+                  plain: s.homeLayoutNoteHintPlain,
+                  parts: [
+                    (false, s.homeLayoutNoteHintA),
+                    (true, s.homeLayoutNoteHintB),
+                    (false, s.homeLayoutNoteHintC),
                   ],
                 ),
                 const SizedBox(height: Spacing.lg),
-                PlainEyebrow(_selectedCount == 3 ? '可选卡片 · 已选 3 / 4' : '可选卡片 · 已选 $_selectedCount / 4'),
+                PlainEyebrow(_selectedCount == 3 ? '可选卡片 · 已选 3 / 4' : s.homeLayoutOptionalCards(_selectedCount)),
                 PlainPanel(
                   children: [
                     for (var i = 0; i < _designCards.length; i++)
@@ -89,11 +92,11 @@ class _HomeLayoutPageState extends ConsumerState<HomeLayoutPage> {
                 ),
                 const SizedBox(height: Spacing.lg),
                 _NotePanel(
-                  plain: '首页卡片顺序与开关属，多端同步时不覆盖其他设备。',
-                  parts: const [
-                    (false, '首页卡片顺序与开关属'),
-                    (true, '本机偏好'),
-                    (false, '，多端同步时不覆盖其他设备。'),
+                  plain: s.homeLayoutNoteLocalPlain,
+                  parts: [
+                    (false, s.homeLayoutNoteLocalA),
+                    (true, s.localPreference),
+                    (false, s.homeLayoutNoteLocalC),
                   ],
                 ),
               ],

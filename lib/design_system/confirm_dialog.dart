@@ -1,6 +1,7 @@
 /// Shared confirm dialog. Replaces the copy-pasted AlertDialog + 取消/确认 template.
 library;
 
+import 'package:plain/app/l10n/app_strings.dart';
 import 'package:plain/app/theme/app_colors.dart';
 import 'package:flutter/material.dart';
 
@@ -13,10 +14,11 @@ Future<bool> showConfirmDialog(
   BuildContext context, {
   required String title,
   required String message,
-  String confirmLabel = '确定',
-  String cancelLabel = '取消',
+  String? confirmLabel,
+  String? cancelLabel,
   bool destructive = false,
 }) async {
+  final s = AppStrings.of(context);
   final result = await showDialog<bool>(
     context: context,
     builder: (ctx) => AlertDialog(
@@ -25,14 +27,14 @@ Future<bool> showConfirmDialog(
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(ctx, false),
-          child: Text(cancelLabel),
+          child: Text(cancelLabel ?? s.cancel),
         ),
         FilledButton(
           onPressed: () => Navigator.pop(ctx, true),
           style: destructive
               ? FilledButton.styleFrom(backgroundColor: context.colors.expense)
               : null,
-          child: Text(confirmLabel),
+          child: Text(confirmLabel ?? s.ok),
         ),
       ],
     ),

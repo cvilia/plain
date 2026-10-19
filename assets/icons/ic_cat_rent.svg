@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" role="img" aria-label="ic_cat_rent">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <circle cx="8" cy="8.5" r="4"/>
+  <path d="M10.5 11 18 18.5"/>
+  <path d="M15.5 15.75h2.5"/>
+  <path d="M17.5 13.5v2"/>
+  </g>
+</svg>

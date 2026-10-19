@@ -20,6 +20,8 @@ import 'package:plain/domain/entities/enums.dart';
 import 'package:plain/domain/entities/ledger_entry.dart';
 import 'package:plain/domain/repositories/repositories.dart';
 import 'package:plain/domain/services/loan_amortization_service.dart';
+import 'package:plain/app/l10n/app_strings.dart';
+import 'package:plain/app/l10n/strings_accounts.dart';
 
 const _svc = LoanAmortizationService();
 
@@ -100,30 +102,31 @@ class _LoanPageState extends ConsumerState<LoanPage> {
 
   @override
   Widget build(BuildContext context) {
+    final s = AppStrings.of(context);
     final colors = context.colors;
     final account = _account;
 
     if (_loading) {
       return Scaffold(
-        appBar: const PlainTopBar(title: '贷款摊销', showBack: true),
+        appBar: PlainTopBar(title: s.loanAmortization, showBack: true),
         body: const Center(child: CircularProgressIndicator()),
       );
     }
     if (account == null) {
       return Scaffold(
-        appBar: PlainTopBar(title: '贷款摊销', showBack: true),
-        body: const Center(child: Text('账户不存在')),
+        appBar: PlainTopBar(title: s.loanAmortization, showBack: true),
+        body: Center(child: Text(s.accountNotFound)),
       );
     }
     final terms = _terms;
     if (terms == null) {
       return Scaffold(
         appBar: PlainTopBar(title: account.name, showBack: true),
-        body: const ContentWidthConstraint(
+        body: ContentWidthConstraint(
           child: AppEmptyState(
             icon: PlainIconData.chartLine,
-            title: '还没有贷款参数',
-            subtitle: '在账户里补全本金、利率、期数与首次还款日',
+            title: s.noLoanParams,
+            subtitle: s.loanParamsHint,
           ),
         ),
       );
@@ -160,41 +163,41 @@ class _LoanPageState extends ConsumerState<LoanPage> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     _HeroBlock(
-                      label: '剩余本金',
+                      label: s.remainingPrincipal,
                       amountCents: prog.remainingPrincipalCents,
                       splits: [
                         _HeroSplit(
-                          label: '下期应还',
+                          label: s.nextPayment,
                           amountCents: prog.nextPaymentCents,
                         ),
                         _HeroSplit(
-                          label: '已还期数',
+                          label: s.paidPeriods,
                           rawValue: '${prog.paidPeriods} / ${prog.totalPeriods}',
                         ),
                         _HeroSplit(
-                          label: '年利率',
+                          label: s.annualRate,
                           rawValue: _rateLabel(terms.annualRateBp),
                         ),
                       ],
                     ),
-                    const PlainEyebrow('贷款参数'),
+                    PlainEyebrow(s.loanParams),
                     PlainPanel(
                       children: [
                         _ParamRow(
-                          label: '还款方式',
-                          value: terms.method.label,
+                          label: s.repayMethod,
+                          value: terms.method.label(AppStrings.of(context)),
                           boldValue: true,
                         ),
                         _ParamRow(
-                          label: '贷款总额',
+                          label: s.loanPrincipal,
                           value: formatAmountYuan(terms.principalCents),
                         ),
                         _ParamRow(
-                          label: '利息总额',
+                          label: s.totalInterest,
                           value: formatAmountYuan(schedule.totalInterestCents),
                         ),
                         _ParamRow(
-                          label: '已还利息',
+                          label: s.paidInterest,
                           value: formatAmountYuan(paidInterest),
                         ),
                         _RepayProgress(
@@ -206,27 +209,27 @@ class _LoanPageState extends ConsumerState<LoanPage> {
                         ),
                       ],
                     ),
-                    PlainEyebrow('剩余还款概况'),
+                    PlainEyebrow(s.remainingOverview),
                     PlainPanel(
                       children: [
                         _ParamRow(
-                          label: '剩余期数',
-                          value: '${prog.remainingMonths} 期',
+                          label: s.remainingPeriods,
+                          value: s.periodsCount(prog.remainingMonths),
                         ),
                         _ParamRow(
-                          label: '剩余利息',
+                          label: s.remainingInterest,
                           value: formatAmountYuan(prog.remainingInterestCents),
                         ),
                         _ParamRow(
-                          label: '预计还清',
+                          label: s.expectedPayoff,
                           value: prog.payoffDate == null
-                              ? '已结清'
+                              ? s.settled
                               : '${prog.payoffDate!.year}-'
                                   '${prog.payoffDate!.month.toString().padLeft(2, '0')}',
                         ),
                       ],
                     ),
-                    PlainEyebrow('提前还款测算'),
+                    PlainEyebrow(s.prepayCalc),
                     PlainPanel(
                       children: [
                         Padding(
@@ -238,8 +241,8 @@ class _LoanPageState extends ConsumerState<LoanPage> {
                                 controller: _extraCtrl,
                                 keyboardType:
                                     const TextInputType.numberWithOptions(decimal: true),
-                                decoration: const InputDecoration(
-                                  labelText: '每月额外还',
+                                decoration: InputDecoration(
+                                  labelText: s.extraMonthly,
                                   hintText: '0.00',
                                   border: OutlineInputBorder(),
                                   prefixText: '¥',
@@ -252,8 +255,8 @@ class _LoanPageState extends ConsumerState<LoanPage> {
                                 controller: _lumpCtrl,
                                 keyboardType:
                                     const TextInputType.numberWithOptions(decimal: true),
-                                decoration: const InputDecoration(
-                                  labelText: '一次性还本',
+                                decoration: InputDecoration(
+                                  labelText: s.lumpSum,
                                   hintText: '0.00',
                                   border: OutlineInputBorder(),
                                   prefixText: '¥',
@@ -265,7 +268,7 @@ class _LoanPageState extends ConsumerState<LoanPage> {
                         ..._prepayRows(terms),
                       ],
                     ),
-                    PlainEyebrow('未来还款计划'),
+                    PlainEyebrow(s.futureSchedule),
                     PlainPanel(
                       children: [
                         _ScheduleTable(
@@ -295,27 +298,28 @@ class _LoanPageState extends ConsumerState<LoanPage> {
 
   /// 提前还款结果（AC2/AC6）：基准与方案并列给出可提前月数与少付利息。
   List<Widget> _prepayRows(LoanTerms terms) {
+    final s = AppStrings.of(context);
     final extra = _centsOf(_extraCtrl);
     final lump = _centsOf(_lumpCtrl);
     if (extra == 0 && lump == 0) {
       return [
         _ParamRow(
-          label: '可提前还清',
-          value: '填入金额后测算',
+          label: s.prepayPossible,
+          value: s.fillAmountToCalc,
         ),
       ];
     }
     final r = _svc.prepay(terms, extraMonthlyCents: extra, lumpSumCents: lump);
     return [
-      _ParamRow(label: '基准剩余期数', value: '${r.baseline.months} 期'),
+      _ParamRow(label: s.baselinePeriods, value: s.periodsCount(r.baseline.months)),
       _ParamRow(
-        label: '方案剩余期数',
-        value: '${r.withExtra.months} 期',
+        label: s.planPeriods,
+        value: s.periodsCount(r.withExtra.months),
         boldValue: true,
       ),
-      _ParamRow(label: '可提前还清', value: '${r.monthsSaved} 个月', boldValue: true),
+      _ParamRow(label: s.prepayPossible, value: s.monthsCount(r.monthsSaved), boldValue: true),
       _ParamRow(
-        label: '少付利息',
+        label: s.interestSaved,
         value: formatAmountYuan(r.interestSavedCents),
         boldValue: true,
       ),
@@ -534,11 +538,12 @@ class _ScheduleTable extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final s = AppStrings.of(context);
     if (rows.isEmpty) {
       return Padding(
         padding: const EdgeInsets.all(Spacing.lg),
         child: Text(
-          '贷款已结清，没有待还期数',
+          s.loanSettledNoPeriods,
           style: TextStyle(fontSize: 14, color: colors.inkTertiary),
         ),
       );
@@ -568,18 +573,18 @@ class _ScheduleTable extends StatelessWidget {
         children: [
           Row(
             children: [
-              Expanded(flex: 2, child: Text('期次', style: hStyle)),
+              Expanded(flex: 2, child: Text(s.colPeriod, style: hStyle)),
               Expanded(
                 flex: 3,
-                child: Text('本金', style: hStyle, textAlign: TextAlign.right),
+                child: Text(s.colPrincipal, style: hStyle, textAlign: TextAlign.right),
               ),
               Expanded(
                 flex: 2,
-                child: Text('利息', style: hStyle, textAlign: TextAlign.right),
+                child: Text(s.colInterest, style: hStyle, textAlign: TextAlign.right),
               ),
               Expanded(
                 flex: 3,
-                child: Text('剩余余额', style: hStyle, textAlign: TextAlign.right),
+                child: Text(s.colRemaining, style: hStyle, textAlign: TextAlign.right),
               ),
             ],
           ),
@@ -620,6 +625,7 @@ class _NotePanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final s = AppStrings.of(context);
     final body = TextStyle(
       fontSize: 14,
       height: 1.65,
@@ -643,14 +649,14 @@ class _NotePanel extends StatelessWidget {
           TextSpan(
             style: body,
             children: [
-              const TextSpan(text: '每期还款自动生成两笔账单：'),
-              TextSpan(text: '利息计入支出', style: bold),
-              const TextSpan(text: '，本金只减少负债、'),
-              TextSpan(text: '不计入支出', style: bold),
+              TextSpan(text: s.loanRepayNotePrefix),
+              TextSpan(text: s.interestCountedInExpense, style: bold),
+              TextSpan(text: s.principalOnlyReducesDebtPart),
+              TextSpan(text: s.notCountedAsExpense, style: bold),
               const TextSpan(text: '（G-2）。'),
               const TextSpan(text: '\n'),
-              const TextSpan(
-                text: '这样你看到的是「这个月真的花了多少利息」， 而不是「我把本金挪了个地方也算花掉」。',
+              TextSpan(
+                text: s.loanRepayNoteBody,
               ),
             ],
           ),

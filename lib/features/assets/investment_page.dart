@@ -25,6 +25,9 @@ import 'package:plain/design_system/plain_ui.dart';
 import 'package:plain/domain/entities/enums.dart';
 import 'package:plain/domain/entities/holding.dart';
 import 'package:plain/domain/services/holding_service.dart';
+import 'package:plain/app/l10n/app_strings.dart';
+import 'package:plain/app/l10n/strings_accounts.dart';
+import 'package:plain/app/l10n/strings_domain.dart';
 
 const _svc = HoldingService();
 
@@ -50,6 +53,7 @@ class _InvestmentPageState extends ConsumerState<InvestmentPage> {
   }
 
   Future<void> _reload() async {
+    final s = AppStrings.of(context);
     setState(() => _loading = true);
     final deps = ref.read(appDependenciesProvider);
     final acct = await deps.accountRepository.getById(widget.accountId);
@@ -61,7 +65,7 @@ class _InvestmentPageState extends ConsumerState<InvestmentPage> {
     // 现金余额取自账户派生余额（持仓市值是另一块，不重复计）
     final cash = bal.successOrNull?.balanceCents ?? 0;
     setState(() {
-      _accountName = account?.name ?? '投资';
+      _accountName = account?.name ?? s.accountTypeInvestment;
       _holdings = holdings;
       _summary = HoldingsSummary.of(holdings: holdings, cashCents: cash);
       _loading = false;
@@ -76,6 +80,7 @@ class _InvestmentPageState extends ConsumerState<InvestmentPage> {
 
   @override
   Widget build(BuildContext context) {
+    final s = AppStrings.of(context);
     final colors = context.colors;
     return Scaffold(
       appBar: PlainTopBar(
@@ -92,7 +97,7 @@ class _InvestmentPageState extends ConsumerState<InvestmentPage> {
                 width: 52,
                 height: 44,
                 child: Center(
-                  child: Text('新增',
+                  child: Text(s.addLabel,
                       style: TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.w500,
@@ -114,16 +119,16 @@ class _InvestmentPageState extends ConsumerState<InvestmentPage> {
                   if (_holdings.isEmpty)
                     AppEmptyState(
                       icon: PlainIconData.trendUp,
-                      title: '还没有持仓',
-                      subtitle: '录入名称、份额与成本单价即可追踪市值与盈亏',
+                      title: s.noHoldings,
+                      subtitle: s.holdingsHint,
                       action: FilledButton.icon(
                         onPressed: _showAddHolding,
                         icon: const PlainIcon(PlainIconData.plus),
-                        label: const Text('新增持仓'),
+                        label: Text(s.addHolding),
                       ),
                     )
                   else ...[
-                    PlainEyebrow('持仓 · ${_holdings.length} 个'),
+                    PlainEyebrow(s.holdingsCount(_holdings.length)),
                     PlainPanel(
                       children: [
                         for (var i = 0; i < _holdings.length; i++) ...[
@@ -150,6 +155,7 @@ class _InvestmentPageState extends ConsumerState<InvestmentPage> {
   }
 
   Future<void> _showAddHolding() async {
+    final s = AppStrings.of(context);
     final nameCtrl = TextEditingController();
     final codeCtrl = TextEditingController();
     final sharesCtrl = TextEditingController();
@@ -171,29 +177,29 @@ class _InvestmentPageState extends ConsumerState<InvestmentPage> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text('新增持仓', style: Theme.of(ctx).textTheme.titleMedium),
+              Text(s.addHolding, style: Theme.of(ctx).textTheme.titleMedium),
               const SizedBox(height: Spacing.md),
               TextField(
                   controller: nameCtrl,
-                  decoration: const InputDecoration(
-                      labelText: '名称', border: OutlineInputBorder())),
+                  decoration: InputDecoration(
+                      labelText: s.nameLabel, border: OutlineInputBorder())),
               const SizedBox(height: Spacing.md),
               TextField(
                   controller: codeCtrl,
-                  decoration: const InputDecoration(
-                      labelText: '代码（选填）', border: OutlineInputBorder())),
+                  decoration: InputDecoration(
+                      labelText: s.codeOptionalLabel, border: OutlineInputBorder())),
               const SizedBox(height: Spacing.md),
               PickerField(
-                label: '类型',
-                value: type.label,
+                label: s.typeLabel,
+                value: type.label(AppStrings.of(context)),
                 onTap: () async {
                   final picked = await showOptionPicker<AssetType>(
                     context: ctx,
-                    title: '类型',
+                    title: s.typeLabel,
                     current: type,
                     options: [
                       for (final t in AssetType.values)
-                        PickerOption(value: t, label: t.label),
+                        PickerOption(value: t, label: t.label(AppStrings.of(context))),
                     ],
                   );
                   if (picked != null) setSheet(() => type = picked);
@@ -206,8 +212,8 @@ class _InvestmentPageState extends ConsumerState<InvestmentPage> {
                     controller: sharesCtrl,
                     keyboardType:
                         const TextInputType.numberWithOptions(decimal: true),
-                    decoration: const InputDecoration(
-                        labelText: '份额', border: OutlineInputBorder()),
+                    decoration: InputDecoration(
+                        labelText: s.shares, border: OutlineInputBorder()),
                   ),
                 ),
                 const SizedBox(width: Spacing.md),
@@ -216,8 +222,8 @@ class _InvestmentPageState extends ConsumerState<InvestmentPage> {
                     controller: costCtrl,
                     keyboardType:
                         const TextInputType.numberWithOptions(decimal: true),
-                    decoration: const InputDecoration(
-                        labelText: '成本单价',
+                    decoration: InputDecoration(
+                        labelText: s.costPrice,
                         border: OutlineInputBorder(),
                         prefixText: '¥'),
                   ),
@@ -255,10 +261,10 @@ class _InvestmentPageState extends ConsumerState<InvestmentPage> {
                     ref.invalidateData.bumpAccountsMutated();
                     _reload();
                   } else {
-                    showAppToast(context, '保存失败');
+                    showAppToast(context, s.saveFailed);
                   }
                 },
-                child: const Text('保存'),
+                child: Text(s.save),
               ),
             ],
           ),
@@ -269,6 +275,7 @@ class _InvestmentPageState extends ConsumerState<InvestmentPage> {
 
   /// 对一笔持仓的操作：买入 / 卖出 / 更新价格 / 删除。
   Future<void> _showActions(Holding h) async {
+    final s = AppStrings.of(context);
     final action = await showModalBottomSheet<String>(
       context: context,
       builder: (ctx) => SafeArea(
@@ -285,19 +292,19 @@ class _InvestmentPageState extends ConsumerState<InvestmentPage> {
             const Divider(height: 1),
             ListTile(
                 leading: const PlainIcon(PlainIconData.plus),
-                title: const Text('买入'),
+                title: Text(s.buy),
                 onTap: () => Navigator.pop(ctx, 'buy')),
             ListTile(
                 leading: const PlainIcon(PlainIconData.minus),
-                title: const Text('卖出'),
+                title: Text(s.sell),
                 onTap: () => Navigator.pop(ctx, 'sell')),
             ListTile(
                 leading: const PlainIcon(PlainIconData.edit),
-                title: const Text('更新价格'),
+                title: Text(s.updatePrice),
                 onTap: () => Navigator.pop(ctx, 'price')),
             ListTile(
                 leading: const PlainIcon(PlainIconData.delete),
-                title: const Text('删除持仓'),
+                title: Text(s.deleteHolding),
                 onTap: () => Navigator.pop(ctx, 'delete')),
           ],
         ),
@@ -315,9 +322,9 @@ class _InvestmentPageState extends ConsumerState<InvestmentPage> {
       case 'delete':
         final ok = await showConfirmDialog(
           context,
-          title: '删除持仓',
-          message: '删除后该持仓不再计入市值与盈亏，历史已实现盈亏一并移除。',
-          confirmLabel: '删除',
+          title: s.deleteHolding,
+          message: s.deleteHoldingMessage,
+          confirmLabel: s.delete,
           destructive: true,
         );
         if (ok != true) return;
@@ -405,12 +412,13 @@ class _InvestmentPageState extends ConsumerState<InvestmentPage> {
   }
 
   Future<void> _showUpdatePrice(Holding h) async {
+    final s = AppStrings.of(context);
     // 同 `_showBuySell`：不手管 controller，交给 `TextFormField` 内部 State。
     var priceText = '';
     await showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text('更新价格「${h.name}」'),
+        title: Text(s.updatePriceTitle(h.name)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -418,22 +426,22 @@ class _InvestmentPageState extends ConsumerState<InvestmentPage> {
             if (h.priceUpdatedAt != null)
               Text(
                 // AC4：行情不可用时显示上次价格并标注更新时间
-                '上次价格更新于 ${_formatStamp(h.priceUpdatedAt!)}',
+                s.lastPriceUpdatedAt(_formatStamp(h.priceUpdatedAt!)),
                 style: TextStyle(fontSize: 12, color: context.colors.inkTertiary),
               ),
             const SizedBox(height: Spacing.md),
             TextFormField(
               keyboardType: const TextInputType.numberWithOptions(decimal: true),
               onChanged: (v) => priceText = v,
-              decoration: const InputDecoration(
-                  labelText: '最新单价',
+              decoration: InputDecoration(
+                  labelText: s.latestPrice,
                   border: OutlineInputBorder(),
                   prefixText: '¥'),
             ),
           ],
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('取消')),
+          TextButton(onPressed: () => Navigator.pop(ctx), child: Text(s.cancel)),
           FilledButton(
             onPressed: () async {
               final price = _centsOf(priceText);
@@ -445,9 +453,9 @@ class _InvestmentPageState extends ConsumerState<InvestmentPage> {
               if (ctx.mounted) Navigator.pop(ctx);
               if (!mounted) return;
               _reload();
-              if (r.isFailure) showAppToast(context, '更新失败');
+              if (r.isFailure) showAppToast(context, s.updateFailed);
             },
-            child: const Text('保存'),
+            child: Text(s.save),
           ),
         ],
       ),
@@ -469,6 +477,7 @@ class _Hero extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final s = AppStrings.of(context);
     final colors = context.colors;
     return Padding(
       padding: const EdgeInsets.only(top: Spacing.sm, bottom: Spacing.sm),
@@ -479,7 +488,7 @@ class _Hero extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.fromLTRB(2, Spacing.lg, 2, Spacing.sm),
             child: Text(
-              '账户净值（持仓市值 + 现金）',
+              s.investmentNetValueLabel,
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
@@ -500,21 +509,21 @@ class _Hero extends StatelessWidget {
             children: [
               Expanded(
                 child: _Split(
-                  label: '持仓市值',
+                  label: s.marketValue,
                   amountCents: summary.marketValueCents,
                 ),
               ),
               const SizedBox(width: Spacing.lg),
               Expanded(
                 child: _Split(
-                  label: '现金余额',
+                  label: s.cashBalance,
                   amountCents: summary.cashCents,
                 ),
               ),
               const SizedBox(width: Spacing.lg),
               Expanded(
                 child: _Split(
-                  label: '浮动盈亏',
+                  label: s.unrealizedPnl,
                   amountCents: summary.unrealizedPnlCents,
                   showSign: true,
                 ),
@@ -574,6 +583,7 @@ class _HoldingRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final s = AppStrings.of(context);
     final colors = context.colors;
     final h = holding;
     final pnl = h.unrealizedPnlCents;
@@ -611,7 +621,7 @@ class _HoldingRow extends StatelessWidget {
               Text(
                 h.hasPrice
                     ? '${pnl >= 0 ? '+' : ''}${formatAmountYuan(pnl)}'
-                    : '未录入现价',
+                    : s.noPrice,
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
@@ -634,14 +644,15 @@ class _NotePanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final s = AppStrings.of(context);
     final colors = context.colors;
     return PlainPanel(
       padding: const EdgeInsets.all(Spacing.lg),
       children: [
         Text(
           hasUnpriced
-              ? '有持仓还没录入现价，市值与浮动盈亏暂按 0 计。点持仓 → 更新价格即可。'
-              : '价格由手动录入并记录更新时间；本项目不接外部行情源，不会发起任何网络请求。',
+              ? s.unpricedNote
+              : s.priceNote,
           style: TextStyle(fontSize: 14, height: 1.65, color: colors.inkSecondary),
         ),
       ],

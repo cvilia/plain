@@ -1,7 +1,9 @@
 /// STORY-8.2 家庭共享（基础）：成员与 AA 参与人。
 library;
 
+import 'package:plain/app/l10n/app_strings.dart';
 import 'package:plain/domain/entities/enums.dart';
+import 'package:plain/app/l10n/strings_domain.dart';
 
 class Member {
   const Member({
@@ -45,8 +47,8 @@ class Member {
   bool get isActive => status == MemberStatus.active && !isDeleted;
 
   /// AC4：退出者的历史账单归属显示为「已退出成员」。
-  String get attributionLabel =>
-      isActive ? name : '已退出成员（$name）';
+  String attributionLabel(AppStrings s) =>
+      isActive ? name : s.memberLeftAttribution(name);
 
   /// 是否占用 6 人名额（只看活跃成员）。
   bool get occupiesSeat => isActive;

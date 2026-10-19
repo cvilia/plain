@@ -11,6 +11,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:plain/app/bootstrap.dart';
 import 'package:plain/app/breakpoints.dart';
+import 'package:plain/app/l10n/app_strings.dart';
+import 'package:plain/app/l10n/strings_reports.dart';
 import 'package:plain/app/settings/ledger_settings.dart';
 import 'package:plain/app/theme/app_colors.dart';
 import 'package:plain/app/theme/design_tokens.dart';
@@ -122,6 +124,7 @@ class _CrossAnalysisPageState extends ConsumerState<CrossAnalysisPage> {
     required int monthStartDay,
   }) =>
       _svc.build(
+        s: AppStrings.of(context),
         rowDim: _rowDim,
         colDim: _colDim,
         categoryNames: categoryNames,
@@ -161,15 +164,16 @@ class _CrossAnalysisPageState extends ConsumerState<CrossAnalysisPage> {
 
   @override
   Widget build(BuildContext context) {
+    final s = AppStrings.of(context);
     final colors = context.colors;
     return Scaffold(
       appBar: PlainTopBar(
-        title: '交叉分析',
+        title: s.reportCrossTitle,
         showBack: true,
         actions: [
           PlainTopBarAction(
             icon: PlainIconData.listCheck,
-            tooltip: '我的报表',
+            tooltip: s.reportMineTitle,
             onTap: _showSaved,
           ),
         ],
@@ -182,7 +186,7 @@ class _CrossAnalysisPageState extends ConsumerState<CrossAnalysisPage> {
                     Spacing.lg, Spacing.sm, Spacing.lg, Spacing.xl),
                 children: [
                   _DimPicker(
-                    label: '行',
+                    label: s.reportRowLabel,
                     selected: _rowDim,
                     onChanged: (d) {
                       setState(() => _rowDim = d);
@@ -191,7 +195,7 @@ class _CrossAnalysisPageState extends ConsumerState<CrossAnalysisPage> {
                   ),
                   const SizedBox(height: Spacing.sm),
                   _DimPicker(
-                    label: '列',
+                    label: s.reportColLabel,
                     selected: _colDim,
                     onChanged: (d) {
                       setState(() => _colDim = d);
@@ -200,7 +204,7 @@ class _CrossAnalysisPageState extends ConsumerState<CrossAnalysisPage> {
                   ),
                   const SizedBox(height: Spacing.sm),
                   PlainSeg(
-                    items: [for (final f in ReportEntryFilter.values) f.label],
+                    items: [for (final f in ReportEntryFilter.values) f.label(s)],
                     selectedIndex: ReportEntryFilter.values.indexOf(_filter),
                     onChanged: (i) async {
                       setState(() => _filter = ReportEntryFilter.values[i]);
@@ -209,7 +213,7 @@ class _CrossAnalysisPageState extends ConsumerState<CrossAnalysisPage> {
                   ),
                   const SizedBox(height: Spacing.md),
                   Row(children: [
-                    Text('热力着色',
+                    Text(s.reportHeatmap,
                         style: TextStyle(
                             fontSize: 14, color: colors.inkSecondary)),
                     const Spacer(),
@@ -220,14 +224,14 @@ class _CrossAnalysisPageState extends ConsumerState<CrossAnalysisPage> {
                   ]),
                   const SizedBox(height: Spacing.sm),
                   if (_table.isEmpty)
-                    const AppEmptyState(
+                    AppEmptyState(
                       icon: PlainIconData.filter,
-                      title: '这个组合下没有数据',
-                      subtitle: '换个维度或时间范围试试',
+                      title: s.reportNoDataComboTitle,
+                      subtitle: s.reportNoDataComboSubtitle,
                     )
                   else ...[
                     PlainEyebrow(
-                        '${_rowDim.label} × ${_colDim.label} · ${_entries.length} 笔'),
+                        s.reportMatrixEyebrow(_rowDim.label(s), _colDim.label(s), _entries.length)),
                     PlainPanel(children: [
                       _Matrix(
                         table: _table,
@@ -237,8 +241,7 @@ class _CrossAnalysisPageState extends ConsumerState<CrossAnalysisPage> {
                     ]),
                     const SizedBox(height: Spacing.sm),
                     Text(
-                      '合计 ${formatAmountYuan(_table.grandTotalCents)} · '
-                      '点任意单元格查看对应账单',
+                      s.reportGrandTotalHint(formatAmountYuan(_table.grandTotalCents)),
                       style:
                           TextStyle(fontSize: 12, color: colors.inkTertiary),
                     ),
@@ -258,23 +261,24 @@ class _CrossAnalysisPageState extends ConsumerState<CrossAnalysisPage> {
   Future<void> _saveCurrent() async {
     // 不手管 controller：`showDialog` 返回时弹窗淡出动画还没结束、子树仍会重建，
     // 此时 dispose 会抛「A TextEditingController was used after being disposed」。
-    var name = '${_rowDim.label} × ${_colDim.label}';
+    final s = AppStrings.of(context);
+    var name = s.reportComboName(_rowDim.label(s), _colDim.label(s));
     final result = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('保存为我的报表'),
+        title: Text(s.reportSaveAsTitle),
         content: TextFormField(
           initialValue: name,
           onChanged: (v) => name = v,
-          decoration: const InputDecoration(
-              labelText: '报表名称', border: OutlineInputBorder()),
+          decoration: InputDecoration(
+              labelText: s.reportNameField, border: const OutlineInputBorder()),
         ),
         actions: [
           TextButton(
-              onPressed: () => Navigator.pop(ctx), child: const Text('取消')),
+              onPressed: () => Navigator.pop(ctx), child: Text(s.cancel)),
           FilledButton(
             onPressed: () => Navigator.pop(ctx, name.trim()),
-            child: const Text('保存'),
+            child: Text(s.save),
           ),
         ],
       ),
@@ -303,17 +307,18 @@ class _CrossAnalysisPageState extends ConsumerState<CrossAnalysisPage> {
     ));
     if (!mounted) return;
     if (r.isSuccess) {
-      showAppToast(context, '已保存「$result」');
+      showAppToast(context, s.reportSavedToast(result));
       await _load();
     } else {
-      showAppToast(context, '保存失败');
+      showAppToast(context, s.reportSaveFailed);
     }
   }
 
   /// AC4：一键复现 / 删除。
   Future<void> _showSaved() async {
+    final s = AppStrings.of(context);
     if (_saved.isEmpty) {
-      showAppToast(context, '还没有保存的报表');
+      showAppToast(context, s.reportNoSaved);
       return;
     }
     await showModalBottomSheet<void>(
@@ -325,25 +330,25 @@ class _CrossAnalysisPageState extends ConsumerState<CrossAnalysisPage> {
             Padding(
               padding: const EdgeInsets.all(Spacing.lg),
               child: Row(children: [
-                const Expanded(
-                  child: Text('我的报表',
-                      style: TextStyle(
+                Expanded(
+                  child: Text(s.reportMineTitle,
+                      style: const TextStyle(
                           fontSize: 15, fontWeight: FontWeight.w600)),
                 ),
                 TextButton(
                     onPressed: () => Navigator.pop(ctx),
-                    child: const Text('关闭')),
+                    child: Text(s.close)),
               ]),
             ),
             const Divider(height: 1),
             for (final r in _saved)
               ListTile(
                 title: Text(r.name, style: const TextStyle(fontSize: 15)),
-                subtitle: Text(r.describe,
+                subtitle: Text(r.describe(s),
                     style: const TextStyle(fontSize: 12)),
                 trailing: IconButton(
                   icon: const PlainIcon(PlainIconData.delete, size: 20),
-                  tooltip: '删除该报表',
+                  tooltip: s.reportDeleteTooltip,
                   onPressed: () async {
                     Navigator.pop(ctx);
                     await _deleteSaved(r);
@@ -362,6 +367,7 @@ class _CrossAnalysisPageState extends ConsumerState<CrossAnalysisPage> {
   }
 
   void _applySaved(SavedReport r) {
+    final s = AppStrings.of(context);
     setState(() {
       _rowDim = r.rowDim;
       _colDim = r.colDim;
@@ -369,15 +375,16 @@ class _CrossAnalysisPageState extends ConsumerState<CrossAnalysisPage> {
       _heatmap = r.heatmap;
     });
     _rebuild();
-    showAppToast(context, '已复现「${r.name}」');
+    showAppToast(context, s.reportAppliedToast(r.name));
   }
 
   Future<void> _deleteSaved(SavedReport r) async {
+    final s = AppStrings.of(context);
     final ok = await showConfirmDialog(
       context,
-      title: '删除报表',
-      message: '删除「${r.name}」？',
-      confirmLabel: '删除',
+      title: s.reportDeleteTitle,
+      message: s.reportDeleteConfirm(r.name),
+      confirmLabel: s.delete,
       destructive: true,
     );
     if (ok != true || !mounted) return;
@@ -387,6 +394,7 @@ class _CrossAnalysisPageState extends ConsumerState<CrossAnalysisPage> {
 
   /// AC3：点单元格下钻到对应账单。
   Future<void> _showCell(String rowKey, String colKey) async {
+    final s = AppStrings.of(context);
     final cell = _table.cellAt(rowKey, colKey);
     if (cell == null) return;
     final mine = [
@@ -407,13 +415,13 @@ class _CrossAnalysisPageState extends ConsumerState<CrossAnalysisPage> {
               padding: const EdgeInsets.all(Spacing.lg),
               child: Row(children: [
                 Expanded(
-                  child: Text('$rowLabel · $colLabel（${mine.length} 笔）',
+                  child: Text(s.reportCellSheetTitle(rowLabel, colLabel, mine.length),
                       style: const TextStyle(
                           fontSize: 15, fontWeight: FontWeight.w600)),
                 ),
                 TextButton(
                     onPressed: () => Navigator.pop(ctx),
-                    child: const Text('关闭')),
+                    child: Text(s.close)),
               ]),
             ),
             const Divider(height: 1),
@@ -424,8 +432,8 @@ class _CrossAnalysisPageState extends ConsumerState<CrossAnalysisPage> {
                   final e = mine[i];
                   final local = e.occurredAt.toLocal();
                   final cat = e.categoryId == null
-                      ? '未分类'
-                      : (_categories[e.categoryId]?.name ?? '未分类');
+                      ? s.uncategorized
+                      : (_categories[e.categoryId]?.name ?? s.uncategorized);
                   return ListTile(
                     dense: true,
                     title: Text(
@@ -485,6 +493,7 @@ class _DimPicker extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final s = AppStrings.of(context);
     final colors = context.colors;
     return Row(children: [
       SizedBox(
@@ -499,15 +508,15 @@ class _DimPicker extends StatelessWidget {
       Expanded(
         child: PickerField(
           label: null,
-          value: selected.label,
+          value: selected.label(AppStrings.of(context)),
           onTap: () async {
             final picked = await showOptionPicker<CrossDimension>(
               context: context,
-              title: '$label维度',
+              title: s.reportDimSheetTitle(label),
               current: selected,
               options: [
                 for (final d in _dims)
-                  PickerOption(value: d, label: d.label),
+                  PickerOption(value: d, label: d.label(AppStrings.of(context))),
               ],
             );
             if (picked != null) onChanged(picked);
@@ -534,6 +543,7 @@ class _Matrix extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final s = AppStrings.of(context);
     final colors = context.colors;
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
@@ -564,7 +574,7 @@ class _Matrix extends StatelessWidget {
               ),
             SizedBox(
               width: _colWidth,
-              child: Text('合计',
+              child: Text(s.reportTotal,
                   textAlign: TextAlign.right,
                   style: TextStyle(
                       fontSize: 12,
@@ -613,7 +623,7 @@ class _Matrix extends StatelessWidget {
               width: _rowLabelWidth,
               child: Padding(
                 padding: const EdgeInsets.symmetric(vertical: 10),
-                child: Text('合计',
+                child: Text(s.reportTotal,
                     style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w700,
@@ -688,6 +698,7 @@ class _SavePanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final s = AppStrings.of(context);
     final colors = context.colors;
     return PlainPanel(
       padding: const EdgeInsets.all(Spacing.lg),
@@ -701,7 +712,7 @@ class _SavePanel extends StatelessWidget {
         FilledButton.icon(
           onPressed: onSave,
           icon: const PlainIcon(PlainIconData.listCheck),
-          label: const Text('保存为我的报表'),
+          label: Text(s.reportSaveAsTitle),
         ),
       ],
     );

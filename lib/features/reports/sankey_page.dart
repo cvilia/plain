@@ -22,6 +22,9 @@ import 'package:plain/domain/entities/category.dart';
 import 'package:plain/domain/entities/enums.dart';
 import 'package:plain/domain/entities/ledger_entry.dart';
 import 'package:plain/domain/services/sankey_service.dart';
+import 'package:plain/app/l10n/app_strings.dart';
+import 'package:plain/app/l10n/strings_reports.dart';
+import 'package:plain/app/l10n/strings_accounts.dart';
 
 const _svc = SankeyService();
 
@@ -110,6 +113,7 @@ class _SankeyPageState extends ConsumerState<SankeyPage> {
     }
 
     final graph = _svc.build(
+      s: AppStrings.of(context),
       dimension: _dimension,
       categories: info,
       accountNames: {
@@ -148,8 +152,9 @@ class _SankeyPageState extends ConsumerState<SankeyPage> {
 
   @override
   Widget build(BuildContext context) {
+    final s = AppStrings.of(context);
     return Scaffold(
-      appBar: const PlainTopBar(title: '桑基现金流', showBack: true),
+      appBar: PlainTopBar(title: s.reportSankeyTitle, showBack: true),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : ContentWidthConstraint(
@@ -160,7 +165,7 @@ class _SankeyPageState extends ConsumerState<SankeyPage> {
                   Padding(
                     padding: const EdgeInsets.only(top: Spacing.sm),
                     child: PlainSeg(
-                      items: [for (final d in SankeyDimension.values) d.label],
+                      items: [for (final d in SankeyDimension.values) d.label(AppStrings.of(context))],
                       selectedIndex: SankeyDimension.values.indexOf(_dimension),
                       onChanged: (i) {
                         setState(() => _dimension = SankeyDimension.values[i]);
@@ -171,7 +176,7 @@ class _SankeyPageState extends ConsumerState<SankeyPage> {
                   Padding(
                     padding: const EdgeInsets.only(top: Spacing.sm),
                     child: PlainSeg(
-                      items: const ['本月', '近 3 月', '自定义'],
+                      items: [s.sankeyRangeThisMonth, s.sankeyRangeLast3, s.sankeyRangeCustom],
                       selectedIndex: _Range.values.indexOf(_range),
                       onChanged: (i) async {
                         final r = _Range.values[i];
@@ -187,17 +192,17 @@ class _SankeyPageState extends ConsumerState<SankeyPage> {
                   const SizedBox(height: Spacing.sm),
                   // AC4：无收入/无支出给提示而不是空图
                   if (_graph.hasNoIncome)
-                    const _Hint(
+                    _Hint(
                       icon: PlainIconData.chartLine,
-                      text: '该时间段没有收入记录，无法形成「来源 → 去向」的流向。',
+                      text: s.sankeyNoIncomeHint,
                     ),
                   if (_graph.hasNoExpense)
-                    const _Hint(
+                    _Hint(
                       icon: PlainIconData.chartLine,
-                      text: '该时间段没有支出记录，只看到收入来源。',
+                      text: s.sankeyNoExpenseHint,
                     ),
                   if (!_graph.isEmpty) ...[
-                    PlainEyebrow('收入来源 → 汇总 → 支出去向'),
+                    PlainEyebrow(s.sankeyFlowEyebrow),
                     PlainPanel(children: [
                       Padding(
                         padding: const EdgeInsets.symmetric(vertical: Spacing.md),
@@ -210,18 +215,18 @@ class _SankeyPageState extends ConsumerState<SankeyPage> {
                         ),
                       ),
                     ]),
-                    PlainEyebrow('明细'),
+                    PlainEyebrow(s.sankeyDetailEyebrow),
                     PlainPanel(children: [
                       _TotalRow(
-                          label: '收入合计',
+                          label: s.sankeyIncomeTotal,
                           cents: _graph.totalIncomeCents,
                           color: context.colors.income),
                       _TotalRow(
-                          label: '支出合计',
+                          label: s.sankeyExpenseTotal,
                           cents: _graph.totalExpenseCents,
                           color: context.colors.expense),
                       _TotalRow(
-                        label: _graph.netCents >= 0 ? '结余' : '超支',
+                        label: _graph.netCents >= 0 ? s.balance : s.sankeyOver,
                         cents: _graph.netCents.abs(),
                         color: _graph.netCents >= 0
                             ? context.colors.income
@@ -230,10 +235,10 @@ class _SankeyPageState extends ConsumerState<SankeyPage> {
                       ),
                     ]),
                   ] else
-                    const AppEmptyState(
+                    AppEmptyState(
                       icon: PlainIconData.chartLine,
-                      title: '这段时间没有收支',
-                      subtitle: '换个时间范围或先记几笔',
+                      title: s.sankeyEmptyTitle,
+                      subtitle: s.sankeyEmptySubtitle,
                     ),
                   const SizedBox(height: Spacing.md),
                   _NotePanel(graph: _graph, dimension: _dimension),
@@ -270,6 +275,7 @@ class _SankeyPageState extends ConsumerState<SankeyPage> {
 
   /// AC3：点节点下钻到该节点的账单明细。
   Future<void> _showNodeEntries(SankeyNode node) async {
+    final s = AppStrings.of(context);
     final isIncome = _graph.sources.contains(node);
     final mine = [
       for (final e in _entries)
@@ -286,13 +292,13 @@ class _SankeyPageState extends ConsumerState<SankeyPage> {
               padding: const EdgeInsets.all(Spacing.lg),
               child: Row(children: [
                 Expanded(
-                  child: Text('${node.label} · ${mine.length} 笔',
+                  child: Text(s.accountEntriesCount(node.label, mine.length),
                       style: const TextStyle(
                           fontSize: 15, fontWeight: FontWeight.w600)),
                 ),
                 TextButton(
                     onPressed: () => Navigator.pop(ctx),
-                    child: const Text('关闭')),
+                    child: Text(s.close)),
               ]),
             ),
             const Divider(height: 1),
@@ -302,8 +308,8 @@ class _SankeyPageState extends ConsumerState<SankeyPage> {
                       padding: const EdgeInsets.all(Spacing.lg),
                       child: Text(
                         node.isOther
-                            ? '「其他」是多个小占比项合并而来，请切换到更细的维度查看。'
-                            : '该节点下没有可展示的账单。',
+                            ? s.sankeyOtherHint
+                            : s.sankeyNoEntries,
                         style: TextStyle(
                             fontSize: 14,
                             color: Theme.of(ctx).extension<AppColors>()!.inkTertiary),
@@ -315,8 +321,8 @@ class _SankeyPageState extends ConsumerState<SankeyPage> {
                         final e = mine[i];
                         final local = e.occurredAt.toLocal();
                         final cat = e.categoryId == null
-                            ? '未分类'
-                            : (_categories[e.categoryId]?.name ?? '未分类');
+                            ? s.uncategorized
+                            : (_categories[e.categoryId]?.name ?? s.uncategorized);
                         return ListTile(
                           dense: true,
                           title: Text(
@@ -581,17 +587,18 @@ class _NotePanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final s = AppStrings.of(context);
     final colors = context.colors;
     final lines = <String>[
       '当前维度：${dimension.label}。点任意节点条可看该节点的账单明细。',
-      '占比不足 1% 的项会并入「其他」，避免图形被碎块淹没。',
+      s.sankeyNoteThreshold,
       if (graph.sources.any((n) => n.isOther) ||
           graph.targets.any((n) => n.isOther))
-        '图中存在「其他」节点，切换到更细的维度可以看到具体分类。',
+        s.sankeyNoteOtherNode,
       if (graph.netCents != 0)
         graph.netCents > 0
-            ? '这段时间收入大于支出，差额作为结余留在账户里，不流向任何支出。'
-            : '这段时间支出大于收入，超出部分来自既有余额。',
+            ? s.sankeyNoteSurplus
+            : s.sankeyNoteDeficit,
     ];
     return PlainPanel(
       padding: const EdgeInsets.all(Spacing.lg),

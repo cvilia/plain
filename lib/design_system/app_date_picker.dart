@@ -2,6 +2,7 @@
 /// Celadon green theme, clean calendar grid.
 library;
 
+import 'package:plain/app/l10n/app_strings.dart';
 import 'package:plain/app/theme/app_colors.dart';
 import 'package:flutter/material.dart';
 import 'package:plain/app/theme/design_tokens.dart';
@@ -53,6 +54,7 @@ class _AppDatePickerDialogState extends State<_AppDatePickerDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final s = AppStrings.of(context);
     return Dialog(
       backgroundColor: context.colors.surface,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(Radii.lg)),
@@ -65,7 +67,7 @@ class _AppDatePickerDialogState extends State<_AppDatePickerDialog> {
             // 设计稿无 24（字阶只有 12/14/15/20/22/34/44）。这是弹窗标题式的大字，
             // 归到 `.title` 档 = 20/w600/行盒 27。
             Text(
-              _formatHeaderDate(_selectedDate),
+              _formatHeaderDate(s, _selectedDate),
               style: TextStyle(
                 fontSize: 20,
                 height: designLineHeight(20),
@@ -87,7 +89,7 @@ class _AppDatePickerDialogState extends State<_AppDatePickerDialog> {
                   onPressed: _prevMonth,
                 ),
                 Text(
-                  '${_displayMonth.year}年${_displayMonth.month}月',
+                  s.yearMonth(_displayMonth),
                   style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500, color: context.colors.ink),
                 ),
                 IconButton(
@@ -103,7 +105,7 @@ class _AppDatePickerDialogState extends State<_AppDatePickerDialog> {
 
             // Weekday header
             Row(
-              children: ['一', '二', '三', '四', '五', '六', '日'].map((d) {
+              children: s.calendarWeekdayLabels.map((d) {
                 return Expanded(
                   child: Center(
                     child: Text(d, style: TextStyle(fontSize: 12, color: context.colors.inkTertiary)),
@@ -123,12 +125,12 @@ class _AppDatePickerDialogState extends State<_AppDatePickerDialog> {
               children: [
                 TextButton(
                   onPressed: () => Navigator.pop(context),
-                  child: Text('取消', style: TextStyle(color: context.colors.inkSecondary)),
+                  child: Text(s.cancel, style: TextStyle(color: context.colors.inkSecondary)),
                 ),
                 const SizedBox(width: Spacing.md),
                 TextButton(
                   onPressed: () => Navigator.pop(context, _selectedDate.toUtc()),
-                  child: Text('确定', style: TextStyle(color: context.colors.primary, fontWeight: FontWeight.w600)),
+                  child: Text(s.ok, style: TextStyle(color: context.colors.primary, fontWeight: FontWeight.w600)),
                 ),
               ],
             ),
@@ -218,9 +220,8 @@ class _AppDatePickerDialogState extends State<_AppDatePickerDialog> {
     });
   }
 
-  String _formatHeaderDate(DateTime date) {
-    const weekdays = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
-    final weekday = weekdays[(date.weekday - 1) % 7];
-    return '${date.year}年${date.month}月${date.day}日 $weekday';
+  String _formatHeaderDate(AppStrings s, DateTime date) {
+    final weekday = s.weekdayLabels[(date.weekday - 1) % 7];
+    return s.dateWithWeekday(date, weekday);
   }
 }

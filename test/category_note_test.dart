@@ -58,7 +58,7 @@ void main() {
     expect(back.note, isNull);
   });
 
-  test('A4 preset catalog 41+4 leaves, renames and notes', () async {
+  test('A4 preset catalog 41+15 leaves, renames and notes', () async {
     final db = AppDatabase.inMemory();
     addTearDown(db.close);
     db.raw.execute("INSERT INTO app_meta (key,value,updated_at) VALUES ('device.id','dev',0)");
@@ -75,7 +75,7 @@ void main() {
     final expLeaves = db.raw.select("SELECT c.name FROM categories c JOIN categories p ON c.parent_id = p.id WHERE c.kind = 'expense' AND c.deleted_at IS NULL");
     final incLeaves = db.raw.select("SELECT c.name FROM categories c JOIN categories p ON c.parent_id = p.id WHERE c.kind = 'income' AND c.deleted_at IS NULL");
     expect(expLeaves.length, 41);
-    expect(incLeaves.length, 4);
+    expect(incLeaves.length, 15);
     final foodKids = db.raw.select("SELECT c.name FROM categories c JOIN categories p ON c.parent_id = p.id WHERE p.name = '餐饮' ORDER BY c.sort_order").map((r) => r['name']! as String).toList();
     expect(foodKids, ['早餐', '午餐', '晚餐', '夜宵', '零食', '饮料']);
     final presets = db.raw.select('SELECT note FROM categories WHERE is_preset = 1 AND deleted_at IS NULL');

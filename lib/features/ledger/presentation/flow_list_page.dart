@@ -1,5 +1,5 @@
 /// Home flow list — Quiet Ledger SP-0-02.
-/// 顶栏：日历（跳报表） | 2026年9月 | 搜索 · 更多 —— 图标 20 / 44×44 / r12
+/// 顶栏：左侧 44 占位（无跳转）| 2026年9月 | 搜索 · 更多 —— 图标 20 / 44×44 / r12
 /// Hero：结余四段式 ink（行盒 45 = 34 × CSS normal）/ 支出 ink / 收入 income 红
 /// 日分组：eyebrow（32 上距 + 8 下距，只有日期、无当日合计）+ 圆角 panel
 /// 行：6px 色点 · 名称/备注 · 金额（右对齐 + tnum）
@@ -28,6 +28,8 @@ import 'package:plain/domain/entities/ledger_entry.dart';
 import 'package:plain/features/ledger/controllers/flow_list_controller.dart';
 import 'package:plain/features/ledger/presentation/advanced_filter_page.dart';
 import 'package:plain/features/ledger/presentation/safe_to_spend_card.dart';
+import 'package:plain/app/l10n/app_strings.dart';
+import 'package:plain/app/l10n/strings_ledger.dart';
 
 final _homeLayoutProvider =
     FutureProvider<(List<String>, Set<String>)>((ref) async {
@@ -42,6 +44,7 @@ class FlowListPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final s = AppStrings.of(context);
     final state = ref.watch(flowListControllerProvider);
     final controller = ref.read(flowListControllerProvider.notifier);
     final filterCatId = ref.watch(flowCategoryFilterProvider);
@@ -53,24 +56,28 @@ class FlowListPage extends ConsumerWidget {
       controller.refresh();
     });
 
+    // ⚠️ 顶栏月份**恒为当前月**，刻意不做月份切换（产品口径 2026-10-19）：
+    // 本页是「这个月的流水」，不是日历浏览器。原左上角日历按钮（跳报表）已移除，
+    // 不要再补月份选择器——要跨月看的是报表页（按月份/区间汇总），不是这里。
     final now = DateTime.now();
     final monthTitle = '${now.year}年${now.month}月';
 
     return Scaffold(
       backgroundColor: colors.surface,
       // 顶栏统一走 PlainTopBar（`.topbar`）：内容盒 56，状态栏高度由它自己的
-      // SafeArea 承担。两处照设计稿：
-      //   · 图标 20（`ic("ic_calendar", 20)`），不是 `.iconbtn` 的默认 22；
-      //   · 左侧是日历按钮（跳报表），不是返回键 —— 本页是 shell 分支，无路由可回。
+      // SafeArea 承担。照设计稿：动作图标 20（`ic("ic_search", 20)`），
+      // 不是 `.iconbtn` 的默认 22。
+      //
+      // 左上角**没有按钮**：原日历（跳 `/reports`）已移除 —— 本页是 shell 分支，
+      // 报表是同级 tab，从流水顶部跳过去会污染返回栈。不传 `leadingIcon` / `onBack`
+      // 时 `PlainTopBar` 自己补一个 44 宽的占位，标题仍居中，不再需要额外对齐处理。
       appBar: PlainTopBar(
         title: monthTitle,
-        leadingIcon: PlainIconData.calendar,
-        onBack: () => context.go('/reports'),
         actions: [
           PlainTopBarAction(
             icon: PlainIconData.search,
             iconSize: 20,
-            tooltip: '搜索 / 筛选',
+            tooltip: s.searchOrFilter,
             onTap: () => Navigator.push<void>(
               context,
               MaterialPageRoute(builder: (_) => const AdvancedFilterPage()),
@@ -79,7 +86,7 @@ class FlowListPage extends ConsumerWidget {
           PlainTopBarAction(
             icon: PlainIconData.more,
             iconSize: 20,
-            tooltip: '更多',
+            tooltip: s.more,
             onTap: () {},
           ),
         ],
@@ -134,6 +141,7 @@ class _FilterStrip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final s = AppStrings.of(context);
     final colors = context.colors;
     return ColoredBox(
       color: colors.surfaceMuted,
@@ -155,7 +163,7 @@ class _FilterStrip extends StatelessWidget {
             ),
             TextButton(
               onPressed: onClear,
-              child: const Text('显示全部'),
+              child: Text(s.showAll),
             ),
           ],
         ),
@@ -177,26 +185,27 @@ class _EmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final s = AppStrings.of(context);
     if (errorCode != null) {
       return AppEmptyState(
         icon: PlainIconData.cloudDownload,
-        title: '流水加载失败',
-        subtitle: '数据还在本机，重试一下就好（$errorCode）',
+        title: s.flowLoadFailed,
+        subtitle: s.flowLoadFailedSubtitle(errorCode!),
         action: FilledButton.icon(
           onPressed: onRetry,
           icon: const PlainIcon(PlainIconData.cloudDownload),
-          label: const Text('重试'),
+          label: Text(s.retry),
         ),
       );
     }
     return AppEmptyState(
       icon: PlainIconData.receipt,
-      title: '还没有记录',
-      subtitle: '点击下方按钮记一笔',
+      title: s.noEntries,
+      subtitle: s.tapToRecord,
       action: FilledButton.icon(
         onPressed: onEntryTap,
         icon: const PlainIcon(PlainIconData.plus),
-        label: const Text('记一笔'),
+        label: Text(s.recordEntry),
       ),
     );
   }
@@ -325,6 +334,7 @@ class _Hero extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final s = AppStrings.of(context);
     final hideAmounts = ref.watch(hideAmountsProvider);
     var income = 0;
     var expense = 0;
@@ -345,7 +355,7 @@ class _Hero extends ConsumerWidget {
           Padding(
             padding: const EdgeInsets.fromLTRB(2, 16, 0, 8),
             child: Text(
-              '本月结余',
+              s.thisMonthBalance,
               style: TextStyle(
                 fontSize: 12,
                 // 12 的设计行盒是 16（normal）。不写就继承 body 的 1.5714 → 18.86（+2.86）。
@@ -382,7 +392,7 @@ class _Hero extends ConsumerWidget {
               spacing: 28,
               children: [
                 _Split(
-                  label: '支出',
+                  label: s.expense,
                   cents: expense,
                   hide: hideAmounts,
                   // 设计：支出 ink，无 − 号
@@ -390,7 +400,7 @@ class _Hero extends ConsumerWidget {
                   showSign: false,
                 ),
                 _Split(
-                  label: '收入',
+                  label: s.income,
                   cents: income,
                   hide: hideAmounts,
                   // 设计 `.tone-income` 的 `--income` = #DC2626 红。
@@ -417,7 +427,7 @@ class _Hero extends ConsumerWidget {
                   color: colors.inkFaint,
                 ),
                 Text(
-                  '记账月起始：$monthStartDay 日',
+                  s.monthStartNote(monthStartDay),
                   style: TextStyle(
                     fontSize: 12,
                     height: designLineHeight(12),
@@ -499,7 +509,7 @@ class _DayHeader extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.fromLTRB(2, 32, 2, 8),
       child: Text(
-        dayLabel(group.dayKey),
+        dayLabel(AppStrings.of(context), group.dayKey),
         style: TextStyle(
           fontSize: 12,
           height: designLineHeight(12),
@@ -549,6 +559,7 @@ class _EntryRowState extends ConsumerState<_EntryRow> {
 
   @override
   Widget build(BuildContext context) {
+    final s = AppStrings.of(context);
     final entry = widget.entry;
     final category = widget.category;
     final controller = widget.controller;
@@ -559,7 +570,7 @@ class _EntryRowState extends ConsumerState<_EntryRow> {
     final amountText = formatAmount(entry.amount.cents, hide: hide);
     // 《08-SCREENS-SPEC/02-ledger》§4：`.rt` = **一级**（餐饮）；
     // `.sub` = 「二级 · 备注」（午餐 · 公司楼下）。
-    final title = widget.parent?.name ?? category?.name ?? '未分类';
+    final title = widget.parent?.name ?? category?.name ?? s.uncategorized;
     final sub = _subtitleOf(entry, category, widget.parent);
     final dotColor = _catColor(category);
 
@@ -584,12 +595,12 @@ class _EntryRowState extends ConsumerState<_EntryRow> {
           if (ok) {
             showAppToastWithAction(
               context,
-              '已删除',
-              actionLabel: '撤销',
+              s.deleted,
+              actionLabel: s.undo,
               onAction: () => controller.undoDelete(),
             );
           } else {
-            showAppToast(context, '删除失败');
+            showAppToast(context, s.deleteFailed);
           }
         });
       },

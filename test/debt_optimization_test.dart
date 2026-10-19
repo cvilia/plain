@@ -1,6 +1,7 @@
 /// STORY-10.5 债务优化（雪球 / 雪崩）逐月模拟。
 library;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:plain/app/l10n/strings_core.dart';
 import 'package:plain/domain/services/debt_optimization_service.dart';
 
 void main() {
@@ -39,8 +40,8 @@ void main() {
           lessThan(cmp.snowball.totalInterestCents));
       expect(cmp.recommended, DebtStrategy.avalanche);
       expect(cmp.savingCents, greaterThan(0));
-      expect(cmp.reason, contains('雪崩法'));
-      expect(cmp.reason, contains('少'));
+      expect(cmp.reason(kDefaultAppStrings), contains('雪崩法'));
+      expect(cmp.reason(kDefaultAppStrings), contains('少'));
     });
 
     test('雪球法先清最小的，雪崩法先清利率最高的（需有余钱可变现）', () {

@@ -1,6 +1,7 @@
 /// Recurring rule use cases: create/update and due-entry generation. See PRD F6.1.
 library;
 
+import 'package:plain/app/l10n/app_strings.dart';
 import 'package:plain/core/constants/app_constants.dart';
 import 'package:plain/core/id/uuid_v7.dart';
 import 'package:plain/core/money/money.dart';
@@ -24,6 +25,7 @@ import 'package:plain/domain/usecases/goal_usecases.dart';
 ///
 /// 两笔共用同一个 [batchId]，因此删除/撤销作用于整个还款批次。
 Future<Result<List<LedgerEntry>>> buildEntriesForRule({
+  required AppStrings s,
   required RecurringRule rule,
   required String batchId,
   required DateTime now,
@@ -38,7 +40,7 @@ Future<Result<List<LedgerEntry>>> buildEntriesForRule({
   Future<LedgerEntry> withRules(LedgerEntry e) async {
     if (ruleRepository == null) return e;
     return applyAutomationRules(
-        ruleRepository: ruleRepository, entry: e, scope: scope);
+        s: s, ruleRepository: ruleRepository, entry: e, scope: scope);
   }
 
   if (rule.kind == RecurringKind.loanRepayment) {
@@ -244,7 +246,7 @@ class GenerateDueRecurringUseCase {
   final RecurringScheduler _scheduler;
 
   /// Generate all due entries. One batch id per rule run so it can be undone as a unit.
-  Future<Result<GenerateResult>> call() async {
+  Future<Result<GenerateResult>> call({required AppStrings s}) async {
     final now = _clock.now();
     final dueRes = await _recurring.listDue(now: now);
     if (dueRes.isFailure) return err(dueRes.failureOrNull!);
@@ -263,6 +265,7 @@ class GenerateDueRecurringUseCase {
       }
       final batchId = _idGen.generate();
       final built = await buildEntriesForRule(
+        s: s,
         rule: rule,
         batchId: batchId,
         now: now,
@@ -434,7 +437,11 @@ class ConfirmRecurringRuleUseCase {
   /// [skip]=true advances the schedule without creating a ledger entry.
   ///
   /// 返回本批生成的账单（贷款还款为 2 笔：利息 + 本金）。
-  Future<Result<List<LedgerEntry>>> call(RecurringRule rule, {bool skip = false}) async {
+  Future<Result<List<LedgerEntry>>> call(
+    RecurringRule rule, {
+    bool skip = false,
+    required AppStrings s,
+  }) async {
     if (rule.isFinished) {
       return err<List<LedgerEntry>>(
           const ValidationFailure('recurring.finished', 'done'));
@@ -445,6 +452,7 @@ class ConfirmRecurringRuleUseCase {
     if (!skip) {
       batchId = _idGen.generate();
       final built = await buildEntriesForRule(
+        s: s,
         rule: rule,
         batchId: batchId,
         now: now,

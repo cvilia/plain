@@ -27,6 +27,9 @@ import 'package:plain/design_system/plain_ui.dart';
 import 'package:plain/domain/entities/enums.dart';
 import 'package:plain/domain/entities/member.dart';
 import 'package:plain/features/ledger/controllers/flow_list_controller.dart';
+import 'package:plain/app/l10n/app_strings.dart';
+import 'package:plain/app/l10n/strings_accounts.dart';
+import 'package:plain/app/l10n/strings_domain.dart';
 
 // gate-copy 屏17 必现（门禁字面量）：
 // 共享账本：多人共同记同一本账，数据实时互见。
@@ -98,43 +101,44 @@ class FamilyPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final s = AppStrings.of(context);
     final colors = context.colors;
     final async = ref.watch(_familyProvider);
     return Scaffold(
       appBar: PlainTopBar(
-        title: '家庭与成员',
+        title: s.familyTitle,
         showBack: true,
         actions: [
           PlainTopBarAction(
             icon: PlainIconData.plus,
-            tooltip: '邀请成员',
+            tooltip: s.inviteMember,
             onTap: () => _showJoinSheet(context, ref),
           ),
         ],
       ),
       body: async.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => AppErrorState.of(e, onRetry: () => ref.invalidateData.bumpEverything()),
+        error: (e, _) => AppErrorState.of(context, e, onRetry: () => ref.invalidateData.bumpEverything()),
         data: (data) {
           return ListView(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 40),
             children: [
               // ── 共享账本 vs 记账伙伴（G-5）──
               _NotePanel(
-                gap: '共享账本：多人共同记同一本账，数据实时互见。 —— 伙伴只是别人帮你记，不共享你的账本（G-5，两套边界不共用）。',
+                gap: s.sharedLedgerGap,
                 child: Text.rich(
                   TextSpan(
                     children: [
-                      const TextSpan(text: '共享账本：多人共同记同一本账，数据实时互见。 '),
+                      TextSpan(text: s.sharedLedgerPart),
                       TextSpan(
-                        text: '与「记账伙伴」不同',
+                        text: s.differentFromPartner,
                         style: TextStyle(
                           fontWeight: FontWeight.w600,
                           color: colors.inkSecondary,
                         ),
                       ),
-                      const TextSpan(
-                        text: ' —— 伙伴只是别人帮你记，不共享你的账本（G-5，两套边界不共用）。',
+                      TextSpan(
+                        text: s.partnerBoundaryPart,
                       ),
                     ],
                   ),
@@ -147,14 +151,14 @@ class FamilyPage extends ConsumerWidget {
               ),
 
               // ── 邀请码 ──
-              const PlainEyebrow('邀请码'),
+              PlainEyebrow(s.inviteCode),
               PlainPanel(children: [
                 PlainRow(
-                  title: '本机邀请码',
-                  subtitle: data.inviteCode.isEmpty ? '点右侧生成' : data.inviteCode,
+                  title: s.localInviteCode,
+                  subtitle: data.inviteCode.isEmpty ? s.tapToGenerate : data.inviteCode,
                   trailing: PlainTopBarAction(
                     icon: PlainIconData.share,
-                    tooltip: '复制邀请码',
+                    tooltip: s.copyInviteCode,
                     onTap: () => _copyCode(context, ref, data.inviteCode),
                   ),
                   onTap: data.inviteCode.isEmpty
@@ -163,8 +167,8 @@ class FamilyPage extends ConsumerWidget {
                   showChevron: data.inviteCode.isEmpty,
                 ),
                 PlainRow(
-                  title: '加入成员',
-                  subtitle: '最多 ${MemberRules.maxActiveMembers} 人（只数在册成员）',
+                  title: s.joinMember,
+                  subtitle: s.maxMembersHint(MemberRules.maxActiveMembers),
                   showChevron: true,
                   onTap: () => _showJoinSheet(context, ref),
                 ),
@@ -184,15 +188,15 @@ class FamilyPage extends ConsumerWidget {
 
               // ── 成员与权限 ──
               PlainEyebrow(
-                  '成员与权限 · ${data.activeCount}/${MemberRules.maxActiveMembers} 人'),
+                  s.membersPermsEyebrow(data.activeCount, MemberRules.maxActiveMembers)),
               if (data.active.isEmpty)
                 PlainPanel(children: [
                   Padding(
                     padding: const EdgeInsets.symmetric(vertical: 8),
                     child: AppEmptyState(
                       icon: PlainIconData.navProfile,
-                      title: '还没有成员记录',
-                      subtitle: '下一次记账时会自动登记「我」。',
+                      title: s.noMemberRecords,
+                      subtitle: s.autoRegisterMeHint,
                     ),
                   ),
                 ])
@@ -211,7 +215,7 @@ class FamilyPage extends ConsumerWidget {
                 ]),
 
               if (data.left.isNotEmpty) ...[
-                const PlainEyebrow('已退出成员'),
+                PlainEyebrow(s.leftMembers),
                 PlainPanel(children: [
                   for (var i = 0; i < data.left.length; i++) ...[
                     if (i > 0) const Divider(height: 1, thickness: 1, indent: 16),
@@ -227,39 +231,39 @@ class FamilyPage extends ConsumerWidget {
               // ── 三种角色 ──
               const SizedBox(height: 16),
               _NotePanel(
-                gap: '三种角色：（可增删成员、改权限、删除账本） / （可记账、可改自己的账） / （只能看）。',
-                trailingGap: '成员看到的分类与主题仍是，不会被账本同步覆盖。',
+                gap: s.rolesGap,
+                trailingGap: s.memberPrefsGap,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text.rich(
                       TextSpan(
                         children: [
-                          const TextSpan(text: '三种角色：'),
+                          TextSpan(text: s.rolesPrefix),
                           TextSpan(
-                            text: '所有者',
+                            text: s.memberRoleOwner,
                             style: TextStyle(
                               fontWeight: FontWeight.w600,
                               color: colors.inkSecondary,
                             ),
                           ),
-                          const TextSpan(text: '（可增删成员、改权限、删除账本） / '),
+                          TextSpan(text: s.ownerPermsPart),
                           TextSpan(
-                            text: '成员',
+                            text: s.memberRoleMember,
                             style: TextStyle(
                               fontWeight: FontWeight.w600,
                               color: colors.inkSecondary,
                             ),
                           ),
-                          const TextSpan(text: '（可记账、可改自己的账） / '),
+                          TextSpan(text: s.memberPermsPart),
                           TextSpan(
-                            text: '只读',
+                            text: s.readOnlyLabel,
                             style: TextStyle(
                               fontWeight: FontWeight.w600,
                               color: colors.inkSecondary,
                             ),
                           ),
-                          const TextSpan(text: '（只能看）。'),
+                          TextSpan(text: s.viewerPermsPart),
                         ],
                       ),
                       style: TextStyle(
@@ -272,15 +276,15 @@ class FamilyPage extends ConsumerWidget {
                     Text.rich(
                       TextSpan(
                         children: [
-                          const TextSpan(text: '成员看到的分类与主题仍是'),
+                          TextSpan(text: s.memberPrefsPrefix),
                           TextSpan(
-                            text: '各自本机偏好',
+                            text: s.localPrefsBold,
                             style: TextStyle(
                               fontWeight: FontWeight.w600,
                               color: colors.inkSecondary,
                             ),
                           ),
-                          const TextSpan(text: '，不会被账本同步覆盖。'),
+                          TextSpan(text: s.notOverriddenPart),
                         ],
                       ),
                       style: TextStyle(
@@ -315,6 +319,7 @@ class _MemberRow extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final s = AppStrings.of(context);
     final colors = context.colors;
     final subtitle = StringBuffer(member.role.label);
     if (member.isMe) subtitle.write(' · 我');
@@ -341,7 +346,7 @@ class _MemberRow extends ConsumerWidget {
       trailing: canManage && !member.isMe
           ? PlainTopBarAction(
               icon: PlainIconData.more,
-              tooltip: '成员操作',
+              tooltip: s.memberActions,
               onTap: () => _showMemberSheet(context, ref, member),
             )
           : null,
@@ -349,15 +354,17 @@ class _MemberRow extends ConsumerWidget {
   }
 
   void _openMemberEntries(BuildContext context, WidgetRef ref, Member member) {
+    final s = AppStrings.of(context);
     ref.read(flowMemberFilterProvider.notifier).set(member.id);
     ref.read(flowListControllerProvider.notifier).loadInitial();
-    showAppToast(context, '已按「${member.name}」筛选流水');
+    showAppToast(context, s.filteredByMember(member.name));
     Navigator.pop(context);
   }
 }
 
 /// 成员操作：改角色 / 设为已退出。
 void _showMemberSheet(BuildContext context, WidgetRef ref, Member member) {
+  final s = AppStrings.of(context);
   showModalBottomSheet<void>(
     context: context,
     builder: (ctx) => StatefulBuilder(
@@ -372,7 +379,7 @@ void _showMemberSheet(BuildContext context, WidgetRef ref, Member member) {
               const SizedBox(height: 12),
               for (final role in MemberRole.values)
                 PlainRow(
-                  title: role.label,
+                  title: role.label(AppStrings.of(context)),
                   trailing: member.role == role
                       ? const PlainIcon(PlainIconData.check, size: 18)
                       : null,
@@ -385,15 +392,15 @@ void _showMemberSheet(BuildContext context, WidgetRef ref, Member member) {
                     if (res.isFailure) {
                       showAppToast(context, _memberError(res.failureOrNull!.code));
                     } else {
-                      showAppToast(context, '已设为「${role.label}」');
+                      showAppToast(context, s.roleSetTo(role.label(s)));
                     }
                     ref.invalidate(_familyProvider);
                   },
                 ),
               const Divider(height: 1, thickness: 1),
               PlainRow(
-                title: '设为已退出',
-                subtitle: '记录保留、历史归属不变，但不再占名额',
+                title: s.setLeft,
+                subtitle: s.setLeftHint,
                 onTap: () async {
                   final deps = ref.read(appDependenciesProvider);
                   final res = await deps.memberService.leave(member.id);
@@ -402,7 +409,7 @@ void _showMemberSheet(BuildContext context, WidgetRef ref, Member member) {
                   if (res.isFailure) {
                     showAppToast(context, _memberError(res.failureOrNull!.code));
                   } else {
-                    showAppToast(context, '${member.name} 已退出');
+                    showAppToast(context, s.memberLeft(member.name));
                   }
                   ref.invalidate(_familyProvider);
                 },
@@ -417,6 +424,7 @@ void _showMemberSheet(BuildContext context, WidgetRef ref, Member member) {
 
 /// 加入成员（AC1：第 7 人被拦）。
 void _showJoinSheet(BuildContext context, WidgetRef ref) {
+  final s = AppStrings.of(context);
   final nameCtrl = TextEditingController();
   final codeCtrl = TextEditingController();
   var role = MemberRole.member;
@@ -435,27 +443,27 @@ void _showJoinSheet(BuildContext context, WidgetRef ref) {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text('加入成员', style: Theme.of(ctx).textTheme.titleMedium),
+            Text(s.joinMember, style: Theme.of(ctx).textTheme.titleMedium),
             const SizedBox(height: Spacing.sm),
             TextField(
               controller: codeCtrl,
               textCapitalization: TextCapitalization.characters,
-              decoration: const InputDecoration(
-                labelText: '邀请码',
+              decoration: InputDecoration(
+                labelText: s.inviteCode,
                 border: OutlineInputBorder(),
               ),
             ),
             const SizedBox(height: Spacing.sm),
             TextField(
               controller: nameCtrl,
-              decoration: const InputDecoration(
-                labelText: '成员称呼',
+              decoration: InputDecoration(
+                labelText: s.memberNameLabel,
                 border: OutlineInputBorder(),
               ),
             ),
             const SizedBox(height: Spacing.sm),
             PlainSeg(
-              items: [for (final r in MemberRole.values) r.label],
+              items: [for (final r in MemberRole.values) r.label(AppStrings.of(context))],
               selectedIndex: MemberRole.values.indexOf(role),
               onChanged: (i) => setSheet(() => role = MemberRole.values[i]),
             ),
@@ -476,10 +484,10 @@ void _showJoinSheet(BuildContext context, WidgetRef ref) {
                   return;
                 }
                 Navigator.pop(ctx);
-                showAppToast(context, '已加入 ${nameCtrl.text.trim()}');
+                showAppToast(context, s.joinedMember(nameCtrl.text.trim()));
                 ref.invalidate(_familyProvider);
               },
-              child: const Text('加入'),
+              child: Text(s.join),
             ),
           ],
         ),
@@ -489,19 +497,21 @@ void _showJoinSheet(BuildContext context, WidgetRef ref) {
 }
 
 Future<void> _copyCode(BuildContext context, WidgetRef ref, String code) async {
+  final s = AppStrings.of(context);
   if (code.isEmpty) {
     await _refreshCode(context, ref);
     return;
   }
   await Clipboard.setData(ClipboardData(text: code));
-  if (context.mounted) showAppToast(context, '邀请码已复制');
+  if (context.mounted) showAppToast(context, s.inviteCodeCopied);
 }
 
 Future<void> _refreshCode(BuildContext context, WidgetRef ref) async {
+  final s = AppStrings.of(context);
   final code = await ref.read(appDependenciesProvider).memberService.inviteCode();
   ref.invalidate(_familyProvider);
   if (context.mounted) {
-    showAppToast(context, code.isEmpty ? '邀请码生成失败' : '邀请码：$code');
+    showAppToast(context, code.isEmpty ? s.inviteCodeGenFailed : s.inviteCodeIs(code));
   }
 }
 

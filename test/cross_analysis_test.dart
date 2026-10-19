@@ -1,6 +1,7 @@
 /// STORY-11.3 交叉分析矩阵。
 library;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:plain/app/l10n/strings_core.dart';
 import 'package:plain/data/db/database.dart';
 import 'package:plain/data/repositories/saved_report_repository.dart';
 import 'package:plain/data/sync/change_log_writer.dart';
@@ -45,6 +46,7 @@ void main() {
         colDim: CrossDimension.month,
         categoryNames: cats,
         monthStartDay: 1,
+        s: kDefaultAppStrings,
       );
       expect(t.rowLabels, ['餐饮', '生活']); // 按行合计降序
       expect(t.colLabels, ['2026-01', '2026-02']);
@@ -64,6 +66,7 @@ void main() {
         colDim: CrossDimension.month,
         categoryNames: cats,
         monthStartDay: 1,
+        s: kDefaultAppStrings,
       );
       expect(t.rowTotals['food'], 60000);
       expect(t.rowTotals['life'], 5000);
@@ -79,6 +82,7 @@ void main() {
         colDim: CrossDimension.month,
         categoryNames: cats,
         monthStartDay: 1,
+        s: kDefaultAppStrings,
       );
       expect(t.maxCellCents, 30000);
       expect(t.heatOf('food', '2026-01'), closeTo(1.0, 1e-9));
@@ -92,7 +96,8 @@ void main() {
         rowDim: CrossDimension.category,
         colDim: CrossDimension.month,
         categoryNames: cats,
-        monthStartDay: 5, // 3 日 < 5 日 → 归上一个月
+        monthStartDay: 5, // 3 日 < 5 日 → 归上一个月,
+        s: kDefaultAppStrings,
       );
       expect(t.colLabels, ['2025-12']);
     });
@@ -110,6 +115,7 @@ void main() {
         categoryNames: cats,
         accountNames: accounts,
         monthStartDay: 1,
+        s: kDefaultAppStrings,
       );
       expect(t.colLabels, ['工资卡', '信用卡']); // 列标签（按列合计降序，此处并列按稳定序）
       expect(t.cellAt('food', 'acc-a')!.cents, 20000);
@@ -127,6 +133,7 @@ void main() {
         colDim: CrossDimension.amountRange,
         categoryNames: cats,
         monthStartDay: 1,
+        s: kDefaultAppStrings,
       );
       expect(t.colLabels,
           ['100 元以下', '500–1000 元', '5000 元及以上']);
@@ -145,6 +152,7 @@ void main() {
         rowDim: CrossDimension.merchant,
         colDim: CrossDimension.month,
         monthStartDay: 1,
+        s: kDefaultAppStrings,
       );
       expect(t.rowLabels.first, '星巴克');
       expect(t.cellAt('星巴克', '2026-01')!.cents, 30000);
@@ -160,6 +168,7 @@ void main() {
         rowDim: CrossDimension.category,
         colDim: CrossDimension.account,
         monthStartDay: 1,
+        s: kDefaultAppStrings,
       );
       expect(t.rowLabels, ['未分类']);
       expect(t.colLabels, ['未指定账户']);
@@ -171,6 +180,7 @@ void main() {
         rowDim: CrossDimension.category,
         colDim: CrossDimension.month,
         monthStartDay: 1,
+        s: kDefaultAppStrings,
       );
       expect(t.isEmpty, true);
       expect(t.grandTotalCents, 0);
@@ -187,6 +197,7 @@ void main() {
         colDim: CrossDimension.month,
         categoryNames: cats,
         monthStartDay: 1,
+        s: kDefaultAppStrings,
       );
       expect(t.grandTotalCents, 510000);
       expect(t.cellAt('__none__', '2026-01')!.cents, 500000);
@@ -233,8 +244,8 @@ void main() {
       expect(r.entryFilter, ReportEntryFilter.income);
       expect(r.heatmap, false);
       expect(r.fromMs, DateTime.utc(2026, 1, 1).millisecondsSinceEpoch);
-      expect(r.describe, contains('分类'));
-      expect(r.describe, contains('账户'));
+      expect(r.describe(kDefaultAppStrings), contains('分类'));
+      expect(r.describe(kDefaultAppStrings), contains('账户'));
     });
 
     test('软删后不再出现在列表里', () async {

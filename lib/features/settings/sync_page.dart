@@ -15,6 +15,10 @@ import 'package:plain/design_system/plain_ui.dart';
 import 'package:plain/data/sync/webdav_client.dart';
 import 'package:plain/data/sync/webdav_sync_service.dart';
 import 'package:plain/features/settings/conflict_center_page.dart';
+import 'package:plain/app/l10n/app_strings.dart';
+import 'package:plain/app/l10n/strings_reports.dart';
+import 'package:plain/app/l10n/strings_settings_a.dart';
+import 'package:plain/app/l10n/strings_settings_b.dart';
 
 class SyncPage extends ConsumerStatefulWidget {
   const SyncPage({super.key});
@@ -79,6 +83,7 @@ class _SyncPageState extends ConsumerState<SyncPage> {
 
   /// STORY-8.1：手动跑一轮增量同步（推 + 拉）。
   Future<void> _syncIncremental() async {
+    final s = AppStrings.of(context);
     setState(() {
       _syncing = true;
       _status = null;
@@ -88,7 +93,7 @@ class _SyncPageState extends ConsumerState<SyncPage> {
     if (config == null) {
       setState(() {
         _syncing = false;
-        _status = '请先保存服务器配置';
+        _status = s.saveServerFirst;
       });
       return;
     }
@@ -115,6 +120,7 @@ class _SyncPageState extends ConsumerState<SyncPage> {
   }
 
   void _saveConfig() {
+    final s = AppStrings.of(context);
     final deps = ref.read(appDependenciesProvider);
     void setK(String k, String v) {
       final now = DateTime.now().toUtc().millisecondsSinceEpoch;
@@ -128,7 +134,7 @@ class _SyncPageState extends ConsumerState<SyncPage> {
     setK('webdav.pass', _passController.text);
     setK('webdav.path', _pathController.text.trim());
     setState(() => _configured = _urlController.text.trim().isNotEmpty);
-    showAppToast(context, '配置已保存');
+    showAppToast(context, s.configSaved);
   }
 
   WebDavConfig _buildConfig() => WebDavConfig(
@@ -139,6 +145,7 @@ class _SyncPageState extends ConsumerState<SyncPage> {
   );
 
   Future<void> _testConnection() async {
+    final s = AppStrings.of(context);
     setState(() { _testing = true; _status = null; });
     final client = WebDavClient();
     final service = WebDavSyncService(
@@ -147,7 +154,7 @@ class _SyncPageState extends ConsumerState<SyncPage> {
     );
     try {
       final ok = await service.testConnection(_buildConfig());
-      setState(() => _status = ok ? '连接成功' : '连接失败，请检查地址和凭据');
+      setState(() => _status = ok ? s.connectOk : s.connectFail);
     } finally {
       setState(() => _testing = false);
       client.dispose();
@@ -175,11 +182,12 @@ class _SyncPageState extends ConsumerState<SyncPage> {
   }
 
   Future<void> _download() async {
+    final s = AppStrings.of(context);
     final confirmed = await showConfirmDialog(
       context,
-      title: '从云端恢复',
-      message: '将用云端备份替换本地数据，当前数据会被覆盖。确定继续？',
-      confirmLabel: '确定恢复',
+      title: s.restoreFromCloudTitle,
+      message: s.restoreFromCloudConfirm,
+      confirmLabel: s.confirmRestore,
       destructive: true,
     );
     if (confirmed != true || !mounted) return;
@@ -201,8 +209,9 @@ class _SyncPageState extends ConsumerState<SyncPage> {
 
   @override
   Widget build(BuildContext context) {
+    final s = AppStrings.of(context);
     return Scaffold(
-      appBar: const PlainTopBar(title: 'WebDAV 同步', showBack: true),
+      appBar: PlainTopBar(title: s.webdavSync, showBack: true),
       body: ContentWidthConstraint(
         child: ListView(
           padding: const EdgeInsets.all(Spacing.lg),
@@ -213,17 +222,17 @@ class _SyncPageState extends ConsumerState<SyncPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('服务器配置', style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
+                    Text(s.serverConfig, style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
                     const SizedBox(height: Spacing.sm),
                     Text(
-                      '支持坚果云、NextCloud 等 WebDAV 服务。数据仅在你自己的服务器上，不经过第三方。',
+                      s.serverConfigDesc,
                       style: TextStyle(fontSize: 14, color: context.colors.inkSecondary),
                     ),
                     const SizedBox(height: Spacing.lg),
                     TextField(
                       controller: _urlController,
                       decoration: InputDecoration(
-                        labelText: '服务器地址',
+                        labelText: s.serverUrl,
                         hintText: 'https://dav.example.com/dav',
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(Radii.sm)),
                       ),
@@ -232,7 +241,7 @@ class _SyncPageState extends ConsumerState<SyncPage> {
                     TextField(
                       controller: _userController,
                       decoration: InputDecoration(
-                        labelText: '用户名',
+                        labelText: s.username,
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(Radii.sm)),
                       ),
                     ),
@@ -241,13 +250,13 @@ class _SyncPageState extends ConsumerState<SyncPage> {
                       controller: _passController,
                       obscureText: _obscurePass,
                       decoration: InputDecoration(
-                        labelText: '密码 / 应用专用密码',
+                        labelText: s.passwordAppPwd,
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(Radii.sm)),
                         suffixIcon: IconButton(
                           icon: PlainIcon(
                             _obscurePass ? PlainIconData.eyeOff : PlainIconData.eye,
                           ),
-                          tooltip: _obscurePass ? '显示密码' : '隐藏密码',
+                          tooltip: _obscurePass ? s.showPassword : s.hidePassword,
                           onPressed: () => setState(() => _obscurePass = !_obscurePass),
                         ),
                       ),
@@ -256,7 +265,7 @@ class _SyncPageState extends ConsumerState<SyncPage> {
                     TextField(
                       controller: _pathController,
                       decoration: InputDecoration(
-                        labelText: '远程路径',
+                        labelText: s.remotePath,
                         hintText: '/plain/sync',
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(Radii.sm)),
                       ),
@@ -278,7 +287,7 @@ class _SyncPageState extends ConsumerState<SyncPage> {
                               child: Center(
                                 child: _testing
                                     ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
-                                    : Text('测试连接', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500, color: context.colors.ink)),
+                                    : Text(s.testConnection, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500, color: context.colors.ink)),
                               ),
                             ),
                           ),
@@ -286,7 +295,7 @@ class _SyncPageState extends ConsumerState<SyncPage> {
                       ),
                       const SizedBox(width: Spacing.md),
                       Expanded(
-                        child: FilledButton(onPressed: _saveConfig, child: const Text('保存配置')),
+                        child: FilledButton(onPressed: _saveConfig, child: Text(s.saveConfig)),
                       ),
                     ]),
                   ],
@@ -300,10 +309,10 @@ class _SyncPageState extends ConsumerState<SyncPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('同步操作', style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
+                    Text(s.syncOps, style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
                     const SizedBox(height: Spacing.sm),
                     Text(
-                      '上传会将本地数据备份到云端；恢复会用云端备份覆盖本地数据。',
+                      s.syncOpsDesc,
                       style: TextStyle(fontSize: 14, color: context.colors.inkSecondary),
                     ),
                     const SizedBox(height: Spacing.lg),
@@ -312,7 +321,7 @@ class _SyncPageState extends ConsumerState<SyncPage> {
                       child: FilledButton.icon(
                         onPressed: _configured && !_syncing ? _upload : null,
                         icon: const PlainIcon(PlainIconData.cloudUpload),
-                        label: Text(_syncing ? '同步中...' : '上传备份到云端'),
+                        label: Text(_syncing ? s.syncingEllipsis : s.uploadToCloud),
                       ),
                     ),
                     const SizedBox(height: Spacing.md),
@@ -338,7 +347,7 @@ class _SyncPageState extends ConsumerState<SyncPage> {
                                   color: context.colors.ink,
                                 ),
                                 const SizedBox(width: 8),
-                                Text('从云端恢复', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500, color: context.colors.ink)),
+                                Text(s.restoreFromCloudTitle, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500, color: context.colors.ink)),
                               ],
                             ),
                           ),
@@ -369,7 +378,7 @@ class _SyncPageState extends ConsumerState<SyncPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('增量同步', style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
+                    Text(s.incrementalSync, style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
                     const SizedBox(height: Spacing.sm),
                     Text(
                       '按账单级变更同步：本机写入后立刻推送，前台每 10 秒拉取一次。'
@@ -378,8 +387,8 @@ class _SyncPageState extends ConsumerState<SyncPage> {
                     ),
                     const SizedBox(height: Spacing.md),
                     PlainRow(
-                      title: '自动同步',
-                      subtitle: _syncEnabled ? '已开启' : '已关闭（手动同步仍可用）',
+                      title: s.autoSync,
+                      subtitle: _syncEnabled ? s.weeklyEnabledOn : s.syncOff,
                       trailing: PlainSwitch(
                         value: _syncEnabled,
                         onChanged: (v) {
@@ -394,15 +403,15 @@ class _SyncPageState extends ConsumerState<SyncPage> {
                       child: FilledButton.icon(
                         onPressed: _configured && !_syncing ? _syncIncremental : null,
                         icon: const PlainIcon(PlainIconData.cloudUpload),
-                        label: Text(_syncing ? '同步中...' : '立即增量同步'),
+                        label: Text(_syncing ? s.syncingEllipsis : s.syncNow),
                       ),
                     ),
                     const SizedBox(height: Spacing.md),
                     PlainRow(
-                      title: '冲突中心',
+                      title: s.conflictCenterTitle,
                       subtitle: _openConflicts == 0
-                          ? '没有待裁决的冲突'
-                          : '$_openConflicts 条待裁决',
+                          ? s.conflictEmptyTitle
+                          : s.conflictsPending(_openConflicts),
                       showChevron: true,
                       onTap: () {
                         Navigator.push<void>(
@@ -423,7 +432,7 @@ class _SyncPageState extends ConsumerState<SyncPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('说明', style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
+                    Text(s.notesSection, style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
                     const SizedBox(height: Spacing.sm),
                     Text(
                       '• 同步基于整库备份文件，适合个人多设备使用\n'

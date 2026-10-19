@@ -6,6 +6,8 @@ import 'dart:io';
 
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
+import 'package:plain/app/l10n/app_strings.dart';
+import 'package:plain/app/l10n/strings_core.dart';
 import 'package:plain/core/logging/app_log.dart';
 import 'package:plain/data/db/database.dart';
 import 'package:plain/data/sync/webdav_client.dart';
@@ -28,11 +30,16 @@ class WebDavSyncService {
     required AppDatabase db,
     required WebDavClient client,
     AppLog? log,
-  })  : _db = db, _client = client, _log = log;
+    AppStrings? strings,
+  })  : _db = db, _client = client, _log = log, _s = strings ?? kDefaultAppStrings;
 
   final AppDatabase _db;
   final WebDavClient _client;
   final AppLog? _log;
+
+  /// 返回给 UI 展示的文案来源。UI 应传 `AppStrings.of(context)`；
+  /// 后台/无 context 场景回退到 [kDefaultAppStrings]。
+  final AppStrings _s;
 
   static const String _backupFileName = 'plain_sync.db';
 
@@ -40,7 +47,7 @@ class WebDavSyncService {
   Future<WebDavSyncResult> upload(WebDavConfig config) async {
     try {
       final ok = await _client.ensureCollection(config);
-      if (!ok) return const WebDavSyncResult(success: false, message: '无法创建远程目录');
+      if (!ok) return WebDavSyncResult(success: false, message: _s.remoteDirCreateFailed);
 
       final docsDir = await getApplicationDocumentsDirectory();
       final tmpPath = p.join(docsDir.path, 'sync_upload_${DateTime.now().millisecondsSinceEpoch}.db');
@@ -50,24 +57,24 @@ class WebDavSyncService {
 
       final file = File(tmpPath);
       if (!await file.exists()) {
-        return const WebDavSyncResult(success: false, message: '备份文件生成失败');
+        return WebDavSyncResult(success: false, message: _s.backupFileGenFailed);
       }
       final bytes = await file.readAsBytes();
       final size = bytes.length;
       await file.delete();
 
       final uploaded = await _client.put(config, _backupFileName, bytes);
-      if (!uploaded) return const WebDavSyncResult(success: false, message: '上传失败');
+      if (!uploaded) return WebDavSyncResult(success: false, message: _s.uploadFailed);
 
       _log?.info('webdav.upload', fields: {'size': size});
       return WebDavSyncResult(
     success: true,
-    message: '上传成功',
+    message: _s.uploadSuccess,
     fileSize: size,
     syncedAt: DateTime.now().toUtc(),
   );
     } on Exception catch (e) {
-      return WebDavSyncResult(success: false, message: '上传异常: $e');
+      return WebDavSyncResult(success: false, message: _s.uploadException(e));
     }
   }
 
@@ -77,7 +84,7 @@ class WebDavSyncService {
     try {
       final bytes = await _client.get(config, _backupFileName);
       if (bytes == null || bytes.isEmpty) {
-        return const WebDavSyncResult(success: false, message: '远程无备份文件或下载失败');
+        return WebDavSyncResult(success: false, message: _s.remoteNoBackup);
       }
 
       final docsDir = await getApplicationDocumentsDirectory();
@@ -92,7 +99,7 @@ class WebDavSyncService {
         final sigStr = String.fromCharCodes(sig);
         if (!sigStr.startsWith('SQLite format 3')) {
           await tmpFile.delete();
-          return const WebDavSyncResult(success: false, message: '远程文件不是有效的数据库');
+          return WebDavSyncResult(success: false, message: _s.remoteInvalidDb);
         }
       } finally {
         await header.close();
@@ -114,12 +121,12 @@ class WebDavSyncService {
 
       return WebDavSyncResult(
     success: true,
-    message: '下载成功，请重启应用',
+    message: _s.downloadSuccessRestart,
     fileSize: bytes.length,
     syncedAt: DateTime.now().toUtc(),
   );
     } on Exception catch (e) {
-      return WebDavSyncResult(success: false, message: '下载异常: $e');
+      return WebDavSyncResult(success: false, message: _s.downloadException(e));
     }
   }
 

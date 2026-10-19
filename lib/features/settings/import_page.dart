@@ -15,6 +15,9 @@ import 'package:plain/design_system/picker_sheet.dart';
 import 'package:plain/design_system/plain_ui.dart';
 import 'package:plain/domain/entities/enums.dart';
 import 'package:plain/domain/services/csv_importer.dart';
+import 'package:plain/app/l10n/app_strings.dart';
+import 'package:plain/app/l10n/strings_ledger.dart';
+import 'package:plain/app/l10n/strings_settings_b.dart';
 
 class ImportPage extends ConsumerStatefulWidget {
   const ImportPage({super.key});
@@ -40,11 +43,12 @@ class _ImportPageState extends ConsumerState<ImportPage> {
   }
 
   void _parseCsv() {
+    final s = AppStrings.of(context);
     final text = _csvController.text;
     if (text.trim().isEmpty) return;
     final rows = parseCsv(text);
     if (rows.length < 2) {
-      showAppToast(context, 'CSV 内容不足，至少需要表头和一行数据');
+      showAppToast(context, s.csvTooShort);
       return;
     }
     setState(() {
@@ -59,25 +63,27 @@ class _ImportPageState extends ConsumerState<ImportPage> {
   }
 
   int _detectDateCol(List<List<String>> rows) {
+    final s = AppStrings.of(context);
     final header = rows.first;
     for (var i = 0; i < header.length; i++) {
       final h = header[i].toLowerCase();
-      if (h.contains('日期') || h.contains('时间') || h.contains('date')) return i;
+      if (h.contains(s.date) || h.contains('时间') || h.contains('date')) return i;
     }
     return 0;
   }
 
   int _detectAmountCol(List<List<String>> rows) {
+    final s = AppStrings.of(context);
     final header = rows.first;
     for (var i = 0; i < header.length; i++) {
       final h = header[i].toLowerCase();
-      if (h.contains('金额') || h.contains('amount') || h.contains('money')) return i;
+      if (h.contains(s.amountFieldLabel) || h.contains('amount') || h.contains('money')) return i;
     }
     return rows.first.length > 1 ? 1 : 0;
   }
 
   void _buildPreview() {
-    final parsed = parseRows(_rows, _mapping);
+    final parsed = parseRows(_rows, _mapping, s: AppStrings.of(context));
     setState(() {
       _previewEntries = parsed.entries;
       _previewErrors = parsed.errors;
@@ -86,6 +92,7 @@ class _ImportPageState extends ConsumerState<ImportPage> {
   }
 
   Future<void> _doImport() async {
+    final s = AppStrings.of(context);
     // STORY-8.2 AC2：导入就是批量新增账单 —— 只读成员不得用导入绕开记账权限
     if (!await guardCanWriteLedger(context, ref)) return;
     setState(() => _importing = true);
@@ -97,6 +104,7 @@ class _ImportPageState extends ConsumerState<ImportPage> {
     final catMap = {for (final c in cats) c.name: c.id};
 
     final result = await deps.importCsv(
+      s: s,
       csvText: _csvController.text,
       mapping: _mapping,
       bookId: deps.bookId,
@@ -117,8 +125,9 @@ class _ImportPageState extends ConsumerState<ImportPage> {
 
   @override
   Widget build(BuildContext context) {
+    final s = AppStrings.of(context);
     return Scaffold(
-      appBar: const PlainTopBar(title: '数据导入', showBack: true),
+      appBar: PlainTopBar(title: s.importTitle, showBack: true),
       body: ContentWidthConstraint(
         child: ListView(
           padding: const EdgeInsets.all(Spacing.lg),
@@ -138,16 +147,17 @@ class _ImportPageState extends ConsumerState<ImportPage> {
   }
 
   Widget _buildPasteStep() {
+    final s = AppStrings.of(context);
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(Spacing.lg),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('粘贴 CSV 内容', style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
+            Text(s.pasteCsv, style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
             const SizedBox(height: Spacing.sm),
             Text(
-              '从竞品 App 导出 CSV 后，将内容粘贴到下方。支持钱迹、随手记、挖财等主流格式。',
+              s.pasteCsvDesc,
               style: TextStyle(fontSize: 14, color: context.colors.inkSecondary),
             ),
             const SizedBox(height: Spacing.lg),
@@ -155,7 +165,7 @@ class _ImportPageState extends ConsumerState<ImportPage> {
               controller: _csvController,
               maxLines: 10,
               decoration: InputDecoration(
-                hintText: '日期,金额,分类,备注\n2024-01-15,25.00,餐饮,午餐\n...',
+                hintText: s.csvSampleHint,
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(Radii.md)),
                 filled: true,
                 fillColor: context.colors.surfaceMuted,
@@ -166,7 +176,7 @@ class _ImportPageState extends ConsumerState<ImportPage> {
               width: double.infinity,
               child: FilledButton(
                 onPressed: _parseCsv,
-                child: const Text('下一步：映射列'),
+                child: Text(s.nextMapColumns),
               ),
             ),
           ],
@@ -176,6 +186,7 @@ class _ImportPageState extends ConsumerState<ImportPage> {
   }
 
   Widget _buildMapStep() {
+    final s = AppStrings.of(context);
     final headers = _rows.first;
     return Card(
       child: Padding(
@@ -183,12 +194,12 @@ class _ImportPageState extends ConsumerState<ImportPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('映射列', style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
+            Text(s.mapColumns, style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
             const SizedBox(height: Spacing.sm),
-            Text('共 ${_rows.length - 1} 行数据，请指定各列含义',
+            Text(s.mapColumnsDesc(_rows.length - 1),
                 style: TextStyle(fontSize: 14, color: context.colors.inkSecondary)),
             const SizedBox(height: Spacing.lg),
-            _buildColDropdown('日期列 *', _mapping.dateCol, headers, (v) {
+            _buildColDropdown(s.colDate, _mapping.dateCol, headers, (v) {
               if (v == null) return;
               setState(() => _mapping = CsvColumnMapping(
                 dateCol: v, amountCol: _mapping.amountCol,
@@ -196,7 +207,7 @@ class _ImportPageState extends ConsumerState<ImportPage> {
                 noteCol: _mapping.noteCol, merchantCol: _mapping.merchantCol,
               ));
             }),
-            _buildColDropdown('金额列 *', _mapping.amountCol, headers, (v) {
+            _buildColDropdown(s.colAmount, _mapping.amountCol, headers, (v) {
               if (v == null) return;
               setState(() => _mapping = CsvColumnMapping(
                 dateCol: _mapping.dateCol, amountCol: v,
@@ -204,21 +215,21 @@ class _ImportPageState extends ConsumerState<ImportPage> {
                 noteCol: _mapping.noteCol, merchantCol: _mapping.merchantCol,
               ));
             }),
-            _buildColDropdown('分类列', _mapping.categoryCol, headers, (v) {
+            _buildColDropdown(s.colCategory, _mapping.categoryCol, headers, (v) {
               setState(() => _mapping = CsvColumnMapping(
                 dateCol: _mapping.dateCol, amountCol: _mapping.amountCol,
                 typeCol: _mapping.typeCol, categoryCol: v,
                 noteCol: _mapping.noteCol, merchantCol: _mapping.merchantCol,
               ));
             }, optional: true),
-            _buildColDropdown('备注列', _mapping.noteCol, headers, (v) {
+            _buildColDropdown(s.colNote, _mapping.noteCol, headers, (v) {
               setState(() => _mapping = CsvColumnMapping(
                 dateCol: _mapping.dateCol, amountCol: _mapping.amountCol,
                 typeCol: _mapping.typeCol, categoryCol: _mapping.categoryCol,
                 noteCol: v, merchantCol: _mapping.merchantCol,
               ));
             }, optional: true),
-            _buildColDropdown('商家列', _mapping.merchantCol, headers, (v) {
+            _buildColDropdown(s.colMerchant, _mapping.merchantCol, headers, (v) {
               setState(() => _mapping = CsvColumnMapping(
                 dateCol: _mapping.dateCol, amountCol: _mapping.amountCol,
                 typeCol: _mapping.typeCol, categoryCol: _mapping.categoryCol,
@@ -240,7 +251,7 @@ class _ImportPageState extends ConsumerState<ImportPage> {
                         border: Border.all(color: context.colors.lineStrong),
                       ),
                       child: Center(
-                        child: Text('返回', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500, color: context.colors.ink)),
+                        child: Text(s.back, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500, color: context.colors.ink)),
                       ),
                     ),
                   ),
@@ -248,7 +259,7 @@ class _ImportPageState extends ConsumerState<ImportPage> {
               ),
               const SizedBox(width: Spacing.md),
               Expanded(
-                child: FilledButton(onPressed: _buildPreview, child: const Text('预览')),
+                child: FilledButton(onPressed: _buildPreview, child: Text(s.preview)),
               ),
             ]),
           ],
@@ -286,6 +297,7 @@ class _ImportPageState extends ConsumerState<ImportPage> {
   }
 
   Widget _buildPreviewStep() {
+    final s = AppStrings.of(context);
     final deduped = dedupEntries(_previewEntries, const {});
     return Card(
       child: Padding(
@@ -293,9 +305,9 @@ class _ImportPageState extends ConsumerState<ImportPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('预览', style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
+            Text(s.preview, style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
             const SizedBox(height: Spacing.sm),
-            Text('可导入 ${deduped.unique.length} 条，跳过 ${_previewErrors.length} 条异常',
+            Text(s.previewSummary(deduped.unique.length, _previewErrors.length),
                 style: TextStyle(fontSize: 14, color: context.colors.inkSecondary)),
             const SizedBox(height: Spacing.md),
             if (_previewErrors.isNotEmpty) ...[
@@ -308,11 +320,11 @@ class _ImportPageState extends ConsumerState<ImportPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('异常行', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: context.colors.expense)),
+                    Text(s.errorRows, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: context.colors.expense)),
                     const SizedBox(height: Spacing.xs),
                     ..._previewErrors.take(5).map((e) => Text(e, style: TextStyle(fontSize: 12, color: context.colors.expense))),
                     if (_previewErrors.length > 5)
-                      Text('... 共 ${_previewErrors.length} 条', style: TextStyle(fontSize: 12, color: context.colors.expense)),
+                      Text(s.moreCount(_previewErrors.length), style: TextStyle(fontSize: 12, color: context.colors.expense)),
                   ],
                 ),
               ),
@@ -328,7 +340,7 @@ class _ImportPageState extends ConsumerState<ImportPage> {
                 ),
                 Expanded(
                   flex: 2,
-                  child: Text(e.categoryName ?? '未分类', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 14)),
+                  child: Text(e.categoryName ?? s.uncategorized, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 14)),
                 ),
                 Expanded(
                   flex: 3,
@@ -346,7 +358,7 @@ class _ImportPageState extends ConsumerState<ImportPage> {
             if (deduped.unique.length > 10)
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: Spacing.sm),
-                child: Text('... 共 ${deduped.unique.length} 条', style: TextStyle(fontSize: 12, color: context.colors.inkTertiary)),
+                child: Text(s.moreCount(deduped.unique.length), style: TextStyle(fontSize: 12, color: context.colors.inkTertiary)),
               ),
             const SizedBox(height: Spacing.lg),
             Row(children: [
@@ -363,7 +375,7 @@ class _ImportPageState extends ConsumerState<ImportPage> {
                         border: Border.all(color: context.colors.lineStrong),
                       ),
                       child: Center(
-                        child: Text('返回', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500, color: context.colors.ink)),
+                        child: Text(s.back, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500, color: context.colors.ink)),
                       ),
                     ),
                   ),
@@ -375,7 +387,7 @@ class _ImportPageState extends ConsumerState<ImportPage> {
                   onPressed: _importing ? null : _doImport,
                   child: _importing
                       ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
-                      : Text('导入 ${deduped.unique.length} 条'),
+                      : Text(s.importCount(deduped.unique.length)),
                 ),
               ),
             ]),
@@ -386,6 +398,7 @@ class _ImportPageState extends ConsumerState<ImportPage> {
   }
 
   Widget _buildDoneStep() {
+    final s = AppStrings.of(context);
     final r = _report;
     return Card(
       child: Padding(
@@ -393,15 +406,15 @@ class _ImportPageState extends ConsumerState<ImportPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('导入完成', style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
+            Text(s.importDone, style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
             const SizedBox(height: Spacing.lg),
             if (r != null) ...[
-              _ResultRow('成功导入', '${r.successCount} 条', context.colors.income),
-              _ResultRow('去重跳过', '${r.dedupedCount} 条', context.colors.inkSecondary),
-              _ResultRow('失败/异常', '${r.failedCount} 条', context.colors.expense),
+              _ResultRow(s.resultSuccess, '${r.successCount} 条', context.colors.income),
+              _ResultRow(s.resultDeduped, '${r.dedupedCount} 条', context.colors.inkSecondary),
+              _ResultRow(s.resultFailed, '${r.failedCount} 条', context.colors.expense),
               if (r.errors.isNotEmpty) ...[
                 const SizedBox(height: Spacing.md),
-                Text('异常详情', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: context.colors.expense)),
+                Text(s.errorDetails, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: context.colors.expense)),
                 ...r.errors.take(5).map((e) => Text(e, style: TextStyle(fontSize: 12, color: context.colors.expense))),
               ],
             ],
@@ -410,7 +423,7 @@ class _ImportPageState extends ConsumerState<ImportPage> {
               width: double.infinity,
               child: FilledButton(
                 onPressed: () => Navigator.pop(context),
-                child: const Text('完成'),
+                child: Text(s.done),
               ),
             ),
           ],
@@ -426,7 +439,8 @@ class _StepIndicator extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const labels = ['粘贴', '映射', '预览', '完成'];
+    final s = AppStrings.of(context);
+    final labels = [s.stepPaste, s.stepMap, s.preview, s.done];
     return Row(
       children: [
         for (var i = 0; i < labels.length; i++) ...[

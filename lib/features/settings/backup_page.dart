@@ -22,6 +22,10 @@ import 'package:plain/data/sync/incremental_sync_service.dart';
 import 'package:plain/domain/services/gamification_service.dart';
 import 'package:plain/data/platform/file_picker_bridge.dart';
 import 'package:plain/core/refresh/data_invalidation.dart';
+import 'package:plain/app/l10n/app_strings.dart';
+import 'package:plain/app/l10n/strings_domain.dart';
+import 'package:plain/app/l10n/strings_settings_a.dart';
+import 'package:plain/app/l10n/strings_settings_b.dart';
 
 // gate-copy 屏8 必现（门禁字面量，与 UI 富文本同源）：
 // 备份为，包含全部账单、分类、账户与设置。通过系统分享保存到网盘或电脑。
@@ -80,14 +84,15 @@ class _BackupPageState extends ConsumerState<BackupPage> {
 
   @override
   Widget build(BuildContext context) {
+    final s = AppStrings.of(context);
     final colors = context.colors;
     return Scaffold(
       backgroundColor: colors.surface,
       appBar: PlainTopBar(
-        title: '备份与恢复',
+        title: s.backupRestore,
         showBack: true,
         actions: [
-          _TextAction(label: '生成备份', onPressed: _exporting ? null : _export),
+          _TextAction(label: s.createBackup, onPressed: _exporting ? null : _export),
         ],
       ),
       body: ListView(
@@ -104,9 +109,9 @@ class _BackupPageState extends ConsumerState<BackupPage> {
                     color: colors.inkTertiary,
                   ),
                   children: [
-                    const TextSpan(text: '备份为'),
+                    TextSpan(text: s.noteBackupIs),
                     TextSpan(
-                      text: '整库加密文件',
+                      text: s.noteWholeEncrypted,
                       style: TextStyle(
                         fontWeight: FontWeight.w600,
                         color: colors.inkSecondary,
@@ -128,9 +133,9 @@ class _BackupPageState extends ConsumerState<BackupPage> {
                     color: colors.inkTertiary,
                   ),
                   children: [
-                    const TextSpan(text: '卸载应用会清除本地数据，'),
+                    TextSpan(text: s.noteUninstallPrefix),
                     TextSpan(
-                      text: '请提前备份',
+                      text: s.noteBackupEarly,
                       style: TextStyle(
                         fontWeight: FontWeight.w600,
                         color: colors.inkSecondary,
@@ -166,7 +171,7 @@ class _BackupPageState extends ConsumerState<BackupPage> {
           ],
 
           // 历史备份
-          const PlainEyebrow('历史备份'),
+          PlainEyebrow(s.historyBackups),
           if (_localBackups.isEmpty)
             PlainPanel(
               padding: const EdgeInsets.symmetric(vertical: 28, horizontal: 16),
@@ -180,7 +185,7 @@ class _BackupPageState extends ConsumerState<BackupPage> {
                     ),
                     const SizedBox(height: 10),
                     Text(
-                      '还没有备份',
+                      s.noBackups,
                       style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w500,
@@ -189,7 +194,7 @@ class _BackupPageState extends ConsumerState<BackupPage> {
                     ),
                     const SizedBox(height: 3),
                     Text(
-                      '点击右上角「生成备份」创建第一份',
+                      s.noBackupsHint,
                       style: TextStyle(fontSize: 12, color: colors.inkTertiary),
                     ),
                   ],
@@ -202,7 +207,7 @@ class _BackupPageState extends ConsumerState<BackupPage> {
                 for (final b in _localBackups)
                   PlainRow(
                     title: b.name.contains('pre_restore')
-                        ? '恢复前自动备份 · ${b.name}'
+                        ? s.preRestoreBackup(b.name)
                         : b.name,
                     subtitle: '${b.sizeKb} KB · ${_fmtTime(b.modified)}',
                     leading: PlainIcon(
@@ -216,12 +221,12 @@ class _BackupPageState extends ConsumerState<BackupPage> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         _TextAction(
-                          label: '恢复',
+                          label: s.restore,
                           onPressed: () => _restoreFromPath(b.path),
                         ),
                         const SizedBox(width: 4),
                         _TextAction(
-                          label: '删除',
+                          label: s.delete,
                           onPressed: () => _deleteLocalBackup(b),
                         ),
                       ],
@@ -230,14 +235,14 @@ class _BackupPageState extends ConsumerState<BackupPage> {
               ],
             ),
           const SizedBox(height: 12),
-          _SecondaryAction(label: '从文件导入', onPressed: _import),
+          _SecondaryAction(label: s.fromFileImport, onPressed: _import),
 
           // 恢复流程
-          const PlainEyebrow('恢复流程'),
+          PlainEyebrow(s.restoreFlow),
           _NotePanel(
             children: [
               Text(
-                '选择备份 → 校验密码与版本 → 预览（笔数 / 时间范围）→ 确认。',
+                s.restoreFlowSteps,
                 style: TextStyle(
                   fontSize: 12,
                   height: 1.72,
@@ -253,15 +258,15 @@ class _BackupPageState extends ConsumerState<BackupPage> {
                     color: colors.inkTertiary,
                   ),
                   children: [
-                    const TextSpan(text: '恢复前系统会'),
+                    TextSpan(text: s.restoreWillPrefix),
                     TextSpan(
-                      text: '自动生成一份「恢复前备份」',
+                      text: s.restoreAutoBackup,
                       style: TextStyle(
                         fontWeight: FontWeight.w600,
                         color: colors.inkSecondary,
                       ),
                     ),
-                    const TextSpan(text: '，操作可反悔。'),
+                    TextSpan(text: s.restoreRevertSuffix),
                   ],
                 ),
               ),
@@ -273,11 +278,12 @@ class _BackupPageState extends ConsumerState<BackupPage> {
   }
 
   Future<void> _export() async {
-    final password = await _askPassword(title: '设置备份密码', confirmLabel: '导出');
+    final s = AppStrings.of(context);
+    final password = await _askPassword(title: s.setBackupPassword, confirmLabel: s.exportAction);
     if (password == null || !mounted) return;
     if (password.length < 4) {
-      setState(() => _error = '密码至少 4 位');
-      showAppToast(context, '密码至少 4 位');
+      setState(() => _error = s.passwordMin4);
+      showAppToast(context, s.passwordMin4);
       return;
     }
 
@@ -307,15 +313,8 @@ class _BackupPageState extends ConsumerState<BackupPage> {
         sourceKey = null;
       }
 
-      // STORY-1.5 AC4：附件计入备份（写进副本的暂存表，运行库不含字节）
-      final attachmentDir = await deps.attachmentStore.directory();
-      final packed = await packAttachmentsIntoCopy(
-        dbCopyPath: rawPath,
-        attachmentDir: attachmentDir,
-        sourceKeyLiteral: sourceKey,
-      );
-
       final encrypted = await writeEncryptedBackup(
+        s: s,
         sourceDbPath: rawPath,
         outPath: backupPath,
         password: password,
@@ -327,7 +326,7 @@ class _BackupPageState extends ConsumerState<BackupPage> {
 
       final file = File(backupPath);
       if (!await file.exists()) {
-        throw FileSystemException('备份文件未生成', backupPath);
+        throw FileSystemException(s.backupFileNotCreated, backupPath);
       }
       final size = await file.length();
       final sizeKb = (size / 1024).toStringAsFixed(1);
@@ -339,12 +338,11 @@ class _BackupPageState extends ConsumerState<BackupPage> {
           _lastExportSize = sizeKb;
         });
         final head = encrypted
-            ? '导出成功（已加密）· $sizeKb KB'
-            : '导出成功（口令保护）· $sizeKb KB';
-        final attachNote = packed > 0 ? ' · 含附件 $packed 个' : '';
+            ? s.exportOkEncrypted(sizeKb)
+            : s.exportOkPassword(sizeKb);
         showAppToast(
           context,
-          '$head$attachNote\n$backupPath',
+          '$head\n$backupPath',
           duration: const Duration(seconds: 6),
         );
         await _refreshLocalBackups();
@@ -354,22 +352,22 @@ class _BackupPageState extends ConsumerState<BackupPage> {
 
       // 分享失败不影响「已导出到本机」的结论
       try {
-        await Share.shareXFiles([XFile(backupPath)], text: '素记备份（需密码）');
+        await Share.shareXFiles([XFile(backupPath)], text: s.shareBackupText);
       } on Exception {
         if (mounted) {
-          showAppToast(context, '文件已保存到应用文档目录（系统分享不可用）');
+          showAppToast(context, s.savedToDocsShareUnavailable);
         }
       }
     } on Exception catch (e) {
       if (mounted) {
-        setState(() => _error = '导出失败: $e');
-        showAppToast(context, '导出失败: $e');
+        setState(() => _error = s.exportFailedDetail(e.toString()));
+        showAppToast(context, s.exportFailedDetail(e.toString()));
       }
     } catch (e) {
       // StateError 等也会给出反馈，不再静默
       final msg = e.toString().contains('backup_rekey_failed')
-          ? '加密失败：无法用密码改写备份（请重试或重启应用）'
-          : '导出失败: $e';
+          ? s.encryptFailedRekey
+          : s.exportFailedDetail(e.toString());
       if (mounted) {
         setState(() => _error = msg);
         showAppToast(context, msg);
@@ -415,11 +413,12 @@ class _BackupPageState extends ConsumerState<BackupPage> {
   }
 
   Future<void> _deleteLocalBackup(_LocalBackup b) async {
+    final s = AppStrings.of(context);
     final ok = await showConfirmDialog(
       context,
-      title: '删除备份',
+      title: s.deleteBackupTitle,
       message: '确定删除「${b.name}」？删除后无法恢复该备份。',
-      confirmLabel: '删除',
+      confirmLabel: s.delete,
       destructive: true,
     );
     if (ok != true || !mounted) return;
@@ -427,11 +426,11 @@ class _BackupPageState extends ConsumerState<BackupPage> {
       final f = File(b.path);
       if (await f.exists()) await f.delete();
       if (mounted) {
-        showAppToast(context, '已删除备份');
+        showAppToast(context, s.deletedBackup);
         await _refreshLocalBackups();
       }
     } on Exception catch (e) {
-      if (mounted) showAppToast(context, '删除失败: $e');
+      if (mounted) showAppToast(context, s.categoryDeleteFailed(e.toString()));
     }
   }
 
@@ -441,6 +440,7 @@ class _BackupPageState extends ConsumerState<BackupPage> {
 
   /// 从任意路径恢复（本机列表 / 系统选择器）。
   Future<void> _restoreFromPath(String path) async {
+    final s = AppStrings.of(context);
     if (!mounted) return;
     final bytes = await File(path).readAsBytes();
     String magicAt(int n) => bytes.length >= n ? String.fromCharCodes(bytes.sublist(0, n)) : '';
@@ -448,27 +448,23 @@ class _BackupPageState extends ConsumerState<BackupPage> {
         magicAt(kBackupMagic.length) == kBackupMagic;
 
     String? decryptedPath = path;
-    var restoredAttachments = 0;
     if (isContainer) {
-      final password = await _askPassword(title: '输入备份密码', confirmLabel: '验证');
+      final password = await _askPassword(title: s.enterBackupPassword, confirmLabel: s.verify);
       if (password == null || !mounted) return;
       try {
         final docsDir = await getApplicationDocumentsDirectory();
         final plainPath = p.join(docsDir.path, '.restore_${DateTime.now().millisecondsSinceEpoch}.db');
-        // STORY-1.5 AC4：解库的同时把附件写回附件目录
         final extracted = await extractBackup(
           backupPath: path,
           password: password,
           outPath: plainPath,
-          attachmentDir: await ref.read(appDependenciesProvider).attachmentStore.directory(),
         );
         decryptedPath = extracted.dbPath;
-        restoredAttachments = extracted.restoredAttachments;
       } on FormatException {
-        if (mounted) setState(() => _error = '密码错误');
+        if (mounted) setState(() => _error = s.wrongPassword);
         return;
       } on Exception catch (e) {
-        if (mounted) setState(() => _error = '备份无法读取: $e');
+        if (mounted) setState(() => _error = s.backupUnreadable(e.toString()));
         return;
       }
     }
@@ -476,13 +472,13 @@ class _BackupPageState extends ConsumerState<BackupPage> {
     if (!mounted) return;
     final preview = AppDatabase.previewBackup(decryptedPath);
     final previewLine = preview == null
-        ? '⚠️ 无法读取备份摘要，文件可能已损坏或不完整'
-        : '备份摘要：${preview.describe()}';
+        ? s.previewUnavailable
+        : s.backupSummary(preview.describe());
     final confirmed = await showConfirmDialog(
       context,
-      title: '导入备份',
+      title: s.importBackup,
       message: '$previewLine\n\n导入将替换当前所有数据，此操作不可恢复。确定继续？',
-      confirmLabel: '确定导入',
+      confirmLabel: s.confirmImport,
       destructive: true,
     );
     if (confirmed != true || !mounted) return;
@@ -501,7 +497,7 @@ class _BackupPageState extends ConsumerState<BackupPage> {
         final esc = pre.replaceAll("'", "''");
         deps.db.raw.execute("VACUUM INTO '$esc'");
         if (mounted) {
-          showAppToast(context, '已生成「恢复前自动备份」');
+          showAppToast(context, s.preRestoreGenerated);
         }
       } catch (_) {}
       deps.db.restoreFrom(decryptedPath);
@@ -517,13 +513,10 @@ class _BackupPageState extends ConsumerState<BackupPage> {
       ref.invalidateData.bumpBudgetMutated();
       ref.invalidateData.bumpRecurringMutated();
       if (mounted) {
-        showAppToast(
-          context,
-          restoredAttachments > 0 ? '导入完成 · 附件 $restoredAttachments 个' : '导入完成',
-        );
+        showAppToast(context, s.importDone);
       }
     } on Exception catch (e) {
-      if (mounted) setState(() => _error = '导入失败: $e');
+      if (mounted) setState(() => _error = s.importFailed(e.toString()));
     } finally {
       if (decryptedPath != path) {
         try {

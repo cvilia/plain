@@ -1,21 +1,33 @@
 /// STORY-5.3 首页卡片布局偏好（本地偏好，不同步）。
 library;
 
+import 'package:plain/app/l10n/app_strings.dart';
+import 'package:plain/app/l10n/strings_core.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// 可选卡片 ID。
 enum HomeCardId {
-  safeToSpend('safe_to_spend', '安全可花'),
-  monthlyBalance('monthly_balance', '本月收支'),
-  budgetProgress('budget_progress', '预算进度'),
-  netAssets('net_assets', '资产净值'),
-  pendingReimburse('pending_reimburse', '待报销'),
-  savingsGoals('savings_goals', '储蓄目标'),
-  recentEntries('recent_entries', '最近账单');
+  safeToSpend('safe_to_spend'),
+  monthlyBalance('monthly_balance'),
+  budgetProgress('budget_progress'),
+  netAssets('net_assets'),
+  pendingReimburse('pending_reimburse'),
+  savingsGoals('savings_goals'),
+  recentEntries('recent_entries');
 
-  const HomeCardId(this.id, this.label);
+  const HomeCardId(this.id);
   final String id;
-  final String label;
+
+  /// 卡片显示名（i18n 收口，调用点：`x.label(s)`）。
+  String label(AppStrings s) => switch (this) {
+        HomeCardId.safeToSpend => s.homeCardSafeToSpend,
+        HomeCardId.monthlyBalance => s.homeCardMonthlyBalance,
+        HomeCardId.budgetProgress => s.homeCardBudgetProgress,
+        HomeCardId.netAssets => s.homeCardNetAssets,
+        HomeCardId.pendingReimburse => s.homeCardPendingReimburse,
+        HomeCardId.savingsGoals => s.homeCardSavingsGoals,
+        HomeCardId.recentEntries => s.homeCardRecentEntries,
+      };
 }
 
 /// 3 套预设布局。

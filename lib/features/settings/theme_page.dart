@@ -4,12 +4,14 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:plain/app/l10n/app_strings.dart';
 import 'package:plain/app/theme/app_colors.dart';
 import 'package:plain/app/theme/theme_prefs.dart';
 import 'package:plain/app/theme/theme_registry.dart';
 import 'package:plain/design_system/app_toast.dart';
 import 'package:plain/design_system/plain_icons_v3.dart';
 import 'package:plain/design_system/plain_ui.dart';
+import 'package:plain/app/l10n/strings_settings_a.dart';
 
 // gate-copy 屏10 必现（门禁字面量）：
 // 10 套主题，每套含浅色 / 深色两态，切换即时生效、无需重启。
@@ -22,6 +24,7 @@ class ThemePage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final s = AppStrings.of(context);
     final prefs = ref.watch(themePrefsProvider);
     final colors = context.colors;
     final modeIndex = switch (prefs.themeMode) {
@@ -32,12 +35,12 @@ class ThemePage extends ConsumerWidget {
 
     return Scaffold(
       backgroundColor: colors.surface,
-      appBar: const PlainTopBar(title: '主题', showBack: true),
+      appBar: PlainTopBar(title: s.theme, showBack: true),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
         children: [
           PlainSeg(
-            items: const ['跟随系统', '浅色', '深色'],
+            items: [s.themeSystem, s.themeLight, s.themeDark],
             selectedIndex: modeIndex,
             onChanged: (i) {
               final mode = switch (i) {
@@ -59,7 +62,7 @@ class ThemePage extends ConsumerWidget {
                     ref.read(themePrefsProvider.notifier).setTheme(id);
                     showAppToast(
                       context,
-                      '已切换主题：${themeSpecOf(id).name}',
+                      s.themeSwitched(themeSpecOf(id).name),
                       duration: const Duration(seconds: 1),
                     );
                   },
@@ -77,16 +80,16 @@ class ThemePage extends ConsumerWidget {
                     color: colors.inkTertiary,
                   ),
                   children: [
-                    const TextSpan(text: '10 套主题'),
+                    TextSpan(text: s.themeCountLabel),
                     TextSpan(
-                      text: '全部免费',
+                      text: s.themeAllFree,
                       style: TextStyle(
                         fontWeight: FontWeight.w600,
                         color: colors.inkSecondary,
                       ),
                     ),
-                    const TextSpan(
-                      text: '，每套含浅色 / 深色两态，切换即时生效、无需重启。',
+                    TextSpan(
+                      text: s.themeNote1Suffix,
                     ),
                   ],
                 ),
@@ -100,18 +103,18 @@ class ThemePage extends ConsumerWidget {
                     color: colors.inkTertiary,
                   ),
                   children: [
-                    const TextSpan(
-                      text: '主题只改外观：分类色板与收入 / 支出语义色',
+                    TextSpan(
+                      text: s.themeNote2Prefix,
                     ),
                     TextSpan(
-                      text: '跨主题固定',
+                      text: s.themeCrossFixed,
                       style: TextStyle(
                         fontWeight: FontWeight.w600,
                         color: colors.inkSecondary,
                       ),
                     ),
-                    const TextSpan(
-                      text: '；主题属本机偏好，多端同步时不覆盖其他设备。',
+                    TextSpan(
+                      text: s.themeNote2Suffix,
                     ),
                   ],
                 ),

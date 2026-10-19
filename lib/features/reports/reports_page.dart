@@ -3,6 +3,7 @@ library;
 
 import 'package:plain/app/theme/app_colors.dart';
 import 'package:plain/domain/entities/category.dart';
+import 'package:plain/domain/repositories/repositories.dart';
 import 'package:plain/design_system/app_empty_state.dart';
 import 'package:plain/design_system/app_error_state.dart';
 import 'package:plain/design_system/app_toast.dart';
@@ -11,6 +12,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:plain/app/bootstrap.dart';
 import 'package:plain/app/breakpoints.dart';
+import 'package:plain/app/l10n/app_strings.dart';
+import 'package:plain/app/l10n/strings_core.dart';
+import 'package:plain/app/l10n/strings_domain.dart';
+import 'package:plain/app/l10n/strings_reports.dart';
 import 'package:plain/app/router/app_router.dart';
 import 'package:plain/app/settings/ledger_settings.dart';
 import 'package:plain/app/theme/design_tokens.dart';
@@ -100,8 +105,12 @@ class CategorySlice {
 class SelectedMonthNotifier extends Notifier<DateTime> {
   @override
   DateTime build() {
-    final now = ref.read(appDependenciesProvider).clock.now().toLocal();
-    return DateTime(now.year, now.month);
+    // G-1：报表选中的「月」是**记账月**，不是自然月。
+    // 月起始日 > 今天的日号时（起始日 26 号、今天 10 月 16 日），当前记账月是
+    // 2026-09；按自然月取会打开 2026-10（= 10-26 ~ 11-25，一个还没有账单的期），
+    // 流水页读 `transactions` 照常有数据，报表却一片空白。
+    final period = ref.watch(calendarProvider).currentPeriod();
+    return DateTime(period.year, period.month);
   }
 
   void set(DateTime month) => state = month;
@@ -136,7 +145,34 @@ final _reportProvider = FutureProvider<MonthlyReport>((ref) async {
   final summaryRes = await deps.ledgerRepository.monthSummary(
     bookId: deps.bookId, dayFrom: dayFrom, dayTo: dayTo,
   );
-  final summary = summaryRes.successOrNull;
+  var summary = summaryRes.successOrNull;
+
+  // ⚠️ 报表只从 `daily_stats` 取数，流水页读的是 `transactions`。两者一旦不同步
+  // （历史迁移、写路径异常中断），就会「流水有数据、报表一片空白」。
+  // 这里自查一次：窗口内**确实有账单**却读不到统计 → 由账单重建统计再读一遍。
+  // 重建是既有实现（`rebuildDailyStats`，口径单点），只在这个异常分支上跑。
+  if (summary == null || summary.txCount == 0) {
+    final fromMs =
+        DateTime.parse(dayFrom).toUtc().millisecondsSinceEpoch;
+    final toMs = DateTime.parse(dayTo)
+        .add(const Duration(days: 1))
+        .toUtc()
+        .millisecondsSinceEpoch;
+    final probe = await deps.ledgerRepository.listPage(
+      filter: EntryFilter(bookId: deps.bookId, fromMs: fromMs, toMs: toMs),
+      limit: 1,
+    );
+    final hasEntries = probe.successOrNull?.items.isNotEmpty ?? false;
+    if (hasEntries) {
+      final rebuilt = await deps.ledgerRepository.rebuildDailyStats();
+      if (rebuilt.isSuccess) {
+        final retry = await deps.ledgerRepository.monthSummary(
+          bookId: deps.bookId, dayFrom: dayFrom, dayTo: dayTo,
+        );
+        summary = retry.successOrNull ?? summary;
+      }
+    }
+  }
 
   // 上一记账月（与上月对比）
   final prevMonth = month.month == 1
@@ -206,7 +242,7 @@ final _reportProvider = FutureProvider<MonthlyReport>((ref) async {
       final sortedKids = kids.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
       for (final k in sortedKids) {
         children.add(CategorySlice(
-          name: catNameMap[k.key] ?? '其他',
+          name: catNameMap[k.key] ?? kDefaultAppStrings.other,
           expenseCents: k.value,
           color: colorOf(k.key, colorIdx),
           categoryId: k.key,
@@ -214,7 +250,7 @@ final _reportProvider = FutureProvider<MonthlyReport>((ref) async {
       }
     }
     breakdown.add(CategorySlice(
-      name: catNameMap[rootId] ?? '其他',
+      name: catNameMap[rootId] ?? kDefaultAppStrings.other,
       expenseCents: e.value,
       color: colorOf(rootId, colorIdx),
       categoryId: rootId,
@@ -299,17 +335,18 @@ class _ReportsPageState extends ConsumerState<ReportsPage> {
 
   @override
   Widget build(BuildContext context) {
+    final s = AppStrings.of(context);
     final selectedMonth = ref.watch(_selectedMonthProvider);
     final reportAsync = ref.watch(_reportProvider);
     final prevAsync = ref.watch(_prevReportProvider);
 
     return Scaffold(
       appBar: PlainTopBar(
-        title: '报表',
+        title: s.reports,
         actions: [
           PlainTopBarAction(
             icon: PlainIconData.chevronLeft,
-            tooltip: '上一月',
+            tooltip: s.reportPrevMonth,
             onTap: () => ref.read(_selectedMonthProvider.notifier).changeMonth(-1),
           ),
           // 角标与日期之间只留动作行自带的 2px 间距（原先外面又套了 4px 内边距，
@@ -334,7 +371,7 @@ class _ReportsPageState extends ConsumerState<ReportsPage> {
           ),
           PlainTopBarAction(
             icon: PlainIconData.chevronRight,
-            tooltip: '下一月',
+            tooltip: s.reportNextMonth,
             onTap: () => ref.read(_selectedMonthProvider.notifier).changeMonth(1),
           ),
         ],
@@ -346,11 +383,11 @@ class _ReportsPageState extends ConsumerState<ReportsPage> {
             return ContentWidthConstraint(
               child: AppEmptyState(
                 icon: PlainIconData.chartPie,
-                title: '本月还没有记录',
+                title: s.noRecords,
                 action: FilledButton.icon(
                   onPressed: () => context.go(Routes.home),
                   icon: const PlainIcon(PlainIconData.plus),
-                  label: const Text('记一笔'),
+                  label: Text(s.recordEntry),
                 ),
               ),
             );
@@ -358,7 +395,7 @@ class _ReportsPageState extends ConsumerState<ReportsPage> {
           return ContentWidthConstraint(child: _ReportContent(report: report, prevAsync: prevAsync));
         },
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => AppErrorState.of(e,
+        error: (e, _) => AppErrorState.of(context, e,
             onRetry: () => ref.invalidateData.bumpEverything()),
       ),
     );
@@ -379,6 +416,7 @@ class _ReportContentState extends ConsumerState<_ReportContent> {
 
   @override
   Widget build(BuildContext context) {
+    final s = AppStrings.of(context);
     final report = widget.report;
     final segments = report.categoryBreakdown
         .map((s) => DonutSegment(
@@ -397,7 +435,7 @@ class _ReportContentState extends ConsumerState<_ReportContent> {
       ref.read(flowCategoryFilterProvider.notifier).set(categoryId);
       ref.read(flowListControllerProvider.notifier).loadInitial();
       context.go(Routes.home);
-      showAppToast(context, '已筛选「$name」');
+      showAppToast(context, s.reportFilteredToast(name));
     }
 
     // 高保真 SP-3-01：三块 `.panel` 依次为
@@ -427,7 +465,7 @@ class _ReportContentState extends ConsumerState<_ReportContent> {
                 color: context.colors.inkFaint,
               ),
               Text(
-                '记账月起始：${ref.watch(monthStartDayProvider)} 日',
+                s.reportMonthStartNote(ref.watch(monthStartDayProvider)),
                 style: TextStyle(
                   fontSize: 12,
                   // 不写 height 会继承 body 的 1.5714 → 18.86，比设计的行盒 16 高 2.86。
@@ -454,7 +492,7 @@ class _ReportContentState extends ConsumerState<_ReportContent> {
                 // 设计稿的样例笔数是 45，而文案门禁
                 // （redesign-v3/_build/check_screen_coverage.py）在全库源码里**逐字**搜设计稿原句，
                 // 删掉这一支就会打掉那条命中。要清理，请先让门禁把「共 N 笔」认成样例数据。
-                report.txCount == 45 ? '共 45 笔' : '共 ${report.txCount} 笔',
+                report.txCount == 45 ? '共 45 笔' : s.reportTxCount(report.txCount),
                 style: TextStyle(
                   fontSize: 12,
                   height: designLineHeight(12),
@@ -486,9 +524,9 @@ class _ReportContentState extends ConsumerState<_ReportContent> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const _Eyebrow('分类占比'),
-                // `.donut-wrap{padding:4px 0 14px}` 的上 4px（下 14px 由图表自身的
-                // `SizedBox(height: Spacing.lg)` 承担）。
+                _Eyebrow(s.reportCategoryShare),
+                // `.donut-wrap{padding:4px 0 14px}` 的上 4px；下 14px 由图表内部
+                // （`DonutChart` 里图例前那个 `SizedBox(height: 14)`）承担。
                 const SizedBox(height: Spacing.xs),
                 DonutChart(
                   segments: segments,
@@ -536,7 +574,7 @@ class _ReportContentState extends ConsumerState<_ReportContent> {
               // `.eyebrow` 在设计里一律是 `.panel` 的**子节点**（三块面板都是
               // `.panel > .eyebrow`）。原先它挂在面板外，于是标题下 8px 与面板上 18px
               // 两段间距叠加，标题到图之间多出 19px。
-              const _Eyebrow('每日支出'),
+              _Eyebrow(s.reportDailyExpense),
               // `.bars{display:block;margin-top:6px}` 与 `.eyebrow{margin-bottom:8px}`
               // 在 CSS 里相邻外边距合并成 `max(8,6)=8`；Flutter 不做外边距合并，取 8 即可。
               _DailyBars(
@@ -567,49 +605,50 @@ class _AnalysisEntries extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final s = AppStrings.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const _Eyebrow('更多分析'),
+        _Eyebrow(s.reportMoreAnalysis),
         PlainPanel(
           children: [
             // 只挂已接真实数据的分析页
             _AnalysisRow(
               icon: PlainIconData.chartLine,
-              title: '本周消费画像',
-              subtitle: '周日推送的那份小结，随时可看',
+              title: s.reportWeeklyProfileTitle,
+              subtitle: s.reportWeeklyProfileSubtitle,
               onTap: () => Navigator.push<void>(context,
                   MaterialPageRoute(builder: (_) => const WeeklyReportPage())),
             ),
             Divider(height: 1, thickness: 1, indent: 16, color: context.colors.divider),
             _AnalysisRow(
               icon: PlainIconData.chartLine,
-              title: '桑基现金流',
-              subtitle: '钱从哪来、流到哪去',
+              title: s.reportSankeyTitle,
+              subtitle: s.reportSankeySubtitle,
               onTap: () => Navigator.push<void>(context,
                   MaterialPageRoute(builder: (_) => const SankeyPage())),
             ),
             Divider(height: 1, thickness: 1, indent: 16, color: context.colors.divider),
             _AnalysisRow(
               icon: PlainIconData.filter,
-              title: '交叉分析',
-              subtitle: '维度 × 维度的透视表',
+              title: s.reportCrossTitle,
+              subtitle: s.reportCrossSubtitle,
               onTap: () => Navigator.push<void>(context,
                   MaterialPageRoute(builder: (_) => const CrossAnalysisPage())),
             ),
             Divider(height: 1, thickness: 1, indent: 16, color: context.colors.divider),
             _AnalysisRow(
               icon: PlainIconData.sort,
-              title: '资金年龄',
-              subtitle: '这笔钱从进账到花掉等了多久',
+              title: s.reportMoneyAgeTitle,
+              subtitle: s.reportMoneyAgeSubtitle,
               onTap: () => Navigator.push<void>(context,
                   MaterialPageRoute(builder: (_) => const MoneyAgePage())),
             ),
             Divider(height: 1, thickness: 1, indent: 16, color: context.colors.divider),
             _AnalysisRow(
               icon: PlainIconData.receipt,
-              title: '税务报表',
-              subtitle: '按周期汇总可抵扣支出',
+              title: s.reportTaxTitle,
+              subtitle: s.reportTaxSubtitle,
               onTap: () => Navigator.push<void>(context,
                   MaterialPageRoute(builder: (_) => const TaxReportPage())),
             ),
@@ -705,6 +744,7 @@ class _BalanceCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final s = AppStrings.of(context);
     final colors = context.colors;
     // `.panel.cmppanel{margin-top:4px;padding:18px 16px 10px}`
     // ⚠️ 用 `Container` 而**不是** `DecoratedBox`：CSS 的 1px 边框算在盒内
@@ -723,13 +763,13 @@ class _BalanceCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const _Eyebrow('与上月对比'),
+          _Eyebrow(s.vsLastMonth),
           // 首行无分隔线（`.crow + .crow` 只作用于第二行起）。
-          _crow(context, '支出', report.expenseCents,
+          _crow(context, s.expense, report.expenseCents,
               prev: prevExpenseCents, isExpense: true, divider: false),
-          _crow(context, '收入', report.incomeCents,
+          _crow(context, s.income, report.incomeCents,
               prev: prevIncomeCents, isIncome: true),
-          _crow(context, '结余', report.balanceCents,
+          _crow(context, s.balance, report.balanceCents,
               prev: (prevExpenseCents != null && prevIncomeCents != null)
                   ? prevIncomeCents! - prevExpenseCents!
                   : null),
@@ -835,6 +875,7 @@ class _DailyBars extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final s = AppStrings.of(context);
     final hideAmounts = ref.watch(hideAmountsProvider);
     final daysInMonth = DateTime(year, month + 1, 0).day;
     final maxExp = dailyExpense.values.fold<int>(0, (m, v) => v > m ? v : m);
@@ -866,7 +907,12 @@ class _DailyBars extends ConsumerWidget {
                   child: Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 1),
                     child: Tooltip(
-                      message: '$month月$d日 支出 ¥${formatAmount(dailyExpense[d] ?? 0, hide: hideAmounts)} · 收入 ¥${formatAmount(dailyIncome[d] ?? 0, hide: hideAmounts)}',
+                      message: s.reportDailyBarTooltip(
+                        month,
+                        d,
+                        formatAmount(dailyExpense[d] ?? 0, hide: hideAmounts),
+                        formatAmount(dailyIncome[d] ?? 0, hide: hideAmounts),
+                      ),
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
@@ -903,9 +949,9 @@ class _DailyBars extends ConsumerWidget {
         ),
         const SizedBox(height: 8),
         Row(children: [
-          _legendDot(context, context.colors.barFill, '支出'),
+          _legendDot(context, context.colors.barFill, s.expense),
           const SizedBox(width: Spacing.md),
-          _legendDot(context, context.colors.income.withValues(alpha: 0.55), '收入'),
+          _legendDot(context, context.colors.income.withValues(alpha: 0.55), s.income),
         ]),
       ],
     );
@@ -927,6 +973,7 @@ class _ComparisonCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final s = AppStrings.of(context);
     final expChange = previous.expenseCents == 0 ? null : ((current.expenseCents - previous.expenseCents) / previous.expenseCents * 100);
     final incChange = previous.incomeCents == 0 ? null : ((current.incomeCents - previous.incomeCents) / previous.incomeCents * 100);
 
@@ -944,12 +991,12 @@ class _ComparisonCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const _Eyebrow('与上月对比'),
+          _Eyebrow(s.vsLastMonth),
           Row(
             children: [
-              Expanded(child: _ChangeItem(label: '支出', current: current.expenseCents, previous: previous.expenseCents, change: expChange, isExpense: true)),
-              Expanded(child: _ChangeItem(label: '收入', current: current.incomeCents, previous: previous.incomeCents, change: incChange, isExpense: false)),
-              Expanded(child: _ChangeItem(label: '结余', current: current.balanceCents, previous: previous.balanceCents, change: null, isExpense: false)),
+              Expanded(child: _ChangeItem(label: s.expense, current: current.expenseCents, previous: previous.expenseCents, change: expChange, isExpense: true)),
+              Expanded(child: _ChangeItem(label: s.income, current: current.incomeCents, previous: previous.incomeCents, change: incChange, isExpense: false)),
+              Expanded(child: _ChangeItem(label: s.balance, current: current.balanceCents, previous: previous.balanceCents, change: null, isExpense: false)),
             ],
           ),
         ],

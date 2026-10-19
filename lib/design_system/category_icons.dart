@@ -44,7 +44,7 @@ const List<String> kAllCategoryIconRefs = [
   'debt', 'credit_card_bill', 'installment',
   'gym', 'yoga', 'running', 'swimming',
   'coffee_shop', 'barber', 'spa',
-  'toy', 'game_pad', 'music_note', 'camera', 'photo',
+  'toy', 'game_pad', 'music_note', 'headphone', 'camera', 'photo',
   'newspaper', 'podcast', 'video',
   'bus_stop', 'metro', 'ferry', 'motorcycle',
   'insurance_car', 'insurance_health', 'pension',
@@ -69,7 +69,7 @@ const List<String> kAllCategoryIconRefs = [
   'laptop_stand', 'mouse', 'keyboard', 'monitor', 'phone_case',
   'medal', 'trophy', 'cup',
   'love', 'kiss', 'date',
-  'bus_ticket', 'train_ticket', 'ship_ticket',
+  'ticket', 'bus_ticket', 'train_ticket', 'ship_ticket',
   'passport', 'visa', 'luggage_tag',
   'electric_car', 'charging', 'bike_share',
   'movie_club', 'streaming', 'game_sub',
@@ -82,6 +82,11 @@ const List<String> kAllCategoryIconRefs = [
   'recipe', 'cookbook', 'kitchen',
   'laundromat', 'dry_clean', 'shoe_repair',
   'auto_debit', 'bill_split', 'shared_expense',
+  // 收入（v1.x 补）：收入分类的专属图标 —— 映射见 `category_icon_v3.dart`
+  // 的「收入」段。`salary` / `bonus` / `invest` / `freelance` / `refund` /
+  // `wallet` / `trophy` 本来就在上面的清单里，这里只补缺的。
+  'parttime', 'business', 'reimburse', 'subsidy',
+  'resale', 'prize', 'family',
 ];
 
 // 取图标请用 `category_icon_v3.dart` 的 `plainIconForRef(ref)`（或 `CategoryIcon`

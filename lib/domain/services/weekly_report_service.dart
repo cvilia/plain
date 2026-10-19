@@ -8,6 +8,7 @@ library;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:plain/app/l10n/app_strings.dart';
 import 'package:plain/core/constants/app_constants.dart';
 import 'package:plain/core/time/clock.dart';
 import 'package:plain/data/platform/notification_bridge.dart';
@@ -15,6 +16,7 @@ import 'package:plain/domain/entities/category.dart';
 import 'package:plain/domain/entities/enums.dart';
 import 'package:plain/domain/entities/reminder.dart';
 import 'package:plain/domain/repositories/repositories.dart';
+import 'package:plain/app/l10n/strings_domain.dart';
 
 /// 消费周报开关（Riverpod，UI 绑定用）。
 class _WeeklyReportEnabledNotifier extends Notifier<bool> {
@@ -82,12 +84,14 @@ class WeeklyReport {
   }
 
   /// 生成周报正文（免费简版，1 屏）。
-  String get summary {
-    final buf = StringBuffer('本周消费画像\n');
-    buf.writeln('支出 ¥${(totalExpenseCents / 100).toStringAsFixed(2)} · $entryCount 笔');
+  String summary(AppStrings s) {
+    final buf = StringBuffer('${s.wrSummaryTitle}\n');
+    buf.writeln(
+        s.wrExpenseLine((totalExpenseCents / 100).toStringAsFixed(2), entryCount));
     if (isComparedToLastWeek) {
-      final dir = expenseChangePercent >= 0 ? '上升' : '下降';
-      buf.writeln('环比$dir ${expenseChangePercent.abs().toStringAsFixed(0)}%');
+      final dir = expenseChangePercent >= 0 ? s.wrUp : s.wrDown;
+      buf.writeln(
+          s.wrMonthOverMonth(dir, expenseChangePercent.abs().toStringAsFixed(0)));
     }
     for (final h in highlights) {
       buf.writeln(h);
@@ -96,13 +100,15 @@ class WeeklyReport {
   }
 
   /// 系统通知正文（一行，中性陈述）。
-  String get notificationBody {
+  String notificationBody(AppStrings s) {
     if (totalExpenseCents == 0 && totalIncomeCents == 0) {
-      return '本周还没有记录，随时可以补一笔';
+      return s.wrNoRecords;
     }
-    final parts = <String>['支出 ¥${(totalExpenseCents / 100).toStringAsFixed(2)}'];
-    if (totalExpenseCents > 0) parts.add('主要「${topCategory ?? '其他'}」');
-    parts.add('$entryCount 笔');
+    final parts = <String>[
+      s.wrExpenseOnly((totalExpenseCents / 100).toStringAsFixed(2)),
+    ];
+    if (totalExpenseCents > 0) parts.add(s.wrMainCategory(topCategory ?? s.other));
+    parts.add(s.wrCountLine(entryCount));
     return parts.join(' · ');
   }
 }
@@ -199,6 +205,7 @@ class WeeklyReportService {
   /// [lastWeekExpenseCents] 必须是**上周同期**合计；
   /// [lastWeekCategories] 同为上周同期的分类支出（缺省则不写占比变化）。
   static WeeklyReport generate({
+    required AppStrings s,
     required String weekStart,
     required String weekEnd,
     required int totalExpenseCents,
@@ -217,9 +224,9 @@ class WeeklyReportService {
       changePercent = ((totalExpenseCents - lastWeekExpenseCents) / lastWeekExpenseCents * 100);
       // 只陈述、只夸不贬
       if (changePercent < -10) {
-        highlights.add('支出比上周同期有所减少，继续保持');
+        highlights.add(s.wrHighlightLess);
       } else if (changePercent > 10) {
-        highlights.add('本周比上周同期多花了一些');
+        highlights.add(s.wrHighlightMore);
       }
     }
 
@@ -229,7 +236,7 @@ class WeeklyReportService {
         ..sort((a, b) => b.value.compareTo(a.value));
       final top = sorted.first;
       final share = (top.value * 100 / totalExpenseCents).round();
-      highlights.add('「${top.key}」是本周主要支出，占 $share%');
+      highlights.add(s.wrTopCategory(top.key, share));
     }
 
     // 占比变化：只取变化最大的一条，纯陈述（百分点阈值见规则常量）。
@@ -245,7 +252,7 @@ class WeeklyReportService {
         final prevCents = lastWeekCategories[e.key];
         final prevPct = prevCents == null ? 0.0 : prevCents * 100 / lastWeekExpenseCents;
         if (curPct - prevPct >= WeeklyReportRules.shareShiftPoints) {
-          highlights.add('「${e.key}」占比 ${prevPct.round()}% → ${curPct.round()}%');
+          highlights.add(s.wrShareShift(e.key, prevPct.round(), curPct.round()));
           break;
         }
       }
@@ -253,7 +260,7 @@ class WeeklyReportService {
 
     // 单笔最大（PRD「异常大额」，用中性措辞，不作评判）
     if (largestExpenseCents > 0) {
-      highlights.add('本周单笔最大 ¥${(largestExpenseCents / 100).toStringAsFixed(2)}');
+      highlights.add(s.wrLargest((largestExpenseCents / 100).toStringAsFixed(2)));
     }
 
     return WeeklyReport(
@@ -272,6 +279,7 @@ class WeeklyReportService {
 
   /// 从库里取数生成周报。所有金额来自 daily_stats / transactions，无写死数据。
   static Future<WeeklyReport> build({
+    required AppStrings s,
     required LedgerRepository ledger,
     required CategoryRepository categories,
     required Clock clock,
@@ -313,12 +321,12 @@ class WeeklyReportService {
       for (final Category c in catRes.successOrNull ?? const <Category>[]) c.id: c.name,
     };
 
-    Map<String, int> byName(MonthSummary? s) {
+    Map<String, int> byName(MonthSummary? m) {
       final out = <String, int>{};
-      if (s == null) return out;
-      for (final e in s.byCategory.entries) {
+      if (m == null) return out;
+      for (final e in m.byCategory.entries) {
         if (e.value.expenseCents <= 0) continue;
-        final name = nameOf[e.key] ?? '其他';
+        final name = nameOf[e.key] ?? s.other;
         out[name] = (out[name] ?? 0) + e.value.expenseCents;
       }
       return out;
@@ -328,6 +336,7 @@ class WeeklyReportService {
     final prevCats = byName(prev);
 
     return generate(
+      s: s,
       weekStart: Clock.dayKeyOf(start),
       weekEnd: Clock.dayKeyOf(today),
       totalExpenseCents: cur?.expenseCents ?? 0,
@@ -342,6 +351,7 @@ class WeeklyReportService {
 
   /// 到点则生成并推系统通知。返回是否真的推送了。
   static Future<bool> pushIfDue({
+    required AppStrings s,
     required LedgerRepository ledger,
     required CategoryRepository categories,
     required Clock clock,
@@ -352,6 +362,7 @@ class WeeklyReportService {
       if (!await shouldPush(now)) return false;
 
       final report = await build(
+        s: s,
         ledger: ledger,
         categories: categories,
         clock: clock,
@@ -367,8 +378,8 @@ class WeeklyReportService {
       final reminderLevel = applyQuietHours(await level(), now);
       await NotificationBridge.show(
         id: WeeklyReportRules.notificationId,
-        title: '本周消费画像',
-        body: report.notificationBody,
+        title: s.wrSummaryTitle,
+        body: report.notificationBody(s),
         payload: 'weekly_report',
         silent: reminderLevel == ReminderLevel.silent,
       );

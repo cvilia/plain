@@ -1,6 +1,7 @@
 /// CSV import use case: parse → dedup → batch insert. PRD F7.5.
 library;
 
+import 'package:plain/app/l10n/app_strings.dart';
 import 'package:plain/core/id/uuid_v7.dart';
 import 'package:plain/core/result/result.dart';
 import 'package:plain/core/time/clock.dart';
@@ -8,6 +9,7 @@ import 'package:plain/domain/entities/automation_rule.dart';
 import 'package:plain/domain/repositories/repositories.dart';
 import 'package:plain/domain/services/csv_importer.dart';
 import 'package:plain/domain/services/rule_applier.dart';
+import 'package:plain/app/l10n/strings_domain.dart';
 
 class ImportCsvUseCase {
   ImportCsvUseCase({
@@ -25,6 +27,7 @@ class ImportCsvUseCase {
   /// Import CSV text with the given column mapping.
   /// [resolveCategoryId] maps a category name to an existing category id (or null).
   Future<Result<ImportReport>> call({
+    required AppStrings s,
     required String csvText,
     required CsvColumnMapping mapping,
     required String bookId,
@@ -38,7 +41,7 @@ class ImportCsvUseCase {
       return err<ImportReport>(const ValidationFailure('import.empty', 'no data rows'));
     }
 
-    final parsed = parseRows(rows, mapping, skipHeaderRows: skipHeaderRows);
+    final parsed = parseRows(rows, mapping, skipHeaderRows: skipHeaderRows, s: s);
     if (parsed.entries.isEmpty) {
       return err<ImportReport>(ValidationFailure('import.no_valid_rows', parsed.errors.join('; ')));
     }
@@ -76,6 +79,7 @@ class ImportCsvUseCase {
       );
       if (ruleRepository != null) {
         entry = await applyAutomationRules(
+          s: s,
           ruleRepository: ruleRepository!,
           entry: entry,
           scope: RuleScope.import,
@@ -86,7 +90,7 @@ class ImportCsvUseCase {
         importedIds.add(entry.id);
       } else {
         failed++;
-        errors.add('导入失败: ${p.fingerprint}');
+        errors.add(s.importFailed(p.fingerprint));
       }
     }
 

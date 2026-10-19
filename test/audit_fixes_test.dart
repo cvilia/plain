@@ -6,6 +6,7 @@ library;
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:plain/app/l10n/strings_core.dart';
 import 'package:plain/core/id/uuid_v7.dart';
 import 'package:plain/core/money/money.dart';
 import 'package:plain/core/time/clock.dart';
@@ -63,7 +64,7 @@ void main() {
       amountExpression: '${cents / 100}', type: EntryType.expense,
       categoryId: categoryId, accountId: 'acc-cash',
       bookId: bookId, deviceId: deviceId,
-    ));
+    ), s: kDefaultAppStrings);
     expect(res.isSuccess, isTrue, reason: '${res.failureOrNull}');
     return res.requireValue.id;
   }

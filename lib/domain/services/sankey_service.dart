@@ -4,15 +4,23 @@
 /// 只做图数据的派生，不涉及渲染；节点占比不足阈值时并入「其他」（AC5）。
 library;
 
+import 'package:plain/app/l10n/app_strings.dart';
+import 'package:plain/app/l10n/strings_domain.dart';
+
 /// 维度（AC1/AC2）。
 enum SankeyDimension {
-  topCategory('top_category', '一级分类'),
-  leafCategory('leaf_category', '二级分类'),
-  account('account', '账户');
+  topCategory('top_category'),
+  leafCategory('leaf_category'),
+  account('account');
 
-  const SankeyDimension(this.wire, this.label);
+  const SankeyDimension(this.wire);
   final String wire;
-  final String label;
+
+  String label(AppStrings s) => switch (this) {
+        SankeyDimension.topCategory => s.sankeyTopCategory,
+        SankeyDimension.leafCategory => s.sankeyLeafCategory,
+        SankeyDimension.account => s.account,
+      };
 }
 
 /// 参与聚合的一笔账单（只需这几个字段）。
@@ -97,6 +105,7 @@ class SankeyService {
   final double minShare;
 
   SankeyGraph build({
+    required AppStrings s,
     required List<SankeyEntry> entries,
     required SankeyDimension dimension,
     Map<String, SankeyCategoryInfo> categories = const {},
@@ -109,14 +118,14 @@ class SankeyService {
       if (e.cents <= 0) continue;
       final bucket = e.isIncome ? incomeRaw : expenseRaw;
       final (groupKey, groupLabel) =
-          _groupOf(e, dimension, categories, accountNames);
+          _groupOf(e, dimension, categories, accountNames, s);
       final agg = bucket.putIfAbsent(
           groupKey, () => _Agg(key: groupKey, label: groupLabel));
       agg.cents += e.cents;
     }
 
-    final sources = _finalize(incomeRaw);
-    final targets = _finalize(expenseRaw);
+    final sources = _finalize(incomeRaw, s);
+    final targets = _finalize(expenseRaw, s);
     return SankeyGraph(
       sources: sources,
       targets: targets,
@@ -126,7 +135,7 @@ class SankeyService {
   }
 
   /// 按占比重排 + 小项合并为「其他」，金额降序。
-  List<SankeyNode> _finalize(Map<String, _Agg> raw) {
+  List<SankeyNode> _finalize(Map<String, _Agg> raw, AppStrings s) {
     if (raw.isEmpty) return const [];
     final all = raw.values.toList()
       ..sort((a, b) => b.cents.compareTo(a.cents));
@@ -145,7 +154,7 @@ class SankeyService {
     }
     if (otherCents > 0) {
       kept.add(SankeyNode(
-          key: null, label: '其他', cents: otherCents, isOther: true));
+          key: null, label: s.other, cents: otherCents, isOther: true));
     }
     return kept;
   }
@@ -156,22 +165,23 @@ class SankeyService {
     SankeyDimension dimension,
     Map<String, SankeyCategoryInfo> categories,
     Map<String, String> accountNames,
+    AppStrings s,
   ) {
     switch (dimension) {
       case SankeyDimension.account:
         final id = e.accountId;
-        if (id == null) return ('__none__', '未指定账户');
-        return (id, accountNames[id] ?? '未知账户');
+        if (id == null) return ('__none__', s.noAccount);
+        return (id, accountNames[id] ?? s.unknownAccount);
       case SankeyDimension.topCategory:
         final id = e.categoryId;
-        if (id == null) return ('__none__', '未分类');
+        if (id == null) return ('__none__', s.uncategorized);
         final info = categories[id];
-        if (info == null) return ('__none__', '未分类');
+        if (info == null) return ('__none__', s.uncategorized);
         return (info.rootId, info.rootName);
       case SankeyDimension.leafCategory:
         final id = e.categoryId;
-        if (id == null) return ('__none__', '未分类');
-        return (id, categories[id]?.name ?? '未知分类');
+        if (id == null) return ('__none__', s.uncategorized);
+        return (id, categories[id]?.name ?? s.unknownCategory);
     }
   }
 }

@@ -4,6 +4,9 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:plain/app/bootstrap.dart';
+import 'package:plain/app/l10n/app_strings.dart';
+import 'package:plain/app/l10n/strings_domain.dart';
+import 'package:plain/app/l10n/strings_settings_a.dart';
 import 'package:plain/app/theme/app_colors.dart';
 import 'package:plain/app/theme/design_tokens.dart';
 import 'package:plain/core/refresh/data_invalidation.dart';
@@ -24,21 +27,20 @@ final _actionLogProvider = FutureProvider<List<ChangeLogItem>>((ref) async {
 class ActionLogPage extends ConsumerWidget {
   const ActionLogPage({super.key});
 
-  String _entityLabel(String type) => switch (type) {
-        'transaction' => '账单',
-        'category' => '分类',
-        'account' => '账户',
-        'budget' => '预算',
-        'recurring_rule' => '周期记账',
-        'currency_rate' => '锁定汇率',
-        'attachment' => '附件',
+  String _entityLabel(AppStrings s, String type) => switch (type) {
+        'transaction' => s.entityTransaction,
+        'category' => s.category,
+        'account' => s.account,
+        'budget' => s.entityBudget,
+        'recurring_rule' => s.actionLogEntityRecurring,
+        'currency_rate' => s.entityCurrencyRate,
         _ => type,
       };
 
-  String _opLabel(String op) => switch (op) {
-        'insert' => '新增',
-        'update' => '修改',
-        'delete' => '删除',
+  String _opLabel(AppStrings s, String op) => switch (op) {
+        'insert' => s.actionLogOpInsert,
+        'update' => s.actionLogOpUpdate,
+        'delete' => s.delete,
         _ => op,
       };
 
@@ -50,18 +52,19 @@ class ActionLogPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final s = AppStrings.of(context);
     final async = ref.watch(_actionLogProvider);
     return Scaffold(
-      appBar: const PlainTopBar(title: '操作日志', showBack: true),
+      appBar: PlainTopBar(title: s.actionLogTitle, showBack: true),
       body: async.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => AppErrorState.of(e, onRetry: () => ref.invalidateData.bumpEverything()),
+        error: (e, _) => AppErrorState.of(context, e, onRetry: () => ref.invalidateData.bumpEverything()),
         data: (items) {
           if (items.isEmpty) {
-            return const AppEmptyState(
+            return AppEmptyState(
               icon: PlainIconData.history,
-              title: '暂无操作记录',
-              subtitle: '记账、改分类等操作会记录在这里',
+              title: s.actionLogEmptyTitle,
+              subtitle: s.actionLogEmptySubtitle,
             );
           }
           return ListView.separated(
@@ -80,7 +83,7 @@ class ActionLogPage extends ConsumerWidget {
                   size: 20,
                   color: _opColor(context, item.op),
                 ),
-                title: '${_opLabel(item.op)}${_entityLabel(item.entityType)}',
+                title: '${_opLabel(s, item.op)}${_entityLabel(s, item.entityType)}',
                 subtitle: formatDateTime(item.changedAt),
                 trailing: Text(
                   '#${item.localRevision}',

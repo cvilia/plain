@@ -1,6 +1,7 @@
 /// STORY-10.2 AC4/AC5：贷款每期还款生成两笔（利息计入支出，本金不计入）。
 library;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:plain/app/l10n/strings_core.dart';
 import 'package:plain/core/id/uuid_v7.dart';
 import 'package:plain/core/time/clock.dart';
 import 'package:plain/data/db/database.dart';
@@ -104,7 +105,7 @@ void main() {
       ledgerRepository: ledgerRepo,
       clock: clock,
       idGen: idGen,
-    )();
+    )(s: kDefaultAppStrings);
     expect(gen.isSuccess, true);
     expect(gen.successOrNull!.created, isEmpty);
     expect(gen.successOrNull!.needConfirm, hasLength(1));
@@ -118,7 +119,7 @@ void main() {
       clock: clock,
       idGen: idGen,
       accountRepository: accountRepo,
-    )(rule);
+    )(rule, s: kDefaultAppStrings);
     expect(res.isSuccess, true, reason: res.failureOrNull?.toString() ?? '');
     final entries = res.successOrNull!;
     expect(entries, hasLength(2));
@@ -149,7 +150,7 @@ void main() {
       clock: clock,
       idGen: idGen,
       accountRepository: accountRepo,
-    )(rule);
+    )(rule, s: kDefaultAppStrings);
 
     // 支出统计 = 仅利息
     expect(statsExpenseCents(), 326667);
@@ -174,7 +175,7 @@ void main() {
       clock: clock,
       idGen: idGen,
       accountRepository: accountRepo,
-    )(rule);
+    )(rule, s: kDefaultAppStrings);
     final batchId = res.successOrNull!.first.batchId!;
 
     final undo = await UndoRecurringBatchUseCase(
@@ -193,13 +194,13 @@ void main() {
       idGen: idGen,
       accountRepository: accountRepo,
     );
-    final first = await confirm(rule);
+    final first = await confirm(rule, s: kDefaultAppStrings);
     expect(first.successOrNull![0].amount.cents, 326667);
 
     // 推进到下一期
     rule = (await recurringRepo.getById(rule.id)).successOrNull!;
     clock.set(DateTime.utc(2026, 3, 20, 9));
-    final second = await confirm(rule);
+    final second = await confirm(rule, s: kDefaultAppStrings);
     final interest2 = second.successOrNull!
         .firstWhere((e) => e.type == EntryType.expense)
         .amount
@@ -221,7 +222,7 @@ void main() {
     );
     // 已还 3 期
     for (var i = 0; i < 3; i++) {
-      await confirm(rule);
+      await confirm(rule, s: kDefaultAppStrings);
       rule = (await recurringRepo.getById(rule.id)).successOrNull!;
     }
 

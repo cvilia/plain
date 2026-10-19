@@ -4,9 +4,11 @@
 library;
 
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:plain/app/l10n/app_strings.dart';
 import 'package:plain/core/constants/app_constants.dart';
 import 'package:plain/domain/services/accounting_calendar.dart';
 import 'package:plain/domain/services/receipt_parser.dart';
+import 'package:plain/app/l10n/strings_domain.dart';
 
 /// 识别入口类型。
 enum AiInputType { screenshot, voice, text }
@@ -20,7 +22,7 @@ class QuotaStatus {
 
   int get remaining => total - used;
   bool get isExhausted => remaining <= 0;
-  String get displayLabel => '$used / $total 次';
+  String displayLabel(AppStrings s) => s.aiQuotaDisplay(used, total);
 }
 
 /// AI 识别服务：额度管理 + 文本解析。

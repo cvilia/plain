@@ -9,6 +9,8 @@ import 'package:plain/core/format/amount_formatter.dart';
 import 'package:plain/design_system/plain_icons_v3.dart';
 import 'package:plain/design_system/plain_ui.dart';
 import 'package:plain/app/theme/theme_registry.dart';
+import 'package:plain/app/l10n/app_strings.dart';
+import 'package:plain/app/l10n/strings_ledger.dart';
 
 /// One child split line.
 class SplitLine {
@@ -65,11 +67,12 @@ class _SplitEditorPageState extends State<SplitEditorPage> {
   }
 
   void _addLine() {
+    final s = AppStrings.of(context);
     setState(() {
       _lines.add(
         SplitLine(
-          title: '新子项',
-          subtitle: '待填写',
+          title: s.splitNewChildTitle,
+          subtitle: s.splitNewChildSub,
           cents: 0,
           color: Color(categoryColorMap['other']!),
         ),
@@ -78,37 +81,25 @@ class _SplitEditorPageState extends State<SplitEditorPage> {
   }
 
   String get _childCountLabel {
+    final s = AppStrings.of(context);
     final n = _lines.length;
     if (n == 2) return '子项（2）';
-    return '子项（$n）';
+    return s.childCountLabel(n);
   }
 
   @override
   Widget build(BuildContext context) {
+    final s = AppStrings.of(context);
     final colors = context.colors;
     return Scaffold(
       backgroundColor: colors.surface,
       appBar: PlainTopBar(
-        title: '分割这笔账单',
+        title: s.splitThisEntry,
         showBack: true,
         actions: [
-          Material(
-            color: const Color(0x00000000),
-            borderRadius: BorderRadius.circular(12),
-            child: InkWell(
-              onTap: () => Navigator.of(context).maybePop(),
-              borderRadius: BorderRadius.circular(12),
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(minHeight: 44),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
-                  child: Text(
-                    '完成',
-                    style: TextStyle(fontSize: 14, color: colors.primary),
-                  ),
-                ),
-              ),
-            ),
+          PlainTopBarTextAction(
+            label: s.done,
+            onTap: () => Navigator.of(context).maybePop(),
           ),
         ],
       ),
@@ -120,12 +111,12 @@ class _SplitEditorPageState extends State<SplitEditorPage> {
             padding: const EdgeInsets.all(16),
             children: [
               _KeyValueRow(
-                label: '账单原始金额',
+                label: s.originalAmountLabel,
                 value: '¥${formatAmount(widget.originalCents)}',
               ),
               const SizedBox(height: 12),
               _KeyValueRow(
-                label: '已分配',
+                label: s.assignedAmountLabel,
                 value: '¥${formatAmount(_assignedCents)}',
                 valueColor: _balanced ? colors.okInk : colors.warnInk,
               ),
@@ -162,7 +153,7 @@ class _SplitEditorPageState extends State<SplitEditorPage> {
                     ),
                     const SizedBox(width: 4),
                     Text(
-                      '已对平，可以保存',
+                      s.splitBalancedOk,
                       style: TextStyle(fontSize: 12, color: colors.okInk),
                     ),
                   ],
@@ -170,8 +161,8 @@ class _SplitEditorPageState extends State<SplitEditorPage> {
               else
                 Text(
                   _assignedCents < widget.originalCents
-                      ? '还差 ¥${formatAmount(widget.originalCents - _assignedCents)}'
-                      : '超出 ¥${formatAmount(_assignedCents - widget.originalCents)}',
+                      ? s.splitShortBy(formatAmount(widget.originalCents - _assignedCents))
+                      : s.splitOverBy(formatAmount(_assignedCents - widget.originalCents)),
                   style: TextStyle(fontSize: 12, color: colors.warnInk),
                 ),
             ],
@@ -200,15 +191,15 @@ class _SplitEditorPageState extends State<SplitEditorPage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     _insertBold(
-                      plain: '父子结构：父单不被删除，子项独立统计。父单金额。',
-                      bold: '恒等于 Σ 子项金额',
-                      anchor: '父单金额',
+                      plain: s.splitNoteParentChild,
+                      bold: s.splitNoteBold,
+                      anchor: s.splitNoteAnchorParentAmount,
                     ),
                     const SizedBox(height: 8),
                     _insertBold(
-                      plain: '报表中各子项按自己的分类计数，父单、不参与分类统计 （避免双算）；父单只计入账户余额一次。',
-                      bold: '分类置空',
-                      anchor: '父单',
+                      plain: s.splitNoteReport,
+                      bold: s.splitNoteBold2,
+                      anchor: s.splitNoteAnchorParent,
                     ),
                   ],
                 ),
@@ -334,6 +325,7 @@ class _AddLineRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final s = AppStrings.of(context);
     final colors = context.colors;
     return Material(
       color: const Color(0x00000000),
@@ -350,7 +342,7 @@ class _AddLineRow extends StatelessWidget {
               ),
               const SizedBox(width: 10),
               Text(
-                '再分一项',
+                s.addChildLine,
                 style: TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.w500,

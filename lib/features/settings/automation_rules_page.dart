@@ -19,6 +19,12 @@ import 'package:plain/domain/repositories/repositories.dart';
 import 'package:plain/domain/services/gamification_service.dart';
 import 'package:plain/domain/services/rule_applier.dart';
 import 'package:plain/domain/services/rule_engine.dart';
+import 'package:plain/app/l10n/app_strings.dart';
+import 'package:plain/app/l10n/strings_accounts.dart';
+import 'package:plain/app/l10n/strings_core.dart';
+import 'package:plain/app/l10n/strings_domain.dart';
+import 'package:plain/app/l10n/strings_ledger.dart';
+import 'package:plain/app/l10n/strings_settings_a.dart';
 
 // gate-copy 屏17 必现（门禁字面量）：
 // 规则 = + 。一条账单可在保存时命中多条规则， 按优先级顺序执行，后者可覆盖前者。
@@ -85,16 +91,18 @@ class _AutomationRulesPageState extends ConsumerState<AutomationRulesPage> {
 
   @override
   Widget build(BuildContext context) {
+    final s = AppStrings.of(context);
     final colors = context.colors;
     final hasRules = _rules.isNotEmpty;
 
     return Scaffold(
       backgroundColor: colors.surface,
       appBar: PlainTopBar(
-        title: '自动规则',
+        title: s.automationTitle,
         showBack: true,
         actions: [
-          _TextAction(label: '新建', onPressed: _showCreateSheet),
+          // 顶栏文字动作走公共组件（设计稿 `.textbtn`：34 高 / 15 号 / w500 / primaryInk）
+          PlainTopBarTextAction(label: s.newAction, onTap: _showCreateSheet),
         ],
       ),
       body: _loading
@@ -113,9 +121,9 @@ class _AutomationRulesPageState extends ConsumerState<AutomationRulesPage> {
                           color: colors.inkTertiary,
                         ),
                         children: [
-                          const TextSpan(text: '规则 = '),
+                          TextSpan(text: s.automationRuleEqPrefix),
                           TextSpan(
-                            text: '条件（IF）',
+                            text: s.automationCondIf,
                             style: TextStyle(
                               fontWeight: FontWeight.w600,
                               color: colors.inkSecondary,
@@ -123,7 +131,7 @@ class _AutomationRulesPageState extends ConsumerState<AutomationRulesPage> {
                           ),
                           const TextSpan(text: ' + '),
                           TextSpan(
-                            text: '动作（THEN）',
+                            text: s.automationActionThen,
                             style: TextStyle(
                               fontWeight: FontWeight.w600,
                               color: colors.inkSecondary,
@@ -138,7 +146,7 @@ class _AutomationRulesPageState extends ConsumerState<AutomationRulesPage> {
                     ),
                     const SizedBox(height: 3),
                     Text(
-                      '每次命中都会记入「规则执行日志」，可查看、可撤销。',
+                      s.automationHitLogNote,
                       style: TextStyle(
                         fontSize: 12,
                         height: 1.72,
@@ -151,16 +159,16 @@ class _AutomationRulesPageState extends ConsumerState<AutomationRulesPage> {
                 if (!hasRules)
                   AppEmptyState(
                     icon: PlainIconData.filter,
-                    title: '还没有自动规则',
-                    subtitle: '例如「备注含房租 → 分类设为居住-房租」',
+                    title: s.automationEmptyTitle,
+                    subtitle: s.automationEmptySubtitle,
                     action: FilledButton.icon(
                       onPressed: _showCreateSheet,
                       icon: const PlainIcon(PlainIconData.plus),
-                      label: const Text('新建规则'),
+                      label: Text(s.newRuleLabel),
                     ),
                   )
                 else ...[
-                  PlainEyebrow('规则 · ${_rules.length} 条'),
+                  PlainEyebrow(s.automationRuleCount(_rules.length)),
                   PlainPanel(
                     children: [
                       for (var i = 0; i < _rules.length; i++)
@@ -188,23 +196,23 @@ class _AutomationRulesPageState extends ConsumerState<AutomationRulesPage> {
                           color: colors.inkTertiary,
                         ),
                         children: [
-                          const TextSpan(text: '执行阶段：'),
+                          TextSpan(text: s.automationStageNotePrefix),
                           TextSpan(
-                            text: '保存前',
+                            text: s.automationStageBefore,
                             style: TextStyle(
                               fontWeight: FontWeight.w600,
                               color: colors.inkSecondary,
                             ),
                           ),
-                          const TextSpan(text: '（可改写分类 / 账户） / '),
+                          TextSpan(text: s.automationStageBetween),
                           TextSpan(
-                            text: '保存后',
+                            text: s.automationStageAfter,
                             style: TextStyle(
                               fontWeight: FontWeight.w600,
                               color: colors.inkSecondary,
                             ),
                           ),
-                          const TextSpan(text: '（只做标记与通知）。'),
+                          TextSpan(text: s.automationStageSuffix),
                         ],
                       ),
                     ),
@@ -217,11 +225,11 @@ class _AutomationRulesPageState extends ConsumerState<AutomationRulesPage> {
                           color: colors.inkTertiary,
                         ),
                         children: [
-                          const TextSpan(
-                            text: '改动仅作用于规则生效之后的新账单，',
+                          TextSpan(
+                            text: s.automationScopePrefix,
                           ),
                           TextSpan(
-                            text: '不回改历史',
+                            text: s.automationScopeBold,
                             style: TextStyle(
                               fontWeight: FontWeight.w600,
                               color: colors.inkSecondary,
@@ -239,26 +247,27 @@ class _AutomationRulesPageState extends ConsumerState<AutomationRulesPage> {
   }
 
   String _describe(AutomationRule r) {
+    final s = AppStrings.of(context);
     final conds = r.conditions.map((c) {
       final f = switch (c.field) {
-        RuleField.amount => '金额',
-        RuleField.note => '备注',
-        RuleField.merchant => '商户',
-        RuleField.accountId => '账户',
-        RuleField.categoryId => '分类',
-        RuleField.source => '来源',
-        RuleField.type => '类型',
+        RuleField.amount => s.amountFieldLabel,
+        RuleField.note => s.note,
+        RuleField.merchant => s.crossMerchant,
+        RuleField.accountId => s.account,
+        RuleField.categoryId => s.category,
+        RuleField.source => s.source,
+        RuleField.type => s.typeLabel,
         RuleField.unknown => '?',
       };
       return '$f ${c.op.wire} ${c.value}';
     }).join(' AND ');
     final acts = r.actions.map((a) {
       return switch (a.type) {
-        RuleActionType.setCategory => '设分类',
-        RuleActionType.setAccount => '设账户',
-        RuleActionType.setNotePrefix => '备注前缀',
-        RuleActionType.setNotInOutflow => '不计入收支',
-        RuleActionType.setReimbursable => '待报销',
+        RuleActionType.setCategory => s.ruleActionSetCategory,
+        RuleActionType.setAccount => s.ruleActionSetAccount,
+        RuleActionType.setNotePrefix => s.ruleActionSetNotePrefix,
+        RuleActionType.setNotInOutflow => s.notInStats,
+        RuleActionType.setReimbursable => s.homeCardPendingReimburse,
         RuleActionType.unknown => '?',
       };
     }).join('，');
@@ -278,23 +287,25 @@ class _AutomationRulesPageState extends ConsumerState<AutomationRulesPage> {
   }
 
   Future<void> _delete(AutomationRule r) async {
+    final s = AppStrings.of(context);
     final ok = await showConfirmDialog(
       context,
-      title: '删除规则',
-      message: '确定删除该规则？不影响已记账单。',
-      confirmLabel: '删除',
+      title: s.automationDeleteTitle,
+      message: s.automationDeleteMessage,
+      confirmLabel: s.delete,
       destructive: true,
     );
     if (ok != true || !mounted) return;
     final deps = ref.read(appDependenciesProvider);
     await deps.automationRuleRepository.softDelete(r.id);
     if (!mounted) return;
-    showAppToast(context, '已删除');
+    showAppToast(context, s.deleted);
     _reload();
   }
 
   /// 试运行：最近账单命中预览，不改数据（AC7）。
   Future<void> _showDryRun(AutomationRule r) async {
+    final s = AppStrings.of(context);
     final deps = ref.read(appDependenciesProvider);
     final page = await deps.ledgerRepository.listPage(
       filter: EntryFilter(bookId: deps.bookId),
@@ -303,7 +314,7 @@ class _AutomationRulesPageState extends ConsumerState<AutomationRulesPage> {
     if (!mounted) return;
     final items = page.successOrNull?.items ?? const <LedgerEntry>[];
     const engine = RuleEngine();
-    final hits = engine.dryRun(items, r);
+    final hits = engine.dryRun(items, r, s: s);
     await showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -311,7 +322,7 @@ class _AutomationRulesPageState extends ConsumerState<AutomationRulesPage> {
         content: SizedBox(
           width: double.maxFinite,
           child: hits.isEmpty
-              ? const Text('最近 100 笔中没有命中')
+              ? Text(s.automationDryRunEmpty)
               : ListView.builder(
                   shrinkWrap: true,
                   itemCount: hits.length.clamp(0, 20),
@@ -325,7 +336,7 @@ class _AutomationRulesPageState extends ConsumerState<AutomationRulesPage> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            e.note?.isNotEmpty == true ? e.note! : '账单',
+                            e.note?.isNotEmpty == true ? e.note! : s.entityTransaction,
                             style: const TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.w500,
@@ -344,7 +355,7 @@ class _AutomationRulesPageState extends ConsumerState<AutomationRulesPage> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: Text(hits.isEmpty ? '关闭' : '仅预览，未修改数据'),
+            child: Text(hits.isEmpty ? s.close : s.automationDryRunHint),
           ),
         ],
       ),
@@ -352,7 +363,8 @@ class _AutomationRulesPageState extends ConsumerState<AutomationRulesPage> {
   }
 
   Future<void> _showCreateSheet() async {
-    final nameCtrl = TextEditingController(text: '新规则');
+    final s = AppStrings.of(context);
+    final nameCtrl = TextEditingController(text: s.automationNewRuleName);
     final noteCtrl = TextEditingController();
     final catCtrl = TextEditingController();
     String op = 'contains';
@@ -374,17 +386,17 @@ class _AutomationRulesPageState extends ConsumerState<AutomationRulesPage> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text('新建规则（备注 → 分类）', style: Theme.of(ctx).textTheme.titleMedium),
+              Text(s.automationCreateTitle, style: Theme.of(ctx).textTheme.titleMedium),
               const SizedBox(height: 12),
               TextField(
                 controller: nameCtrl,
-                decoration: const InputDecoration(labelText: '名称', border: OutlineInputBorder()),
+                decoration: InputDecoration(labelText: s.nameLabel, border: OutlineInputBorder()),
               ),
               const SizedBox(height: 12),
               TextField(
                 controller: noteCtrl,
                 decoration: InputDecoration(
-                  labelText: '备注关键词',
+                  labelText: s.automationNoteKeyword,
                   suffixIcon: _MatchOperatorSuffix(
                     value: op,
                     onChanged: (v) => setSheet(() => op = v),
@@ -395,14 +407,14 @@ class _AutomationRulesPageState extends ConsumerState<AutomationRulesPage> {
               const SizedBox(height: 12),
               TextField(
                 controller: catCtrl,
-                decoration: const InputDecoration(
-                  labelText: '目标分类 ID（或名称，暂填 ID）',
+                decoration: InputDecoration(
+                  labelText: s.automationTargetCategory,
                   border: OutlineInputBorder(),
                 ),
               ),
               const SizedBox(height: 12),
               _SecondaryAction(
-                label: previewCount == null ? '预览命中数（最近 500 笔）' : '将命中 $previewCount 笔',
+                label: previewCount == null ? s.automationPreviewCount : s.automationWillHit(previewCount!),
                 onPressed: () async {
                   final deps = ref.read(appDependenciesProvider);
                   final note = noteCtrl.text.trim();
@@ -424,10 +436,10 @@ class _AutomationRulesPageState extends ConsumerState<AutomationRulesPage> {
               ),
               const SizedBox(height: 12),
               PlainRow(
-                title: '回溯历史账单',
+                title: s.automationRetroTitle,
                 subtitle: previewCount == null
-                    ? '保存后套用到最近 500 笔（默认不回溯）'
-                    : '将更新约 $previewCount 笔历史账单',
+                    ? s.automationRetroSubtitleIdle
+                    : s.automationRetroSubtitle(previewCount!),
                 trailing: PlainSwitch(
                   value: retroApply,
                   onChanged: (v) => setSheet(() => retroApply = v),
@@ -435,7 +447,7 @@ class _AutomationRulesPageState extends ConsumerState<AutomationRulesPage> {
               ),
               const SizedBox(height: 12),
               _PrimaryAction(
-                label: '保存规则',
+                label: s.automationSaveRule,
                 onPressed: () async {
                   final deps = ref.read(appDependenciesProvider);
                   final note = noteCtrl.text.trim();
@@ -452,7 +464,7 @@ class _AutomationRulesPageState extends ConsumerState<AutomationRulesPage> {
                   final rule = AutomationRule(
                     id: deps.idGen.generate(),
                     bookId: deps.bookId,
-                    name: nameCtrl.text.trim().isEmpty ? '新规则' : nameCtrl.text.trim(),
+                    name: nameCtrl.text.trim().isEmpty ? s.automationNewRuleName : nameCtrl.text.trim(),
                     stage: RuleStage.post,
                     priority: 0,
                     scope: RuleScope.manual,
@@ -471,14 +483,14 @@ class _AutomationRulesPageState extends ConsumerState<AutomationRulesPage> {
                   if (retroApply) {
                     final r = await ApplyRuleRetroactively(
                       repository: deps.ledgerRepository,
-                    )(bookId: deps.bookId, rule: rule);
+                    )(bookId: deps.bookId, rule: rule, s: s);
                     retroCount = r.successOrNull ?? 0;
                   }
                   if (ctx.mounted) Navigator.pop(ctx);
                   if (!mounted) return;
                   showAppToast(
                     context,
-                    retroApply ? '规则已创建，已回溯 $retroCount 笔' : '规则已创建',
+                    retroApply ? s.automationCreatedRetro(retroCount) : s.automationCreated,
                   );
                   _reload();
                 },
@@ -511,6 +523,7 @@ class _RuleRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final s = AppStrings.of(context);
     final colors = context.colors;
     final enabled = rule.isEnabled;
     return ConstrainedBox(
@@ -548,7 +561,7 @@ class _RuleRow extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        rule.name ?? '规则 $index',
+                        rule.name ?? s.automationRuleIndexed(index),
                         style: const TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.w500,
@@ -601,37 +614,6 @@ class _NotePanel extends StatelessWidget {
   }
 }
 
-/// 顶栏文字按钮（textbtn）。
-class _TextAction extends StatelessWidget {
-  const _TextAction({required this.label, required this.onPressed});
-  final String label;
-  final VoidCallback? onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.colors;
-    return Material(
-      color: const Color(0x00000000),
-      borderRadius: BorderRadius.circular(12),
-      child: InkWell(
-        onTap: onPressed,
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-          child: Text(
-            label,
-            style: TextStyle(
-              fontSize: 15,
-              fontWeight: FontWeight.w500,
-              color: onPressed == null ? colors.inkFaint : colors.primaryInk,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 /// 备注关键词的匹配方式：嵌在输入框尾部的小选择器。
 ///
 /// 与全站选择项一致 —— 点击弹底部弹层，不用系统下拉。
@@ -648,12 +630,13 @@ class _MatchOperatorSuffix extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final s = AppStrings.of(context);
     final colors = context.colors;
     return InkWell(
       onTap: () async {
         final picked = await showOptionPicker<String>(
           context: context,
-          title: '匹配方式',
+          title: s.matchMethod,
           current: value,
           options: [
             for (final e in _labels.entries)
@@ -667,7 +650,7 @@ class _MatchOperatorSuffix extends StatelessWidget {
         children: [
           const SizedBox(width: 12),
           Text(
-            _labels[value] ?? '包含',
+            _labels[value] ?? s.matchContains,
             style: TextStyle(fontSize: 14, color: colors.primary),
           ),
           const SizedBox(width: 2),

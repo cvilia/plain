@@ -2,6 +2,7 @@
 library;
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:plain/app/l10n/strings_core.dart';
 import 'package:plain/core/constants/app_constants.dart';
 import 'package:plain/core/id/uuid_v7.dart';
 import 'package:plain/core/time/clock.dart';
@@ -103,6 +104,7 @@ void main() {
       svc.validateTransfer(
         fromCurrency: 'USD', toCurrency: 'CNY',
         rate: null, fromAmountCents: 10000, toAmountCents: 72000,
+        s: kDefaultAppStrings,
       ),
       '需填写两边金额与汇率',
     );
@@ -110,6 +112,7 @@ void main() {
       svc.validateTransfer(
         fromCurrency: 'USD', toCurrency: 'CNY',
         rate: 7.20, fromAmountCents: null, toAmountCents: 72000,
+        s: kDefaultAppStrings,
       ),
       '需填写两边金额与汇率',
     );
@@ -117,6 +120,7 @@ void main() {
       svc.validateTransfer(
         fromCurrency: 'USD', toCurrency: 'CNY',
         rate: 7.20, fromAmountCents: 10000, toAmountCents: 72000,
+        s: kDefaultAppStrings,
       ),
       isNull,
     );
@@ -124,6 +128,7 @@ void main() {
       svc.validateTransfer(
         fromCurrency: 'CNY', toCurrency: 'CNY',
         rate: null, fromAmountCents: null, toAmountCents: null,
+        s: kDefaultAppStrings,
       ),
       isNull,
     );
@@ -244,7 +249,7 @@ void main() {
         deviceId: 'dev-1',
         exchangeRate: 7.20,
         originalCurrency: 'USD',
-      ));
+      ), s: kDefaultAppStrings);
       expect(r.isSuccess, true, reason: r.failureOrNull?.toString() ?? '');
       final e = r.successOrNull!;
       // 本位币金额：所有统计口径都用它
@@ -272,7 +277,7 @@ void main() {
           deviceId: 'dev-1',
           exchangeRate: rate,
           originalCurrency: 'USD',
-        ));
+        ), s: kDefaultAppStrings);
         return r.successOrNull!.amount.cents;
       }
 
@@ -294,7 +299,7 @@ void main() {
         accountId: 'acc-cny',
         bookId: 'book-1',
         deviceId: 'dev-1',
-      ));
+      ), s: kDefaultAppStrings);
       final e = r.successOrNull!;
       expect(e.amount.cents, 10000);
       expect(e.originalAmountCents, isNull);
@@ -311,7 +316,7 @@ void main() {
         deviceId: 'dev-1',
         exchangeRate: 0.4, // 1 × 0.4 = 0.4 → 四舍五入为 0 分
         originalCurrency: 'USD',
-      ));
+      ), s: kDefaultAppStrings);
       expect(r.isFailure, true);
       expect(r.failureOrNull!.code, 'entry.amount_rounds_to_zero');
     });
@@ -326,7 +331,7 @@ void main() {
         deviceId: 'dev-1',
         exchangeRate: 0,
         originalCurrency: 'USD',
-      ));
+      ), s: kDefaultAppStrings);
       expect(r.isFailure, true);
       expect(r.failureOrNull!.code, 'entry.fx_rate_invalid');
     });
