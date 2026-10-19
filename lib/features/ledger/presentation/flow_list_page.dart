@@ -11,6 +11,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:plain/app/breakpoints.dart';
 import 'package:plain/app/settings/home_layout_prefs.dart';
+import 'package:plain/app/bootstrap.dart';
 import 'package:plain/app/settings/ledger_settings.dart';
 import 'package:plain/app/theme/app_colors.dart';
 import 'package:plain/app/theme/theme_registry.dart';
@@ -25,6 +26,7 @@ import 'package:plain/design_system/plain_icons_v3.dart';
 import 'package:plain/design_system/plain_ui.dart';
 import 'package:plain/domain/entities/category.dart' as domain;
 import 'package:plain/domain/entities/ledger_entry.dart';
+import 'package:plain/domain/repositories/repositories.dart';
 import 'package:plain/features/ledger/controllers/flow_list_controller.dart';
 import 'package:plain/features/ledger/presentation/advanced_filter_page.dart';
 import 'package:plain/features/ledger/presentation/safe_to_spend_card.dart';
@@ -327,6 +329,28 @@ class _FlowRow {
 /// hairline 1
 /// month-note  padding-top 12 + 行盒 16
 /// ```
+/// 记账月收支合计：走 `daily_stats`（monthSummary），与列表分页无关。
+///
+/// 之前 `_Hero` 累加 `state.groups`（**已加载**的条目），翻页翻到上个月后
+/// 会把上个月的钱算进「本月结余」。这里按 `monthStartDay` 的记账月边界查库。
+final _monthTotalsProvider = FutureProvider<MonthSummary>((ref) async {
+  ref.watch(ledgerVersionProvider);
+  final deps = ref.watch(appDependenciesProvider);
+  final period = ref.watch(calendarProvider).currentPeriod();
+  final res = await deps.ledgerRepository.monthSummary(
+    bookId: deps.bookId,
+    dayFrom: period.dayFrom,
+    dayTo: period.dayTo,
+  );
+  return res.successOrNull ??
+      const MonthSummary(
+        expenseCents: 0,
+        incomeCents: 0,
+        txCount: 0,
+        byCategory: {},
+      );
+});
+
 class _Hero extends ConsumerWidget {
   const _Hero({required this.state, required this.monthStartDay});
   final FlowListState state;
@@ -336,11 +360,19 @@ class _Hero extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final s = AppStrings.of(context);
     final hideAmounts = ref.watch(hideAmountsProvider);
+    final totals = ref.watch(_monthTotalsProvider);
+    final summary = totals.value;
     var income = 0;
     var expense = 0;
-    for (final g in state.groups) {
-      income += g.dayIncome;
-      expense += g.dayExpense;
+    if (summary != null) {
+      income = summary.incomeCents;
+      expense = summary.expenseCents;
+    } else {
+      // 首次加载还没回来：先按已加载条目占位，避免闪一下 0。
+      for (final g in state.groups) {
+        income += g.dayIncome;
+        expense += g.dayExpense;
+      }
     }
     final balance = income - expense;
     final colors = context.colors;
