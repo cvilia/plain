@@ -7,7 +7,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:plain/app/bootstrap.dart';
 import 'package:plain/app/theme/app_colors.dart';
 import 'package:plain/core/refresh/data_invalidation.dart';
-import 'package:plain/design_system/app_empty_state.dart';
 import 'package:plain/design_system/app_error_state.dart';
 import 'package:plain/design_system/app_toast.dart';
 import 'package:plain/design_system/confirm_dialog.dart';
@@ -162,14 +161,73 @@ class _AutomationRulesPageState extends ConsumerState<AutomationRulesPage> {
                 ),
 
                 if (!hasRules)
-                  AppEmptyState(
-                    icon: PlainIconData.filter,
-                    title: s.automationEmptyTitle,
-                    subtitle: s.automationEmptySubtitle,
-                    action: FilledButton.icon(
-                      onPressed: _showCreateSheet,
-                      icon: const PlainIcon(PlainIconData.plus),
-                      label: Text(s.newRuleLabel),
+                  // 空态与页面面板同语言：说明 + 一行可点的「新建规则」，
+                  // 不再用居中大图标（与上下两块说明面板放一起过于突兀）。
+                  Container(
+                    width: double.infinity,
+                    decoration: BoxDecoration(
+                      color: colors.surface,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: colors.border, width: 1),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                s.automationEmptyTitle,
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w500,
+                                  color: colors.ink,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                s.automationEmptySubtitle,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  height: 1.5,
+                                  color: colors.inkTertiary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Divider(
+                            height: 1,
+                            thickness: 1,
+                            indent: 16,
+                            color: colors.divider),
+                        InkWell(
+                          onTap: _showCreateSheet,
+                          child: SizedBox(
+                            height: 44,
+                            child: Padding(
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 16),
+                              child: Row(
+                                children: [
+                                  const PlainIcon(PlainIconData.plus, size: 16),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    s.newRuleLabel,
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w500,
+                                      color: colors.primary,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   )
                 else ...[
