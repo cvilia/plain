@@ -9,6 +9,7 @@ import 'package:plain/app/settings/display_prefs.dart';
 import 'package:plain/app/settings/ledger_settings.dart';
 import 'package:plain/core/constants/app_constants.dart';
 import 'package:plain/core/format/amount_formatter.dart';
+import 'package:plain/core/logging/app_log.dart';
 import 'package:plain/core/money/expression_evaluator.dart';
 import 'package:plain/core/money/money.dart';
 import 'package:plain/core/refresh/data_invalidation.dart';
@@ -49,6 +50,7 @@ class EntryInputState {
     this.wasIncompleteExpression = false,
     this.isSubmitting = false,
     this.errorMessage,
+    this.occurredAtUserSet = false,
     this.foreignCurrency,
     this.foreignRate,
   });
@@ -91,6 +93,16 @@ class EntryInputState {
   /// 是否在外币语境下（记账页据此显示「你输入的是外币」）。
   bool get isForeign => foreignCurrency != null;
 
+  /// 用户**显式**改过日期（日期选择器 / OCR 带日期）。
+  ///
+  /// 新建保存时只有它为 true 才用 [occurredAt]，否则取保存那一刻的 now()。
+  /// 否则会踩这个坑：记账页的 `occurredAt` 是**页面元素首次创建时**取的
+  /// （全局 NotifierProvider，进程不退出就不重建），草稿恢复还会带回更早的
+  /// `savedAt` —— 结果「最后记的一笔」带着半小时前的时间戳，流水按
+  /// `occurred_at DESC` 一排就沉到别人下面去了（用户实测：最后记美妆，
+  /// 首行却是汽车养护）。
+  final bool occurredAtUserSet;
+
   bool get hasAmount => displayAmount.isNotEmpty && displayAmount != '0';
 
   EntryInputState copyWith({
@@ -112,6 +124,7 @@ class EntryInputState {
     bool? wasIncompleteExpression,
     bool? isSubmitting,
     String? errorMessage,
+    bool? occurredAtUserSet,
     String? foreignCurrency,
     double? foreignRate,
     bool clearCategory = false,
@@ -141,6 +154,7 @@ class EntryInputState {
       wasIncompleteExpression: wasIncompleteExpression ?? this.wasIncompleteExpression,
       isSubmitting: isSubmitting ?? this.isSubmitting,
       errorMessage: clearError ? null : (errorMessage ?? this.errorMessage),
+      occurredAtUserSet: occurredAtUserSet ?? this.occurredAtUserSet,
       foreignCurrency:
           clearForeignCurrency ? null : (foreignCurrency ?? this.foreignCurrency),
       foreignRate: clearForeignCurrency ? null : (foreignRate ?? this.foreignRate),
@@ -173,8 +187,9 @@ class EntryInputController extends Notifier<EntryInputState> {
           occurredAt: draft.savedAt,
         );
       }
-    } on Exception {
-      // Ignore draft restore errors
+    } catch (e, st) {
+      // 草稿恢复失败不该挡住记账，但不能静默——否则「草稿没回来」无从查起
+      _log.warn('entry.draft_restore_failed', fields: {'error': '$e', 'stack': '$st'});
     }
   }
 
@@ -182,6 +197,7 @@ class EntryInputController extends Notifier<EntryInputState> {
   UpdateEntryUseCase get _updateEntry => ref.read(appDependenciesProvider).updateEntry;
   DeleteEntryUseCase get _deleteEntry => ref.read(appDependenciesProvider).deleteEntry;
   Clock get _clock => ref.read(appDependenciesProvider).clock;
+  AppLog get _log => ref.read(logProvider);
 
   AppStrings get _strings => ref.read(appStringsProvider);
   String get _bookId => ref.read(appDependenciesProvider).bookId;
@@ -428,6 +444,8 @@ class EntryInputController extends Notifier<EntryInputState> {
       displayAmount: amountStr ?? state.displayAmount,
       note: (merchant != null && merchant.isNotEmpty) ? merchant : state.note,
       occurredAt: occurredAt ?? state.occurredAt,
+      // 小票上的时间算「用户给定」的时间，保存时不再覆盖成 now()
+      occurredAtUserSet: occurredAt != null ? true : null,
     );
     final hint = categoryHint;
     if (hint != null && hint.isNotEmpty) {
@@ -438,7 +456,7 @@ class EntryInputController extends Notifier<EntryInputState> {
   }
 
   void onDateSelected(DateTime date) {
-    state = state.copyWith(occurredAt: date);
+    state = state.copyWith(occurredAt: date, occurredAtUserSet: true);
     final calendar = ref.read(calendarProvider);
     final today = _clock.now();
     final cur = calendar.periodFor(today.year, today.month);
@@ -491,38 +509,52 @@ class EntryInputController extends Notifier<EntryInputState> {
 
   Future<bool> saveExplicit() => _save();
 
+  /// 校验拦截：写 state 的同时留一条 debug 日志。
+  ///
+  /// 「点了保存没反应」是最高频的用户困惑，而有日志之前这条链路上一个字都没有。
+  bool _blockSave(String code) {
+    state = state.copyWith(errorMessage: code, isSubmitting: false, clearToast: true);
+    _log.debug('entry.save_blocked', fields: {'reason': code, 'type': state.type.wire});
+    return false;
+  }
+
   Future<bool> _save() async {
-    if (state.isSubmitting) return false;
+    if (state.isSubmitting) {
+      _log.debug('entry.save_ignored', fields: {'reason': 'submitting'});
+      return false;
+    }
+    _log.debug('entry.save_start', fields: {
+      'type': state.type.wire,
+      'editing': state.isEditing,
+      'hasCategory': state.selectedCategoryId != null,
+      'hasAccount': state.selectedAccountId != null,
+      'noteLen': state.note?.length ?? 0,
+    });
     // STORY-8.2 AC2：只读成员点保存时拦截（不写库、不消费任何额度）
     final deps = ref.read(appDependenciesProvider);
     if (!await deps.memberService.canWrite(deps.bookId)) {
-      state = state.copyWith(errorMessage: 'member_read_only', clearToast: true);
-      return false;
+      return _blockSave('member_read_only');
     }
     final eval = _evaluator.eval(state.amountExpression);
     if (eval.error != null) {
       // AC8：除零等非法表达式不得入账
-      state = state.copyWith(errorMessage: 'expression_invalid', clearToast: true);
-      return false;
+      _log.debug('entry.expression_invalid', fields: {'expr': state.amountExpression});
+      return _blockSave('expression_invalid');
     }
     // 新建态：0 元拦截；编辑态：允许存 0（AC9，轻提示）
     if (eval.money.isZero && !state.isEditing) {
-      state = state.copyWith(errorMessage: 'amount_zero', clearToast: true);
-      return false;
+      return _blockSave('amount_zero');
     }
     if (!eval.money.withinProductLimit) {
-      state = state.copyWith(errorMessage: 'amount_over_limit', clearToast: true);
-      return false;
+      return _blockSave('amount_over_limit');
     }
     // 转账不选分类（G-2 / AC12）；其余类型必须选分类
     final isTransfer = state.type == EntryType.transfer;
     if (!isTransfer && state.selectedCategoryId == null) {
-      state = state.copyWith(errorMessage: 'category_required', clearToast: true);
-      return false;
+      return _blockSave('category_required');
     }
     if (isTransfer && (state.selectedAccountId == null || state.toAccountId == null)) {
-      state = state.copyWith(errorMessage: 'transfer_accounts_required', clearToast: true);
-      return false;
+      return _blockSave('transfer_accounts_required');
     }
     state = state.copyWith(isSubmitting: true, clearError: true);
 
@@ -538,9 +570,9 @@ class EntryInputController extends Notifier<EntryInputState> {
       );
       if (ctx != null) {
         if (ctx.rate == null || ctx.rate! <= 0) {
-          state = state.copyWith(
-              errorMessage: 'fx_rate_required', isSubmitting: false, clearToast: true);
-          return false;
+          _log.debug('entry.fx_rate_missing',
+              fields: {'account': resolvedAccountId, 'currency': ctx.currency});
+          return _blockSave('fx_rate_required');
         }
         fxRate = ctx.rate;
         fxCurrency = ctx.currency;
@@ -590,12 +622,14 @@ class EntryInputController extends Notifier<EntryInputState> {
           return true;
         },
         failure: (f) {
+          _log.entrySaveFailed(entryType: state.type.wire, code: f.code);
           state = state.copyWith(isSubmitting: false, errorMessage: f.code, clearToast: true);
           return false;
         },
       );
     }
 
+    final occurredAt = state.occurredAtUserSet ? state.occurredAt : _clock.now();
     final result = await _createEntry(CreateEntryInput(
       amountExpression: state.amountExpression,
       type: state.type,
@@ -603,7 +637,7 @@ class EntryInputController extends Notifier<EntryInputState> {
       accountId: resolvedAccountId,
       toAccountId: state.toAccountId,
       note: state.note,
-      occurredAt: state.occurredAt,
+      occurredAt: occurredAt,
       bookId: _bookId,
       deviceId: _deviceId,
       reimburseStatus: state.reimburseStatus,
@@ -628,6 +662,10 @@ class EntryInputController extends Notifier<EntryInputState> {
           isSubmitting: false,
           clearError: true,
           clearEmotion: true,
+          // 下一笔回到「现在」：否则停留在记账页连记时，后面几笔都会继承
+          // 第一笔的旧时间戳，流水排序跟着乱。
+          occurredAt: _clock.now(),
+          occurredAtUserSet: false,
         );
         draftStore.clear(); // Clear draft after successful save
         // STORY-1.6：记住这次的「备注 → 分类」
@@ -645,6 +683,7 @@ class EntryInputController extends Notifier<EntryInputState> {
         return true;
       },
       failure: (f) {
+        _log.entrySaveFailed(entryType: state.type.wire, code: f.code);
         state = state.copyWith(isSubmitting: false, errorMessage: f.code, clearToast: true);
         return false;
       },
@@ -730,8 +769,9 @@ class EntryInputController extends Notifier<EntryInputState> {
       if (feedback != null) {
         state = state.copyWith(emotionFeedback: feedback);
       }
-    } catch (_) {
+    } catch (e, st) {
       // 反馈失败不影响业务
+      _log.warn('entry.emotion_feedback_failed', fields: {'error': '$e', 'stack': '$st'});
     }
   }
 
@@ -753,8 +793,9 @@ class EntryInputController extends Notifier<EntryInputState> {
     Future.microtask(() {
       try {
         ref.read(flowListControllerProvider.notifier).refresh();
-      } catch (_) {
-        // 首页尚未构建时忽略
+      } catch (e, st) {
+        // 首页尚未构建时忽略，但要留痕：流水不刷新是可见故障
+        _log.warn('flow.refresh_failed', fields: {'error': '$e', 'stack': '$st'});
       }
     });
   }

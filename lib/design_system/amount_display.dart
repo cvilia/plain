@@ -26,6 +26,7 @@ class AmountDisplay extends ConsumerStatefulWidget {
     this.color,
     this.decorationColor,
     this.showSign = false,
+    this.showValueSign = false,
     this.isExpense = false,
     this.isIncome = false,
     this.currency = '¥',
@@ -38,6 +39,12 @@ class AmountDisplay extends ConsumerStatefulWidget {
   final Color? color;
   final Color? decorationColor;
   final bool showSign;
+
+  /// 数值符号：正数（含 0）显示 `+`，负数显示 `-`，都落在货币符号之后。
+  ///
+  /// 用于「结余 / 净值」这类需要一眼看出正负的汇总金额；明细行不要开
+  /// （列表里一堆 `+456.00` 是噪音）。
+  final bool showValueSign;
   final bool isExpense;
   final bool isIncome;
   final String currency;
@@ -75,9 +82,27 @@ class _AmountDisplayState extends ConsumerState<AmountDisplay> {
     final isHidden = hideAmounts && !_revealed;
 
     final parsed = formatAmountParts(widget.cents, hide: isHidden);
-    final sign = widget.showSign
-        ? (widget.isExpense ? '-' : widget.isIncome ? '+' : '')
-        : '';
+    // ⚠️ 以前负余额会显示成正数：`formatAmountParts` 只取绝对值，而 sign 完全
+    // 由 isExpense/isIncome 标志决定 —— 「当前净值 -1786」被渲染成 `¥1,786.00`。
+    //
+    // 符号口径（2026-10-19 定）：**一律排在货币符号之后**，`¥-30.00` / `¥+0.00`。
+    //   · 值为负 → 永远 '-'（负债 / 负余额 / 负结余）
+    //   · showValueSign（结余 / 净值）→ 正数与零显示 '+'
+    //   · 否则看方向标志（支出 '-' / 收入 '+'）
+    //   · 隐藏金额时不显示任何符号（`¥****`）
+    final valueNeg = widget.cents < 0;
+    final String sign;
+    if (isHidden) {
+      sign = '';
+    } else if (valueNeg) {
+      sign = '-';
+    } else if (widget.showValueSign) {
+      sign = '+';
+    } else if (widget.showSign) {
+      sign = widget.isExpense ? '-' : (widget.isIncome ? '+' : '');
+    } else {
+      sign = '';
+    }
 
     final main = widget.color ??
         (widget.isExpense
@@ -130,6 +155,18 @@ class _AmountDisplayState extends ConsumerState<AmountDisplay> {
       child: Text.rich(
         TextSpan(
           children: [
+            TextSpan(
+              text: widget.currency,
+              style: TextStyle(
+                fontSize: small,
+                height: lh,
+                letterSpacing: ls,
+                fontWeight: FontWeight.w600,
+                color: quiet,
+                fontFeatures: kTabularFigures,
+              ),
+            ),
+            // 符号在货币符号**之后**：`¥-1,786.00` / `¥+0.00`。样式跟整数段走。
             if (sign.isNotEmpty)
               TextSpan(
                 text: sign,
@@ -142,17 +179,6 @@ class _AmountDisplayState extends ConsumerState<AmountDisplay> {
                   fontFeatures: kTabularFigures,
                 ),
               ),
-            TextSpan(
-              text: widget.currency,
-              style: TextStyle(
-                fontSize: small,
-                height: lh,
-                letterSpacing: ls,
-                fontWeight: FontWeight.w600,
-                color: quiet,
-                fontFeatures: kTabularFigures,
-              ),
-            ),
             TextSpan(
               text: parsed.intPart,
               style: TextStyle(

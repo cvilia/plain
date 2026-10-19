@@ -547,15 +547,49 @@ class PlainTopBar extends StatelessWidget implements PreferredSizeWidget {
     if (actions.isEmpty) return 44;
     var w = 0.0;
     for (final a in actions) {
-      if (a is PlainTopBarAction) {
-        w += 44;
-      } else if (a is Text) {
-        w += _measureTextWidth(a) + 4;
-      } else {
-        w += 64;
-      }
+      w += _estimateActionWidth(a);
     }
     return w + 2 * (actions.length - 1); // 动作之间的 spacing
+  }
+
+  /// 递归估算一个动作 widget 的宽度。页面常把 [Text] 包在
+  /// `SizedBox > Center > Padding` 里做垂直居中（如对账页的状态文本），
+  /// 只判 `is Text` 会漏 —— 必须解包一层层看进去。
+  static double _estimateActionWidth(Widget w) {
+    if (w is PlainTopBarAction) return 44;
+    if (w is Text) return _measureTextWidth(w);
+    if (w is Icon || w is PlainIcon) return 24;
+    // 单透明容器：宽度交给子级，附加自身的水平内/外边距
+    if (w is SizedBox) {
+      final explicit = w.width;
+      if (explicit != null) return explicit;
+      final child = w.child;
+      return child == null ? 0 : _estimateActionWidth(child);
+    }
+    if (w is Padding) {
+      final child = w.child;
+      return child == null
+          ? w.padding.horizontal
+          : w.padding.horizontal + _estimateActionWidth(child);
+    }
+    if (w is Center || w is Align) {
+      final child = (w as dynamic).child as Widget?;
+      return child == null ? 0 : _estimateActionWidth(child);
+    }
+    if (w is DecoratedBox) {
+      final child = w.child;
+      return child == null ? 0 : _estimateActionWidth(child);
+    }
+    if (w is Container) {
+      var extra = 0.0;
+      final padding = w.padding;
+      if (padding is EdgeInsets) extra += padding.horizontal;
+      final margin = w.margin;
+      if (margin is EdgeInsets) extra += margin.horizontal;
+      final child = w.child;
+      return extra + (child == null ? 0 : _estimateActionWidth(child));
+    }
+    return 64; // 兜底：认不出的按旧口径估
   }
 
   /// 单行实测一段文字的宽度（含内边距）。

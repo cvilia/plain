@@ -51,14 +51,17 @@ String _grouped(int n) {
   );
 }
 
-/// Format amount with currency symbol.
+/// 负号写在**货币符号之后**：`¥-12.50`，不是 `-¥12.50`。
+///
+/// 产品口径：符号是量的单位前缀，负号属于数值本身的符号，所以跟在符号后面。
+/// 只在有符号时生效；纯数字（[formatAmount] / `Money.toYuanString`）仍是前置 `-`。
 String formatAmountYuan(int cents, {bool hide = false}) {
   if (hide) return '¥****';
   final sign = cents < 0 ? '-' : '';
-  return '$sign¥${formatAmount(cents)}';
+  return '¥$sign${formatAmount(cents.abs())}';
 }
 
-/// 按币种代码格式化（STORY-9.3）。
+/// 按币种代码格式化（STORY-9.3）。负号同样落在符号之后：`$-12.50`。
 String formatAmountCurrency(
   int cents, {
   String currencyCode = 'CNY',
@@ -67,7 +70,7 @@ String formatAmountCurrency(
   final sym = CurrencyRules.symbolOf(currencyCode);
   if (hide) return '$sym****';
   final sign = cents < 0 ? '-' : '';
-  return '$sign$sym${formatAmount(cents)}';
+  return '$sym$sign${formatAmount(cents.abs())}';
 }
 
 /// 双币显示（STORY-9.3）：原币 + 折算本位币。

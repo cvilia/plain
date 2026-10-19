@@ -1162,7 +1162,8 @@ class _BorrowForm extends StatelessWidget {
                 // 用实时金额，不写死数字
                 _ImpactRow(
                   label: s.thisAccount,
-                  value: (isOut ? '−' : '+') + formatAmountYuan(_previewCents(state)),
+                  // 符号跟在货币符号之后：`¥−30.00` / `¥+30.00`
+                  value: '¥${isOut ? '−' : '+'}${formatAmount(_previewCents(state))}',
                   bold: true,
                 ),
                 _ImpactRow(label: s.counterpartyRowLabel, value: s.counterpartyRecordOnly, bold: true),
@@ -1316,12 +1317,12 @@ class _TransferForm extends ConsumerWidget {
                 const SizedBox(height: 10),
                 _ImpactRow(
                   label: s.fromAccountLabel,
-                  value: '−${formatAmountYuan(_previewCents(state))}',
+                  value: '¥−${formatAmount(_previewCents(state))}',
                   bold: true,
                 ),
                 _ImpactRow(
                   label: s.toAccountLabel,
-                  value: '+${formatAmountYuan(_previewCents(state))}',
+                  value: '¥+${formatAmount(_previewCents(state))}',
                   bold: true,
                 ),
                 // 转账只在自己账户之间搬，净资产确实不变

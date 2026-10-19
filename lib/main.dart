@@ -16,6 +16,7 @@ import 'package:plain/app/settings/locale_prefs.dart';
 import 'package:plain/app/theme/theme_prefs.dart';
 import 'package:plain/app/theme/theme_resolver.dart';
 import 'package:plain/core/id/uuid_v7.dart';
+import 'package:plain/core/logging/startup_trace.dart';
 import 'package:plain/core/refresh/data_invalidation.dart';
 import 'package:plain/data/db/database.dart';
 import 'package:plain/data/platform/legacy_dir_cleanup.dart';
@@ -29,6 +30,8 @@ import 'package:plain/features/settings/onboarding_page.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  StartupTrace.installSlowFrameLogger();
+  StartupTrace.mark('main.enter');
 
   // Theme prefs must be known before first frame (§5.2). Failure → defaults.
   await preloadThemePrefs();
@@ -36,6 +39,7 @@ Future<void> main() async {
   await preloadLanguagePrefs();
   final appLock = await AppLockPrefs.load();
   final onboardPending = await isOnboardingPending();
+  StartupTrace.mark('prefs.loaded');
 
   AppDatabase? db;
   AppDependencies? deps;
@@ -43,8 +47,10 @@ Future<void> main() async {
   try {
     // Startup: at most 2 awaits (DB handle + device meta). See 04-8.2.
     db = await AppDatabase.open();
+    StartupTrace.mark('db.opened');
     final meta = await ensureDeviceMeta(db, UuidV7());
     deps = buildDependencies(db: db, deviceId: meta.deviceId, bookId: meta.bookId);
+    StartupTrace.mark('deps.built');
 
     // 种子延后到首帧之后，不阻塞启动（幂等，仅空表时写入）。
   } catch (e, stack) {
@@ -72,11 +78,13 @@ Future<void> main() async {
       child: PlainApp(showOnboarding: onboardPending, appLockInitiallyEnabled: appLock.isConfigured),
     ),
   );
+  StartupTrace.mark('runApp');
   // 08-§8 巡检 + 06-C3 change_log GC 不阻塞首帧，空闲后再跑。
   // 首帧后补种子（幂等），不挡启动
   final dbRef = db;
   final depsRef = deps;
   WidgetsBinding.instance.addPostFrameCallback((_) async {
+    StartupTrace.mark('firstFrame');
     try {
       // ignore: unnecessary_null_comparison
       if (dbRef != null && depsRef != null) {

@@ -188,6 +188,8 @@ class _AccountsBody extends ConsumerWidget {
                   cents: totalAssets + totalDebts,
                   fontSize: 34,
                   integerWeight: FontWeight.w700,
+                  // 净资产是结余类：正 `¥+1,786.00` / 负 `¥-1,786.00`
+                  showValueSign: true,
                 ),
                 const SizedBox(height: 14),
                 Row(

@@ -20,6 +20,7 @@ import 'package:plain/features/family/family_page.dart';
 import 'package:plain/features/settings/achievements_page.dart';
 import 'package:plain/features/settings/action_log_page.dart';
 import 'package:plain/features/settings/currency_rate_page.dart';
+import 'package:plain/features/settings/debug_log_page.dart';
 import 'package:plain/features/settings/home_layout_page.dart';
 import 'package:plain/features/settings/privacy_policy_page.dart';
 
@@ -119,6 +120,13 @@ class MoreSettingsPage extends ConsumerWidget {
                 title: s.privacyPledge,
                 showChevron: true,
                 onTap: () => _open(context, const PrivacyPolicyPage()),
+              ),
+              // 诊断日志：读进程内环形缓冲。放在「关于」是因为它跟版本号一样
+              // 属于「出问题时才来看」的信息，不占主流程入口。
+              PlainRow(
+                title: s.debugLog,
+                showChevron: true,
+                onTap: () => _open(context, const DebugLogPage()),
               ),
               // 版本号从构建元数据（pubspec `version: 2.0.0+5`）实时读取，
               // 不再硬编码 —— 以前写死 'V1.0.0'，升版后页面不跟着变。

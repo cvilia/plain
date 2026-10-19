@@ -428,4 +428,18 @@ extension SettingsBStrings on AppStrings {
   String get budgetNote2A => isZh ? '进度条三级着色与「是否响铃通知」绑定（G-3）： ' : 'The progress bar\'s three-level coloring is tied to "whether it rings" (G-3): ';
   String get budgetNote2B => isZh ? '90% 静默提醒、100% 响铃通知' : 'silent at 90%, rings at 100%';
   String get budgetNote2C => isZh ? '，但两者都不阻挡你继续记账。' : ', but neither stops you from tracking.';
+
+  // ─────────────────────── debug_log_page.dart ───────────────────────
+  String get debugLog => isZh ? '诊断日志' : 'Diagnostic log';
+  String get debugLogSubtitle => isZh ? '最近的运行事件（仅本次启动）' : 'Recent runtime events (this session only)';
+  String get debugLogClear => isZh ? '清空' : 'Clear';
+  String get debugLogLevelAll => isZh ? '全部' : 'All';
+  String get debugLogLevelInfo => isZh ? '普通+' : 'Info+';
+  String get debugLogLevelWarn => isZh ? '警告+' : 'Warn+';
+  String get debugLogLevelError => isZh ? '错误' : 'Errors';
+  String debugLogCount(int n) => isZh ? '$n 条事件' : '$n events';
+  String get debugLogEmptyTitle => isZh ? '还没有日志' : 'No events yet';
+  String get debugLogEmptySubtitle => isZh
+      ? '在应用里记一笔、删一笔，或切换页面后再回来'
+      : 'Save an entry, delete one, or switch pages, then come back';
 }

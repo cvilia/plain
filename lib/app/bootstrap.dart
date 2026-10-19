@@ -1,6 +1,7 @@
 /// Bootstrap and dependency wiring. See 04-8.2, 06-B1.
 library;
 
+import 'package:flutter/foundation.dart' show kReleaseMode;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:plain/core/id/uuid_v7.dart';
 import 'package:plain/core/logging/app_log.dart';
@@ -46,7 +47,7 @@ import 'package:plain/app/l10n/app_strings.dart';
 
 class AppDependencies {
   const AppDependencies({
-    required this.db, required this.clock, required this.log, required this.idGen,
+    required this.db, required this.clock, required this.log, required this.logBuffer, required this.idGen,
     required this.ledgerRepository, required this.categoryRepository,
     required this.accountRepository, required this.budgetRepository, required this.recurringRepository,
     required this.automationRuleRepository,
@@ -82,6 +83,9 @@ class AppDependencies {
   final AppStrings strings;
   final Clock clock;
   final AppLog log;
+
+  /// 进程内日志环形缓冲，供「诊断日志」页读取。与 [log] 共用同一个实例。
+  final RingBufferSink logBuffer;
   final UuidV7 idGen;
   final LedgerRepository ledgerRepository;
   final CategoryRepository categoryRepository;
@@ -132,6 +136,7 @@ final appDependenciesProvider = Provider<AppDependencies>((ref) {
 
 final clockProvider = Provider<Clock>((ref) => ref.watch(appDependenciesProvider).clock);
 final logProvider = Provider<AppLog>((ref) => ref.watch(appDependenciesProvider).log);
+final logBufferProvider = Provider<RingBufferSink>((ref) => ref.watch(appDependenciesProvider).logBuffer);
 final ledgerRepositoryProvider = Provider<LedgerRepository>((ref) => ref.watch(appDependenciesProvider).ledgerRepository);
 final categoryRepositoryProvider = Provider<CategoryRepository>((ref) => ref.watch(appDependenciesProvider).categoryRepository);
 final budgetRepositoryProvider = Provider<BudgetRepository>((ref) => ref.watch(appDependenciesProvider).budgetRepository);
@@ -361,7 +366,13 @@ AppDependencies buildDependencies({
   required AppDatabase db, required String deviceId, required String bookId, Clock? clock,
 }) {
   final effectiveClock = clock ?? SystemClock();
-  final log = AppLog(sink: RingBufferSink());
+  // 两个出口：环形缓冲留给「诊断日志」页，控制台出口供 `flutter run` 直接看。
+  // release 包只留 warn 以上，避免 debug 噪声拖慢启动（06-A1 分级门禁）。
+  final logBuffer = RingBufferSink();
+  final log = AppLog(
+    sink: MultiSink(<LogSink>[logBuffer, const ConsoleSink()]),
+    minLevel: kReleaseMode ? LogLevel.warn : LogLevel.debug,
+  );
   final idGen = UuidV7();
   final changeLogWriter = ChangeLogWriter(db, clock: effectiveClock);
   final changeLogRepo = ChangeLogRepository(db);
@@ -450,7 +461,7 @@ AppDependencies buildDependencies({
   );
   _registerSyncedMetaWriter(db, changeLogWriter, deviceId);
   return AppDependencies(
-    db: db, clock: effectiveClock, log: log, idGen: idGen,
+    db: db, clock: effectiveClock, log: log, logBuffer: logBuffer, idGen: idGen,
     ledgerRepository: ledgerRepo, categoryRepository: categoryRepo, accountRepository: accountRepo,
     budgetRepository: budgetRepo, recurringRepository: recurringRepo,
     automationRuleRepository: ruleRepo,

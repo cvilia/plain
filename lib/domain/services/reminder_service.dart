@@ -644,8 +644,9 @@ class ReminderService {
     return DateTime(today.year, today.month + 1, d);
   }
 
+  // 负号在货币符号之后（`¥-12.50`），与 formatAmountYuan 同一口径。
   static String _yuan(int cents) =>
-      '${cents < 0 ? '-' : ''}¥${(cents.abs() / 100).toStringAsFixed(2)}';
+      '¥${cents < 0 ? '-' : ''}${(cents.abs() / 100).toStringAsFixed(2)}';
 }
 
 /// 分类索引：id → 名称、id → 所属一级分类。

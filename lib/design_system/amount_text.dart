@@ -147,10 +147,21 @@ class _AmountWithCurrencyState extends ConsumerState<AmountWithCurrency> {
   Widget build(BuildContext context) {
     final hideAmounts = ref.watch(hideAmountsProvider);
     final isHidden = hideAmounts && !_revealed;
-    final text = formatAmountYuan(widget.cents, hide: isHidden);
-    final sign = widget.showSign
-        ? (widget.isExpense ? '-' : widget.isIncome ? '+' : '')
-        : '';
+    final valueNeg = widget.cents < 0;
+    // 符号统一排在货币符号之后（`¥-12.50` / `¥+12.50`）；隐藏金额时不显示符号。
+    final String mark;
+    if (isHidden) {
+      mark = '';
+    } else if (valueNeg) {
+      mark = '-';
+    } else if (widget.showSign) {
+      mark = widget.isExpense ? '-' : (widget.isIncome ? '+' : '');
+    } else {
+      mark = '';
+    }
+    final display = isHidden
+        ? '¥****'
+        : '¥$mark${formatAmount(widget.cents.abs())}';
 
     final displayColor = widget.color ??
         (widget.isExpense
@@ -162,7 +173,7 @@ class _AmountWithCurrencyState extends ConsumerState<AmountWithCurrency> {
     return GestureDetector(
       onTap: _toggleReveal,
       child: Text(
-        '$sign$text',
+        display,
         style: TextStyle(
           fontSize: widget.fontSize,
           // ⚠️ 不写 height 会静默继承 DefaultTextStyle（见 amountLineHeight）。

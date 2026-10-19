@@ -16,6 +16,7 @@ import 'package:plain/app/l10n/strings_reports.dart';
 import 'package:plain/app/settings/ledger_settings.dart';
 import 'package:plain/app/theme/app_colors.dart';
 import 'package:plain/app/theme/design_tokens.dart';
+import 'package:plain/app/theme/typography.dart';
 import 'package:plain/core/format/amount_formatter.dart';
 import 'package:plain/design_system/amount_display.dart';
 import 'package:plain/design_system/app_empty_state.dart';
@@ -673,19 +674,33 @@ class _Matrix extends StatelessWidget {
     final colors = context.colors;
     return InkWell(
       onTap: cell == null ? null : () => onCellTap(rowKey, colKey),
-      child: Container(
+      // 固定行高 + Center：金额与行标签垂直居中；热力色块不再铺满整格，
+      // 改成一块内缩的圆角「色片」，上下左右都留空隙。
+      child: SizedBox(
         width: _colWidth,
-        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
-        color: heat <= 0
-            ? null
-            : colors.primary.withValues(alpha: 0.06 + 0.34 * heat),
-        child: Text(
-          cell == null ? '—' : formatAmountYuan(cell.cents),
-          textAlign: TextAlign.right,
-          style: TextStyle(
-            fontSize: 12,
-            fontWeight: cell == null ? FontWeight.w400 : FontWeight.w600,
-            color: cell == null ? colors.inkFaint : colors.ink,
+        height: 40,
+        child: Center(
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: heat <= 0
+                  ? null
+                  : colors.primary.withValues(alpha: 0.06 + 0.34 * heat),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+              child: Text(
+                cell == null ? '—' : formatAmountYuan(cell.cents),
+                textAlign: TextAlign.right,
+                style: TextStyle(
+                  fontSize: 12,
+                  height: designLineHeight(12),
+                  fontWeight:
+                      cell == null ? FontWeight.w400 : FontWeight.w600,
+                  color: cell == null ? colors.inkFaint : colors.ink,
+                ),
+              ),
+            ),
           ),
         ),
       ),

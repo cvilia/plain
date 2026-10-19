@@ -409,6 +409,8 @@ class _Hero extends ConsumerWidget {
                 // 设计：结余用 ink，不因正负变色
                 color: colors.ink,
                 decorationColor: colors.inkTertiary,
+                // 结余要一眼看出正负：`¥+3,842.00` / `¥-3,842.00`
+                showValueSign: true,
               ),
             ),
           ),
@@ -423,9 +425,10 @@ class _Hero extends ConsumerWidget {
                   label: s.expense,
                   cents: expense,
                   hide: hideAmounts,
-                  // 设计：支出 ink，无 − 号
+                  // 设计：支出 ink；符号跟在货币符之后（`¥-3,842.00`）
                   color: colors.ink,
-                  showSign: false,
+                  showSign: true,
+                  isExpense: true,
                 ),
                 _Split(
                   label: s.income,
@@ -480,6 +483,7 @@ class _Split extends StatelessWidget {
     required this.hide,
     required this.color,
     this.showSign = false,
+    this.isExpense = false,
     this.isIncome = false,
   });
 
@@ -488,6 +492,7 @@ class _Split extends StatelessWidget {
   final bool hide;
   final Color color;
   final bool showSign;
+  final bool isExpense;
   final bool isIncome;
 
   @override
@@ -517,6 +522,7 @@ class _Split extends StatelessWidget {
           // 支出那份是墨色 + cur/dec muted —— 两者都由 AmountDisplay 自己判，
           // 硬塞一个灰色会把收入的小数位也染灰。
           showSign: showSign,
+          isExpense: isExpense,
           isIncome: isIncome,
         ),
       ],

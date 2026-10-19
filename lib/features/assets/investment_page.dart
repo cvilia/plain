@@ -581,8 +581,9 @@ class _Split extends StatelessWidget {
                 color: colors.inkTertiary)),
         const SizedBox(height: 4),
         Text(
+          // 正号也在货币符号之后：`¥+2,000.00`，不是 `+¥2,000.00`
           showSign && amountCents > 0
-              ? '+${formatAmountYuan(amountCents)}'
+              ? '¥+${formatAmount(amountCents)}'
               : formatAmountYuan(amountCents),
           style: TextStyle(
             fontSize: 15,
@@ -640,7 +641,8 @@ class _HoldingRow extends StatelessWidget {
               ),
               Text(
                 h.hasPrice
-                    ? '${pnl >= 0 ? '+' : ''}${formatAmountYuan(pnl)}'
+                    // 正号在货币符号之后：`¥+120.00` / `¥-80.00`
+                    ? '¥${pnl >= 0 ? '+' : '-'}${formatAmount(pnl.abs())}'
                     : s.noPrice,
                 style: TextStyle(
                   fontSize: 12,

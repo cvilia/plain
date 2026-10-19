@@ -27,6 +27,15 @@ class LedgerRepositoryImpl implements LedgerRepository {
   final Clock _clock;
   final AppLog? _log;
 
+  /// 仓储异常的统一出口：**日志拿全量（异常对象 + 堆栈），返回值只暴露 code**。
+  ///
+  /// 以前每个 catch 都直接 `err(StorageFailure(code, e.toString()))`，异常和堆栈在
+  /// 这一层就地蒸发，UI 只拿到一个 code —— 线上排查等于从零开始。
+  Result<T> _dbFailure<T>(String code, Object error, StackTrace stack) {
+    _log?.exception(code, error, stack);
+    return err<T>(StorageFailure(code, error.toString(), isRetryable: true));
+  }
+
   @override
   Future<Result<LedgerEntry>> create(LedgerEntry entry) async {
     try {
@@ -42,8 +51,8 @@ class LedgerRepositoryImpl implements LedgerRepository {
       });
       _log?.entrySaved(entryType: entry.type.wire, source: entry.source.wire);
       return ok(entry);
-    } on Object catch (e) {
-      return err(StorageFailure('db.insert_failed', e.toString(), isRetryable: true));
+    } on Object catch (e, st) {
+      return _dbFailure('db.insert_failed', e, st);
     }
   }
 
@@ -65,8 +74,8 @@ class LedgerRepositoryImpl implements LedgerRepository {
         );
       });
       return ok(entry);
-    } on Object catch (e) {
-      return err(StorageFailure('db.update_failed', e.toString(), isRetryable: true));
+    } on Object catch (e, st) {
+      return _dbFailure('db.update_failed', e, st);
     }
   }
 
@@ -88,8 +97,8 @@ class LedgerRepositoryImpl implements LedgerRepository {
         );
       });
       return ok(null);
-    } on Object catch (e) {
-      return err(StorageFailure('db.delete_failed', e.toString(), isRetryable: true));
+    } on Object catch (e, st) {
+      return _dbFailure('db.delete_failed', e, st);
     }
   }
 
@@ -140,8 +149,8 @@ class LedgerRepositoryImpl implements LedgerRepository {
           ? EntryCursor(occurredAtMs: items.last.occurredAt.millisecondsSinceEpoch, id: items.last.id)
           : null;
       return ok(EntryPage(items: items, nextCursor: nextCursor, hasMore: hasMore));
-    } on Object catch (e) {
-      return err(StorageFailure('db.query_failed', e.toString(), isRetryable: true));
+    } on Object catch (e, st) {
+      return _dbFailure('db.query_failed', e, st);
     }
   }
 
@@ -162,8 +171,8 @@ class LedgerRepositoryImpl implements LedgerRepository {
         byCat[r['category_id']! as String] = CategoryAgg(expenseCents: exp, incomeCents: inc, txCount: cnt);
       }
       return ok(MonthSummary(expenseCents: expense, incomeCents: income, txCount: count, byCategory: byCat));
-    } on Object catch (e) {
-      return err(StorageFailure('db.query_failed', e.toString(), isRetryable: true));
+    } on Object catch (e, st) {
+      return _dbFailure('db.query_failed', e, st);
     }
   }
 
@@ -194,8 +203,8 @@ class LedgerRepositoryImpl implements LedgerRepository {
             incomeCents: (r['inc'] as int?) ?? 0,
           ),
       ]);
-    } on Object catch (e) {
-      return err(StorageFailure('db.query_failed', e.toString(), isRetryable: true));
+    } on Object catch (e, st) {
+      return _dbFailure('db.query_failed', e, st);
     }
   }
 
@@ -226,8 +235,8 @@ class LedgerRepositoryImpl implements LedgerRepository {
         }
       });
       return ok(null);
-    } on Object catch (e) {
-      return err(StorageFailure('db.sync_apply_failed', e.toString(), isRetryable: true));
+    } on Object catch (e, st) {
+      return _dbFailure('db.sync_apply_failed', e, st);
     }
   }
 
@@ -240,8 +249,8 @@ class LedgerRepositoryImpl implements LedgerRepository {
         'AND $_statsRowPredicate',
         [bookId, fromMs, toMs]);
       return ok((rows.first['m'] as int?) ?? 0);
-    } on Object catch (e) {
-      return err(StorageFailure('db.query_failed', e.toString(), isRetryable: true));
+    } on Object catch (e, st) {
+      return _dbFailure('db.query_failed', e, st);
     }
   }
 
@@ -255,8 +264,8 @@ class LedgerRepositoryImpl implements LedgerRepository {
       final rows = _db.raw.select(
         'SELECT * FROM transactions WHERE $where ORDER BY deleted_at DESC, id DESC LIMIT ?', args);
       return ok(rows.map(_fromRow).toList());
-    } on Object catch (e) {
-      return err(StorageFailure('db.query_failed', e.toString(), isRetryable: true));
+    } on Object catch (e, st) {
+      return _dbFailure('db.query_failed', e, st);
     }
   }
 
@@ -282,8 +291,8 @@ class LedgerRepositoryImpl implements LedgerRepository {
         );
       });
       return ok(restored);
-    } on Object catch (e) {
-      return err(StorageFailure('db.restore_failed', e.toString(), isRetryable: true));
+    } on Object catch (e, st) {
+      return _dbFailure('db.restore_failed', e, st);
     }
   }
 
@@ -307,8 +316,8 @@ class LedgerRepositoryImpl implements LedgerRepository {
         );
       });
       return ok(null);
-    } on Object catch (e) {
-      return err(StorageFailure('db.hard_delete_failed', e.toString(), isRetryable: true));
+    } on Object catch (e, st) {
+      return _dbFailure('db.hard_delete_failed', e, st);
     }
   }
 
@@ -342,8 +351,8 @@ class LedgerRepositoryImpl implements LedgerRepository {
         }
       });
       return ok(count);
-    } on Object catch (e) {
-      return err(StorageFailure('db.purge_failed', e.toString(), isRetryable: true));
+    } on Object catch (e, st) {
+      return _dbFailure('db.purge_failed', e, st);
     }
   }
 
@@ -363,8 +372,8 @@ class LedgerRepositoryImpl implements LedgerRepository {
         result.add('$dayKey|$cents|${note ?? ''}');
       }
       return ok(result);
-    } on Object catch (e) {
-      return err(StorageFailure('db.query_failed', e.toString(), isRetryable: true));
+    } on Object catch (e, st) {
+      return _dbFailure('db.query_failed', e, st);
     }
   }
 
@@ -380,8 +389,8 @@ class LedgerRepositoryImpl implements LedgerRepository {
       final a = (tx.first['c'] as int?) ?? 0;
       final b = (stats.first['c'] as int?) ?? 0;
       return ok(a == b);
-    } on Object catch (e) {
-      return err(StorageFailure('db.query_failed', e.toString(), isRetryable: true));
+    } on Object catch (e, st) {
+      return _dbFailure('db.query_failed', e, st);
     }
   }
 
@@ -435,8 +444,8 @@ class LedgerRepositoryImpl implements LedgerRepository {
         );
       });
       return ok(null);
-    } on Object catch (e) {
-      return err(StorageFailure('db.rebuild_failed', e.toString(), isRetryable: true));
+    } on Object catch (e, st) {
+      return _dbFailure('db.rebuild_failed', e, st);
     }
   }
 
@@ -539,8 +548,8 @@ class LedgerRepositoryImpl implements LedgerRepository {
         }
       });
       return ok(old.length);
-    } on Object catch (e) {
-      return err(StorageFailure('db.undo_failed', e.toString(), isRetryable: true));
+    } on Object catch (e, st) {
+      return _dbFailure('db.undo_failed', e, st);
     }
   }
 

@@ -407,6 +407,8 @@ class _Hero extends StatelessWidget {
               cents: snapshot.netCents,
               fontSize: 34,
               integerWeight: FontWeight.w700,
+              // 净值为负时必须是 `¥-1,786.00`：以前这里会把负号吃掉
+              showValueSign: true,
             ),
           ),
           Row(children: [
@@ -516,14 +518,17 @@ class _TrendPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
-    final maxAbs = points
+    // 时间倒序：最近一个月在最上面。数据源是升序（旧→新），这里翻一次，
+    // 不要改 `monthlySeries` —— 别处（如趋势计算）依赖升序。
+    final rows = points.reversed.toList();
+    final maxAbs = rows
         .map((p) => p.netCents.abs())
         .fold<int>(1, (a, b) => a > b ? a : b);
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, Spacing.md, 16, Spacing.md),
       child: Column(
         children: [
-          for (final p in points)
+          for (final p in rows)
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 3),
               child: Row(children: [
