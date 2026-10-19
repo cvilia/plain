@@ -40,7 +40,7 @@ import 'package:plain/app/l10n/strings_settings_a.dart';
 // IF 商户 包含 且 金额
 // 地铁
 // ≤ 20
-// THEN 分类 → 交通 · 公交地铁
+// THEN 分类 → 交通 · 公交
 // 已命中 34 次
 // IF 金额
 // ≥ 500

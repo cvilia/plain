@@ -69,7 +69,7 @@ void main() {
     expect(names.contains('蔬果'), isFalse);
     expect(names.contains('午餐'), isTrue);
     expect(names.contains('正餐'), isFalse);
-    expect(names.contains('代付请客'), isTrue);
+    expect(names.contains('请客'), isTrue);
     expect(names.contains('聚餐'), isTrue);
     expect(names.contains('超市'), isFalse);
     final expLeaves = db.raw.select("SELECT c.name FROM categories c JOIN categories p ON c.parent_id = p.id WHERE c.kind = 'expense' AND c.deleted_at IS NULL");
@@ -77,7 +77,7 @@ void main() {
     expect(expLeaves.length, 146);
     expect(incLeaves.length, 44);
     final foodKids = db.raw.select("SELECT c.name FROM categories c JOIN categories p ON c.parent_id = p.id WHERE p.name = '餐饮' ORDER BY c.sort_order").map((r) => r['name']! as String).toList();
-    expect(foodKids, ['早餐', '午餐', '晚餐', '夜宵', '外卖', '咖啡奶茶', '零食', '聚餐']);
+    expect(foodKids, ['早餐', '午餐', '晚餐', '夜宵', '外卖', '饮品', '零食', '聚餐']);
     final presets = db.raw.select('SELECT note FROM categories WHERE is_preset = 1 AND deleted_at IS NULL');
     for (final r in presets) {
       final n = r['note'] as String?;

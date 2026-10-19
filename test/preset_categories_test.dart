@@ -80,6 +80,17 @@ void main() {
     check(presetIncomeCategories, '收入');
   });
 
+  test('二级名避开四字格（命名口径：书面术语，2/3/5 字）', () {
+    for (final tree in [presetExpenseCategories, presetIncomeCategories]) {
+      for (final top in tree) {
+        for (final child in top.children) {
+          expect(child.name.length, isNot(4),
+              reason: '${top.name} · ${child.name} 是四字格，改成 2/3 字或 5 字以上');
+        }
+      }
+    }
+  });
+
   test('分类 key 全局唯一，且「其他」垫底', () {
     final keys = <String>[];
     void walk(PresetCategory c) {

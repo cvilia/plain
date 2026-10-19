@@ -1,14 +1,16 @@
 /// Preset category seed data —— **本文件就是分类预设的唯一真值**。
 ///
-/// ## 设计口径（2026-10-19 第二版：边界优先）
+/// ## 设计口径（2026-10-19 第三版：命名书面化）
 ///
-/// 上一版为了「凑够 30 个」把同一件事拆成了两个一级（学习 / 书籍阅读、
-/// 餐饮 / 咖啡茶饮），并把「购物」当成了筐 —— 结果是一笔支出能放进三四个地方。
-/// 本版按**互斥**重排，规则只有三条：
+/// 前两版把同一件事拆成了两个一级（学习 / 书籍阅读、餐饮 / 咖啡茶饮），
+/// 并把「购物」当成了筐 —— 一笔支出能放进三四个地方。第二版按**互斥**重排，
+/// 规则三条：一个一级 = 一个生活场景；二级名整棵树唯一；每条 note 写清边界。
 ///
-/// 1. **一个一级 = 一个生活场景**，不按「商品 / 服务」拆同一个场景；
-/// 2. **二级名在整棵树里唯一**，跨一级也不许重名（测试会守）；
-/// 3. **每条 note 都写「什么算、什么不算」**，边界写在数据里，不靠记。
+/// 第三版只动**名字**（key 不变），把口语化的并列堆词改成书面术语：
+///
+/// - 二级名**不用四字格**（「咖啡奶茶」「公交地铁」这种凑字数的并列结构），
+///   一律收敛成 2～3 字的类目名，确实需要限定时用 5 字以上（如「提现转账费」）；
+/// - 名字是**类目名**，不是举例：举例进 note，不写进名字。
 ///
 /// 支出一级 30 个，每个都有专属图标、都有二级；收入一级 13 个，同样全员有二级。
 /// 二级不写 `iconRef`，**继承父级图标** —— 30 枚图标对应 30 个一级。
@@ -80,7 +82,7 @@ const List<PresetCategory> presetExpenseCategories = [
             note: '配送费、打包费一并算餐费'),
         PresetCategory(
             key: 'food_cafe',
-            name: '咖啡奶茶',
+            name: '饮品',
             kind: CategoryKind.expense,
             note: '现制饮品店：咖啡、奶茶、果茶、纯茶'),
         PresetCategory(
@@ -104,7 +106,7 @@ const List<PresetCategory> presetExpenseCategories = [
       children: [
         PresetCategory(
             key: 'fruit_veg',
-            name: '蔬菜菌菇',
+            name: '蔬菜',
             kind: CategoryKind.expense,
             note: '蔬菜、菌菇、豆制品'),
         PresetCategory(
@@ -119,14 +121,14 @@ const List<PresetCategory> presetExpenseCategories = [
             note: '猪牛羊肉、鸡鸭、蛋'),
         PresetCategory(
             key: 'fruit_seafood',
-            name: '水产海鲜',
+            name: '水产',
             kind: CategoryKind.expense,
-            note: '鱼虾蟹贝'),
+            note: '鱼虾蟹贝、海鲜'),
         PresetCategory(
             key: 'fruit_grain',
-            name: '米面粮油',
+            name: '粮油',
             kind: CategoryKind.expense,
-            note: '大米、面粉、食用油、杂粮'),
+            note: '大米、面粉、杂粮、食用油'),
         PresetCategory(
             key: 'fruit_sauce',
             name: '调味品',
@@ -134,9 +136,9 @@ const List<PresetCategory> presetExpenseCategories = [
             note: '盐糖酱醋、香料；保鲜膜等耗材记「日用」'),
         PresetCategory(
             key: 'fruit_frozen',
-            name: '速冻半成品',
+            name: '半成品',
             kind: CategoryKind.expense,
-            note: '速冻水饺、半成品菜'),
+            note: '速冻水饺、预制菜、半成品菜'),
       ]),
 
   // ───────────────────────── 住 ─────────────────────────
@@ -238,7 +240,7 @@ const List<PresetCategory> presetExpenseCategories = [
             note: '冰箱、洗衣机、空调、电视'),
         PresetCategory(
             key: 'home_decor',
-            name: '家饰绿植',
+            name: '软装',
             kind: CategoryKind.expense,
             note: '摆件、挂画、绿植花盆'),
       ]),
@@ -252,27 +254,27 @@ const List<PresetCategory> presetExpenseCategories = [
       children: [
         PresetCategory(
             key: 'daily_clean',
-            name: '清洁纸品',
+            name: '日化',
             kind: CategoryKind.expense,
             note: '纸巾、洗衣液、清洁剂、垃圾袋'),
         PresetCategory(
             key: 'daily_bath',
-            name: '沐浴洗护',
+            name: '个护',
             kind: CategoryKind.expense,
-            note: '洗发水、沐浴露、牙膏牙刷；脸上的护肤记「美妆护肤」'),
+            note: '洗发水、沐浴露、牙膏牙刷；护肤记「美妆护肤」'),
         PresetCategory(
             key: 'daily_kitchen',
-            name: '厨房耗材',
+            name: '耗材',
             kind: CategoryKind.expense,
             note: '保鲜膜、洗碗布、一次性餐具'),
         PresetCategory(
             key: 'daily_storage',
-            name: '收纳用品',
+            name: '收纳',
             kind: CategoryKind.expense,
             note: '收纳盒、衣架、挂钩'),
         PresetCategory(
             key: 'daily_battery',
-            name: '五金电池',
+            name: '五金',
             kind: CategoryKind.expense,
             note: '电池、灯泡、螺丝、胶带'),
       ]),
@@ -288,7 +290,7 @@ const List<PresetCategory> presetExpenseCategories = [
       children: [
         PresetCategory(
             key: 'transport_bus',
-            name: '公交地铁',
+            name: '公交',
             kind: CategoryKind.expense,
             note: '公交、地铁、轮渡'),
         PresetCategory(
@@ -298,7 +300,7 @@ const List<PresetCategory> presetExpenseCategories = [
             note: '网约车、出租车、顺风车'),
         PresetCategory(
             key: 'transport_train',
-            name: '火车高铁',
+            name: '铁路',
             kind: CategoryKind.expense,
             note: '火车、高铁、长途客运'),
         PresetCategory(
@@ -308,12 +310,12 @@ const List<PresetCategory> presetExpenseCategories = [
             note: '国内国际航班、机建燃油'),
         PresetCategory(
             key: 'transport_park',
-            name: '停车过路',
+            name: '通行费',
             kind: CategoryKind.expense,
             note: '停车费、高速过路费；违章罚款记「税费」'),
         PresetCategory(
             key: 'transport_bike',
-            name: '共享单车',
+            name: '单车',
             kind: CategoryKind.expense,
             note: '共享单车、共享电单车'),
         PresetCategory(
@@ -347,17 +349,17 @@ const List<PresetCategory> presetExpenseCategories = [
             note: '小保养、大保养、轮胎'),
         PresetCategory(
             key: 'auto_repair',
-            name: '维修',
+            name: '汽修',
             kind: CategoryKind.expense,
             note: '事故维修、换件、钣喷'),
         PresetCategory(
             key: 'auto_wash',
-            name: '洗车美容',
+            name: '洗车',
             kind: CategoryKind.expense,
             note: '洗车、打蜡、内饰清洁'),
         PresetCategory(
             key: 'auto_inspection',
-            name: '年检上牌',
+            name: '车务',
             kind: CategoryKind.expense,
             note: '年检、上牌、车船税'),
       ]),
@@ -373,7 +375,7 @@ const List<PresetCategory> presetExpenseCategories = [
       children: [
         PresetCategory(
             key: 'clothes_tops',
-            name: '上衣裤装',
+            name: '服装',
             kind: CategoryKind.expense,
             note: 'T 恤、衬衫、裤子、外套'),
         PresetCategory(
@@ -383,7 +385,7 @@ const List<PresetCategory> presetExpenseCategories = [
             note: '运动鞋、皮鞋、靴子'),
         PresetCategory(
             key: 'clothes_underwear',
-            name: '内衣袜品',
+            name: '内衣',
             kind: CategoryKind.expense,
             note: '内衣、袜子、家居服'),
         PresetCategory(
@@ -393,14 +395,14 @@ const List<PresetCategory> presetExpenseCategories = [
             note: '背包、行李箱、钱包'),
         PresetCategory(
             key: 'clothes_jewelry',
-            name: '首饰手表',
+            name: '首饰',
             kind: CategoryKind.expense,
             note: '项链、戒指、耳饰、腕表'),
         PresetCategory(
             key: 'clothes_tailor',
-            name: '改衣干洗',
+            name: '洗衣',
             kind: CategoryKind.expense,
-            note: '裁缝、改裤脚、干洗熨烫'),
+            note: '干洗、熨烫、改衣织补'),
       ]),
   // 10
   PresetCategory(
@@ -422,12 +424,12 @@ const List<PresetCategory> presetExpenseCategories = [
             note: '底妆、口红、眼妆'),
         PresetCategory(
             key: 'beauty_perfume',
-            name: '香水香氛',
+            name: '香水',
             kind: CategoryKind.expense,
             note: '香水、香薰、身体香氛'),
         PresetCategory(
             key: 'beauty_tools',
-            name: '美妆工具',
+            name: '刷具',
             kind: CategoryKind.expense,
             note: '化妆刷、美妆蛋、修眉刀'),
       ]),
@@ -441,9 +443,9 @@ const List<PresetCategory> presetExpenseCategories = [
       children: [
         PresetCategory(
             key: 'service_hair',
-            name: '剪发烫染',
+            name: '理发',
             kind: CategoryKind.expense,
-            note: '理发、烫发、染发、接发'),
+            note: '剪发、烫发、染发、接发'),
         PresetCategory(
             key: 'service_nail',
             name: '美甲',
@@ -451,7 +453,7 @@ const List<PresetCategory> presetExpenseCategories = [
             note: '美甲、美睫、手足护理'),
         PresetCategory(
             key: 'service_spa',
-            name: '美容 SPA',
+            name: 'SPA',
             kind: CategoryKind.expense,
             note: '面部护理、身体 SPA、按摩'),
         PresetCategory(
@@ -470,7 +472,7 @@ const List<PresetCategory> presetExpenseCategories = [
       children: [
         PresetCategory(
             key: 'digital_phone',
-            name: '手机平板',
+            name: '手机',
             kind: CategoryKind.expense,
             note: '手机整机、平板、手表'),
         PresetCategory(
@@ -480,17 +482,17 @@ const List<PresetCategory> presetExpenseCategories = [
             note: '笔记本、台式机、显示器'),
         PresetCategory(
             key: 'digital_accessory',
-            name: '数码配件',
+            name: '配件',
             kind: CategoryKind.expense,
-            note: '数据线、充电头、键鼠、耳机、音箱'),
+            note: '数据线、充电头、键鼠、音箱'),
         PresetCategory(
             key: 'digital_smart',
-            name: '智能设备',
+            name: '可穿戴',
             kind: CategoryKind.expense,
-            note: '手环、智能家居、无人机'),
+            note: '手环、手表、耳机；智能家居设备记「家居 · 家电」'),
         PresetCategory(
             key: 'digital_repair',
-            name: '数码维修',
+            name: '报修',
             kind: CategoryKind.expense,
             note: '换屏、换电池、数据恢复'),
       ]),
@@ -511,7 +513,7 @@ const List<PresetCategory> presetExpenseCategories = [
             note: '药店购药、常备药'),
         PresetCategory(
             key: 'medical_hospital',
-            name: '门诊住院',
+            name: '就诊',
             kind: CategoryKind.expense,
             note: '挂号、门诊、住院、手术'),
         PresetCategory(
@@ -531,7 +533,7 @@ const List<PresetCategory> presetExpenseCategories = [
             note: '近视镜、隐形眼镜、护理液'),
         PresetCategory(
             key: 'medical_care',
-            name: '康复理疗',
+            name: '康复',
             kind: CategoryKind.expense,
             note: '推拿、针灸、康复训练；保健品记「药品」'),
       ]),
@@ -555,7 +557,7 @@ const List<PresetCategory> presetExpenseCategories = [
             note: '综合意外、旅行意外'),
         PresetCategory(
             key: 'insurance_life',
-            name: '寿险重疾',
+            name: '寿险',
             kind: CategoryKind.expense,
             note: '定期寿险、重疾险'),
         PresetCategory(
@@ -574,7 +576,7 @@ const List<PresetCategory> presetExpenseCategories = [
       children: [
         PresetCategory(
             key: 'sport_gym',
-            name: '健身卡私教',
+            name: '会籍',
             kind: CategoryKind.expense,
             note: '年卡、月卡、私教课'),
         PresetCategory(
@@ -584,19 +586,19 @@ const List<PresetCategory> presetExpenseCategories = [
             note: '球场、泳池、攀岩馆门票'),
         PresetCategory(
             key: 'sport_gear',
-            name: '运动装备',
+            name: '器材',
             kind: CategoryKind.expense,
             note: '球拍、护具、泳镜、骑行装备'),
         PresetCategory(
             key: 'sport_course',
-            name: '运动课程',
+            name: '课程',
             kind: CategoryKind.expense,
             note: '游泳课、瑜伽课、滑雪课'),
         PresetCategory(
             key: 'sport_outdoor',
-            name: '户外运动',
+            name: '户外',
             kind: CategoryKind.expense,
-            note: '徒步、露营活动费；装备记「运动装备」'),
+            note: '徒步、露营活动费；装备记「器材」'),
       ]),
 
   // ───────────────────────── 成长 ─────────────────────────
@@ -610,22 +612,22 @@ const List<PresetCategory> presetExpenseCategories = [
       children: [
         PresetCategory(
             key: 'study_course',
-            name: '课程学费',
+            name: '学费',
             kind: CategoryKind.expense,
             note: '培训班、网课、学历教育'),
         PresetCategory(
             key: 'study_exam',
-            name: '考证报名',
+            name: '考证',
             kind: CategoryKind.expense,
             note: '资格证、语言考试、报名费'),
         PresetCategory(
             key: 'study_training',
-            name: '技能培训',
+            name: '实训',
             kind: CategoryKind.expense,
             note: '线下工作坊、企业内训'),
         PresetCategory(
             key: 'study_online',
-            name: '线上学习',
+            name: '网课',
             kind: CategoryKind.expense,
             note: '题库、学习平台会员；影视音乐会员记「订阅会员」'),
       ]),
@@ -654,7 +656,7 @@ const List<PresetCategory> presetExpenseCategories = [
             note: '有声书、播客付费节目'),
         PresetCategory(
             key: 'book_magazine',
-            name: '报刊杂志',
+            name: '报刊',
             kind: CategoryKind.expense,
             note: '期刊、报纸、年鉴'),
       ]),
@@ -675,7 +677,7 @@ const List<PresetCategory> presetExpenseCategories = [
             note: '电影票、影院卖品'),
         PresetCategory(
             key: 'ent_show',
-            name: '演出展览',
+            name: '演出',
             kind: CategoryKind.expense,
             note: '演唱会、话剧、音乐节、展览'),
         PresetCategory(
@@ -685,19 +687,19 @@ const List<PresetCategory> presetExpenseCategories = [
             note: 'KTV、Livehouse'),
         PresetCategory(
             key: 'ent_bar',
-            name: '酒吧夜店',
+            name: '酒吧',
             kind: CategoryKind.expense,
-            note: '酒吧、清吧、夜店；买酒回家记「其他 · 杂项支出」'),
+            note: '酒吧、清吧、夜店；买酒回家记「其他 · 杂项」'),
         PresetCategory(
             key: 'ent_boardgame',
-            name: '桌游密室',
+            name: '桌游',
             kind: CategoryKind.expense,
             note: '桌游、剧本杀、密室逃脱'),
         PresetCategory(
             key: 'ent_internet',
-            name: '网吧电竞',
+            name: '电竞',
             kind: CategoryKind.expense,
-            note: '网吧、电竞馆、台球厅'),
+            note: '网吧、电竞馆、电玩城'),
       ]),
   // 19
   PresetCategory(
@@ -709,22 +711,22 @@ const List<PresetCategory> presetExpenseCategories = [
       children: [
         PresetCategory(
             key: 'game_recharge',
-            name: '游戏充值',
+            name: '充值',
             kind: CategoryKind.expense,
             note: '点券、钻石、金币'),
         PresetCategory(
             key: 'game_sub',
-            name: '月卡通行证',
+            name: '通行证',
             kind: CategoryKind.expense,
-            note: '游戏内月卡、战令、通行证'),
+            note: '月卡、战令、赛季通行证'),
         PresetCategory(
             key: 'game_item',
-            name: '道具皮肤',
+            name: '道具',
             kind: CategoryKind.expense,
             note: '皮肤、道具、抽卡'),
         PresetCategory(
             key: 'game_console',
-            name: '主机卡带',
+            name: '主机',
             kind: CategoryKind.expense,
             note: '游戏主机、卡带、手柄'),
       ]),
@@ -743,7 +745,7 @@ const List<PresetCategory> presetExpenseCategories = [
             note: '酒店、民宿、青旅'),
         PresetCategory(
             key: 'travel_ticket',
-            name: '景点门票',
+            name: '门票',
             kind: CategoryKind.expense,
             note: '景区、乐园、博物馆门票'),
         PresetCategory(
@@ -753,14 +755,14 @@ const List<PresetCategory> presetExpenseCategories = [
             note: '旅行团、机酒套餐'),
         PresetCategory(
             key: 'travel_visa',
-            name: '签证证件',
+            name: '签证',
             kind: CategoryKind.expense,
             note: '签证、通行证、护照'),
         PresetCategory(
             key: 'travel_camping',
-            name: '露营营地',
+            name: '露营',
             kind: CategoryKind.expense,
-            note: '营地费、营位预订；装备记「运动装备」'),
+            note: '营地费、营位预订；装备记「器材」'),
       ]),
   // 21
   PresetCategory(
@@ -772,14 +774,14 @@ const List<PresetCategory> presetExpenseCategories = [
       children: [
         PresetCategory(
             key: 'sub_video',
-            name: '视频会员',
+            name: '影音',
             kind: CategoryKind.expense,
             note: '长视频、影视平台、电视端会员'),
         PresetCategory(
             key: 'sub_music',
-            name: '音乐会员',
+            name: '音乐',
             kind: CategoryKind.expense,
-            note: '音乐、播客、有声书平台'),
+            note: '音乐、播客平台'),
         PresetCategory(
             key: 'sub_cloud',
             name: '云存储',
@@ -787,7 +789,7 @@ const List<PresetCategory> presetExpenseCategories = [
             note: '网盘、相册扩容、备份服务'),
         PresetCategory(
             key: 'sub_software',
-            name: '软件订阅',
+            name: '软件',
             kind: CategoryKind.expense,
             note: '工具类 App、设计软件、办公套件'),
       ]),
@@ -803,12 +805,12 @@ const List<PresetCategory> presetExpenseCategories = [
       children: [
         PresetCategory(
             key: 'telecom_phone',
-            name: '话费套餐',
+            name: '话费',
             kind: CategoryKind.expense,
             note: '手机月租、套餐费'),
         PresetCategory(
             key: 'telecom_net',
-            name: '宽带网费',
+            name: '宽带',
             kind: CategoryKind.expense,
             note: '家庭宽带、随身 WiFi'),
         PresetCategory(
@@ -818,7 +820,7 @@ const List<PresetCategory> presetExpenseCategories = [
             note: '流量加油包、日租卡'),
         PresetCategory(
             key: 'telecom_tv',
-            name: '有线电视',
+            name: '收视费',
             kind: CategoryKind.expense,
             note: '广电基本收视费；点播会员记「订阅会员」'),
       ]),
@@ -832,22 +834,22 @@ const List<PresetCategory> presetExpenseCategories = [
       children: [
         PresetCategory(
             key: 'office_supplies',
-            name: '办公用品',
+            name: '文具',
             kind: CategoryKind.expense,
             note: '文具、纸张、打印耗材'),
         PresetCategory(
             key: 'office_print',
-            name: '打印复印',
+            name: '文印',
             kind: CategoryKind.expense,
             note: '打印、复印、装订'),
         PresetCategory(
             key: 'office_shipping',
-            name: '快递物流',
+            name: '快递',
             kind: CategoryKind.expense,
             note: '寄件、退货运费、同城配送'),
         PresetCategory(
             key: 'office_card',
-            name: '名片工牌',
+            name: '物料',
             kind: CategoryKind.expense,
             note: '名片、工牌、宣传物料'),
       ]),
@@ -863,22 +865,22 @@ const List<PresetCategory> presetExpenseCategories = [
       children: [
         PresetCategory(
             key: 'house_clean',
-            name: '日常保洁',
+            name: '保洁',
             kind: CategoryKind.expense,
-            note: '钟点工、定期保洁'),
+            note: '定期保洁、退租清洁'),
         PresetCategory(
             key: 'house_deepclean',
-            name: '深度保洁',
+            name: '开荒',
             kind: CategoryKind.expense,
             note: '开荒保洁、除螨、消毒'),
         PresetCategory(
             key: 'house_appliance_clean',
-            name: '家电清洗',
+            name: '清洗',
             kind: CategoryKind.expense,
             note: '油烟机、空调、洗衣机清洗'),
         PresetCategory(
             key: 'house_repair',
-            name: '上门维修',
+            name: '维修',
             kind: CategoryKind.expense,
             note: '水电、门窗、管道维修；数码产品记「数码」'),
         PresetCategory(
@@ -897,27 +899,27 @@ const List<PresetCategory> presetExpenseCategories = [
       children: [
         PresetCategory(
             key: 'baby_food',
-            name: '奶粉辅食',
+            name: '喂养',
             kind: CategoryKind.expense,
             note: '奶粉、米粉、辅食'),
         PresetCategory(
             key: 'baby_diaper',
-            name: '纸尿裤湿巾',
+            name: '纸尿裤',
             kind: CategoryKind.expense,
             note: '纸尿裤、拉拉裤、湿巾'),
         PresetCategory(
             key: 'baby_clothes',
-            name: '童装童鞋',
+            name: '童装',
             kind: CategoryKind.expense,
             note: '孩子的衣服、鞋袜'),
         PresetCategory(
             key: 'baby_toy',
-            name: '玩具绘本',
+            name: '玩具',
             kind: CategoryKind.expense,
             note: '玩具、绘本、早教玩具；课程记「教育培训」'),
         PresetCategory(
             key: 'baby_care',
-            name: '托育保姆',
+            name: '托育',
             kind: CategoryKind.expense,
             note: '托班、月嫂、育儿嫂'),
       ]),
@@ -931,22 +933,22 @@ const List<PresetCategory> presetExpenseCategories = [
       children: [
         PresetCategory(
             key: 'pet_food',
-            name: '主粮零食',
+            name: '主粮',
             kind: CategoryKind.expense,
             note: '主粮、罐头、冻干'),
         PresetCategory(
             key: 'pet_vet',
-            name: '医疗疫苗',
+            name: '诊疗',
             kind: CategoryKind.expense,
             note: '看病、疫苗、驱虫、绝育'),
         PresetCategory(
             key: 'pet_grooming',
-            name: '洗护寄养',
+            name: '洗护',
             kind: CategoryKind.expense,
             note: '洗澡、剪毛、寄养、遛狗'),
         PresetCategory(
             key: 'pet_supplies',
-            name: '用品玩具',
+            name: '用品',
             kind: CategoryKind.expense,
             note: '猫砂、牵引绳、窝、玩具'),
       ]),
@@ -965,22 +967,22 @@ const List<PresetCategory> presetExpenseCategories = [
             note: '送出去的礼物、伴手礼'),
         PresetCategory(
             key: 'social_red',
-            name: '红包份子',
+            name: '随礼',
             kind: CategoryKind.expense,
             note: '份子钱、压岁钱、微信红包'),
         PresetCategory(
             key: 'social_party',
-            name: '代付请客',
+            name: '请客',
             kind: CategoryKind.expense,
             note: '替别人付的账、请客送礼'),
         PresetCategory(
             key: 'social_elder',
-            name: '孝敬长辈',
+            name: '赡养',
             kind: CategoryKind.expense,
             note: '给父母的生活费、礼品'),
         PresetCategory(
             key: 'social_donate',
-            name: '公益捐赠',
+            name: '捐赠',
             kind: CategoryKind.expense,
             note: '捐款、义卖、众筹'),
       ]),
@@ -1006,9 +1008,9 @@ const List<PresetCategory> presetExpenseCategories = [
             note: '车船税、车辆购置税'),
         PresetCategory(
             key: 'tax_property',
-            name: '房产税费',
+            name: '房产税',
             kind: CategoryKind.expense,
-            note: '契税、房产税'),
+            note: '契税、房产税等相关税费'),
         PresetCategory(
             key: 'tax_fine',
             name: '罚没滞纳金',
@@ -1035,12 +1037,12 @@ const List<PresetCategory> presetExpenseCategories = [
             note: '电商、外卖、票务平台佣金'),
         PresetCategory(
             key: 'fee_interest',
-            name: '利息支出',
+            name: '利息',
             kind: CategoryKind.expense,
             note: '信用卡分期、消费贷利息'),
         PresetCategory(
             key: 'fee_annual',
-            name: '账户年费',
+            name: '年费',
             kind: CategoryKind.expense,
             note: '银行卡年费、账户管理费'),
       ]),
@@ -1054,7 +1056,7 @@ const List<PresetCategory> presetExpenseCategories = [
       children: [
         PresetCategory(
             key: 'other_misc',
-            name: '杂项支出',
+            name: '杂项',
             kind: CategoryKind.expense,
             note: '说不清归哪类的小额支出'),
         PresetCategory(
@@ -1082,7 +1084,7 @@ const List<PresetCategory> presetIncomeCategories = [
       children: [
         PresetCategory(
             key: 'income_base',
-            name: '基本工资',
+            name: '月薪',
             kind: CategoryKind.income,
             note: '税后到手的基本薪酬'),
         PresetCategory(
@@ -1097,7 +1099,7 @@ const List<PresetCategory> presetIncomeCategories = [
             note: '月度全勤、考勤奖励'),
         PresetCategory(
             key: 'income_performance',
-            name: '绩效工资',
+            name: '绩效',
             kind: CategoryKind.income,
             note: '月度/季度绩效'),
       ]),
@@ -1125,7 +1127,7 @@ const List<PresetCategory> presetIncomeCategories = [
             note: '销售提成、业务提成'),
         PresetCategory(
             key: 'income_contest',
-            name: '评优奖励',
+            name: '评优',
             kind: CategoryKind.income,
             note: '公司内部评优、优秀员工'),
       ]),
@@ -1143,7 +1145,7 @@ const List<PresetCategory> presetIncomeCategories = [
             note: '存款、货币基金利息'),
         PresetCategory(
             key: 'income_invest_return',
-            name: '投资理财收益',
+            name: '投资',
             kind: CategoryKind.income,
             note: '基金、股票、理财赎回的已实现收益'),
         PresetCategory(
@@ -1161,22 +1163,22 @@ const List<PresetCategory> presetIncomeCategories = [
       children: [
         PresetCategory(
             key: 'income_royalty',
-            name: '稿费版权',
+            name: '稿费',
             kind: CategoryKind.income,
             note: '稿酬、版权、课程分成'),
         PresetCategory(
             key: 'income_freelance',
-            name: '外包接单',
+            name: '外包',
             kind: CategoryKind.income,
             note: '设计、开发、咨询等私活'),
         PresetCategory(
             key: 'income_tutoring',
-            name: '家教辅导',
+            name: '家教',
             kind: CategoryKind.income,
             note: '家教、代课、课后辅导'),
         PresetCategory(
             key: 'income_streaming',
-            name: '直播打赏',
+            name: '直播',
             kind: CategoryKind.income,
             note: '直播、自媒体打赏分成'),
       ]),
@@ -1189,17 +1191,17 @@ const List<PresetCategory> presetIncomeCategories = [
       children: [
         PresetCategory(
             key: 'income_revenue',
-            name: '营业收入',
+            name: '营收',
             kind: CategoryKind.income,
             note: '店铺、项目结算的净收入'),
         PresetCategory(
             key: 'income_affiliate',
-            name: '带货佣金',
+            name: '佣金',
             kind: CategoryKind.income,
-            note: '直播、分销、联盟返佣'),
+            note: '直播、分销、联盟返利'),
         PresetCategory(
             key: 'income_service_fee',
-            name: '服务收入',
+            name: '劳务',
             kind: CategoryKind.income,
             note: '咨询、代运营等对公服务费'),
       ]),
@@ -1212,22 +1214,22 @@ const List<PresetCategory> presetIncomeCategories = [
       children: [
         PresetCategory(
             key: 'income_reimburse_travel',
-            name: '差旅报销',
+            name: '差旅',
             kind: CategoryKind.income,
             note: '出差交通住宿回款'),
         PresetCategory(
             key: 'income_reimburse_meal',
-            name: '餐费报销',
+            name: '餐费',
             kind: CategoryKind.income,
             note: '业务招待、加班餐'),
         PresetCategory(
             key: 'income_reimburse_purchase',
-            name: '采购报销',
+            name: '采购',
             kind: CategoryKind.income,
             note: '垫付办公采购'),
         PresetCategory(
             key: 'income_reimburse_other',
-            name: '其他报销',
+            name: '杂费',
             kind: CategoryKind.income,
             note: '说不清类别的回款'),
       ]),
@@ -1240,7 +1242,7 @@ const List<PresetCategory> presetIncomeCategories = [
       children: [
         PresetCategory(
             key: 'income_rp_friend',
-            name: '亲友红包',
+            name: '亲友',
             kind: CategoryKind.income,
             note: '微信/支付宝收到的红包'),
         PresetCategory(
@@ -1268,22 +1270,22 @@ const List<PresetCategory> presetIncomeCategories = [
             note: '单位缴存 + 提取到账'),
         PresetCategory(
             key: 'income_social_insurance',
-            name: '社保返还',
+            name: '社保',
             kind: CategoryKind.income,
             note: '医保报销、失业金'),
         PresetCategory(
             key: 'income_meal_allowance',
-            name: '交通餐补',
+            name: '餐补',
             kind: CategoryKind.income,
             note: '车补、餐补、话费补贴'),
         PresetCategory(
             key: 'income_housing_allowance',
-            name: '住房补贴',
+            name: '住房',
             kind: CategoryKind.income,
             note: '租房补贴、安家费'),
         PresetCategory(
             key: 'income_maternity',
-            name: '生育津贴',
+            name: '生育',
             kind: CategoryKind.income,
             note: '生育医疗费、产假津贴'),
       ]),
@@ -1296,17 +1298,17 @@ const List<PresetCategory> presetIncomeCategories = [
       children: [
         PresetCategory(
             key: 'income_refund_shopping',
-            name: '购物退款',
+            name: '购物',
             kind: CategoryKind.income,
             note: '退货、取消订单'),
         PresetCategory(
             key: 'income_refund_platform',
-            name: '平台赔付',
+            name: '赔付',
             kind: CategoryKind.income,
             note: '超时赔付、破损赔付'),
         PresetCategory(
             key: 'income_refund_service',
-            name: '服务退款',
+            name: '服务',
             kind: CategoryKind.income,
             note: '会员、课程、票务退款'),
       ]),
@@ -1319,17 +1321,17 @@ const List<PresetCategory> presetIncomeCategories = [
       children: [
         PresetCategory(
             key: 'income_resale_secondhand',
-            name: '二手转让',
+            name: '转让',
             kind: CategoryKind.income,
             note: '闲鱼、转转成交'),
         PresetCategory(
             key: 'income_resale_idle',
-            name: '闲置出售',
+            name: '闲置',
             kind: CategoryKind.income,
             note: '家具家电等闲置'),
         PresetCategory(
             key: 'income_resale_scrap',
-            name: '废品回收',
+            name: '回收',
             kind: CategoryKind.income,
             note: '旧书旧纸、废金属'),
       ]),
@@ -1352,7 +1354,7 @@ const List<PresetCategory> presetIncomeCategories = [
             note: '福彩、体彩'),
         PresetCategory(
             key: 'income_prize_contest',
-            name: '竞赛获奖',
+            name: '获奖',
             kind: CategoryKind.income,
             note: '马拉松、公开赛、征文比赛'),
       ]),
@@ -1388,7 +1390,7 @@ const List<PresetCategory> presetIncomeCategories = [
       children: [
         PresetCategory(
             key: 'income_other_misc',
-            name: '杂项收入',
+            name: '杂项',
             kind: CategoryKind.income,
             note: '说不清归哪类的小额进账'),
         PresetCategory(
