@@ -265,7 +265,7 @@ class _RemindersPageState extends ConsumerState<RemindersPage> {
                                   text: s.budgetTieredPrefix,
                                 ),
                                 TextSpan(
-                                  text: '不阻挡你继续记账',
+                                  text: s.notBlocking,
                                   style: TextStyle(
                                     fontWeight: FontWeight.w600,
                                     color: colors.inkSecondary,

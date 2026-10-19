@@ -381,8 +381,7 @@ class _SyncPageState extends ConsumerState<SyncPage> {
                     Text(s.incrementalSync, style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
                     const SizedBox(height: Spacing.sm),
                     Text(
-                      '按账单级变更同步：本机写入后立刻推送，前台每 10 秒拉取一次。'
-                      '附件只同步「哪笔账单挂了附件」，图片本身不出设备。',
+                      '${s.incrementalSyncDesc}${s.incrementalSyncAttachmentNote}',
                       style: TextStyle(fontSize: 14, color: context.colors.inkSecondary),
                     ),
                     const SizedBox(height: Spacing.md),

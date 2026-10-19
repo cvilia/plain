@@ -427,7 +427,7 @@ class _CreditReconcilePageState extends ConsumerState<CreditReconcilePage> {
         );
         _reload();
       },
-      failure: (f) => showAppToast(context, '对账失败: ${f.code}'),
+      failure: (f) => showAppToast(context, s.creditReconcileFailed(f.code)),
     );
   }
 }

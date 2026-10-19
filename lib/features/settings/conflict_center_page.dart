@@ -105,7 +105,7 @@ class _ConflictCardState extends ConsumerState<_ConflictCard> {
     if (!mounted) return;
     setState(() => _busy = false);
     if (res.isFailure) {
-      showAppToast(context, '裁决失败：${res.failureOrNull!.code}');
+      showAppToast(context, s.conflictResolveFailed(res.failureOrNull!.code));
       return;
     }
     showAppToast(context, s.conflictResolved(choice.label(s)));

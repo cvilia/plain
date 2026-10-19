@@ -22,6 +22,7 @@ import 'package:plain/domain/entities/enums.dart';
 import 'package:plain/domain/services/category_naming.dart';
 import 'package:plain/app/l10n/app_strings.dart';
 import 'package:plain/app/l10n/strings_accounts.dart';
+import 'package:plain/app/l10n/strings_domain.dart';
 import 'package:plain/app/l10n/strings_ledger.dart';
 import 'package:plain/app/l10n/strings_settings_a.dart';
 
@@ -479,8 +480,9 @@ class _CategoryManagePageState extends ConsumerState<CategoryManagePage> {
     WidgetRef ref,
     domain.Category cat,
   ) async {
+    final s = AppStrings.of(context);
     if (cat.isPreset) {
-      showAppToast(context, '默认分类不可修改');
+      showAppToast(context, s.categoryPresetReadonly);
       return;
     }
     final deps = ref.read(appDependenciesProvider);
@@ -502,20 +504,19 @@ class _CategoryManagePageState extends ConsumerState<CategoryManagePage> {
     final fallbackId = cat.kind == CategoryKind.expense
         ? 'preset_other'
         : 'preset_income_other';
-    const fallbackName = '其他';
+    final fallbackName = s.other;
 
-    final title = isGroup ? '删除分类组' : '删除分类';
+    final title = isGroup ? s.categoryDeleteGroupTitle : s.categoryDeleteTitle;
     final String message;
     if (count > 0) {
       final scope = isGroup && childIds.isNotEmpty
-          ? '及其 ${childIds.length} 个下级分类'
+          ? s.categoryDeleteScope(childIds.length)
           : '';
-      message =
-          '「${cat.name}」$scope下有 $count 笔账单。\n删除后账单将归入「$fallbackName」分类。';
+      message = s.categoryDeleteEntries(cat.name, scope, count, fallbackName);
     } else {
       message = isGroup && childIds.isNotEmpty
-          ? '将删除「${cat.name}」及其 ${childIds.length} 个下级分类。'
-          : '确定删除「${cat.name}」？';
+          ? s.categoryDeleteGroupConfirm(cat.name, childIds.length)
+          : s.categoryDeleteConfirm(cat.name);
     }
 
     final okDel = await showDialog<bool>(
@@ -524,13 +525,13 @@ class _CategoryManagePageState extends ConsumerState<CategoryManagePage> {
         title: Text(title),
         content: Text(message),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('取消')),
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(s.cancel)),
           FilledButton(
             onPressed: () => Navigator.pop(ctx, true),
             style: count > 0
                 ? FilledButton.styleFrom(backgroundColor: context.colors.expense)
                 : null,
-            child: const Text('删除'),
+            child: Text(s.delete),
           ),
         ],
       ),
@@ -550,11 +551,11 @@ class _CategoryManagePageState extends ConsumerState<CategoryManagePage> {
         showAppToast(
           context,
           moved > 0
-              ? '已删除，$moved 笔账单归入「$fallbackName」'
-              : '已删除「${cat.name}」',
+              ? s.categoryDeletedMoved(moved, fallbackName)
+              : s.categoryDeletedNamed(cat.name),
         );
       },
-      failure: (f) => showAppToast(context, '删除失败: ${f.code}'),
+      failure: (f) => showAppToast(context, s.categoryDeleteFailed(f.code)),
     );
   }
 
@@ -590,7 +591,7 @@ class _CategoryManagePageState extends ConsumerState<CategoryManagePage> {
       deviceId: deps.deviceId,
     ));
     ref.invalidateData.bumpCategoriesMutated();
-    showAppToast(context, '已添加「$name」');
+    showAppToast(context, AppStrings.of(context).categoryAdded(name));
   }
 
   /// Build one kind section as first-level groups + nested second-level tiles.
@@ -795,6 +796,7 @@ class _CategoryManagePageState extends ConsumerState<CategoryManagePage> {
     domain.Category source,
     domain.Category target,
   ) async {
+    final s = AppStrings.of(context);
     final deps = ref.read(appDependenciesProvider);
     final count = await deps.categoryRepository.countLiveEntries(
       categoryId: source.id,
@@ -805,11 +807,10 @@ class _CategoryManagePageState extends ConsumerState<CategoryManagePage> {
 
     final ok = await showConfirmDialog(
       context,
-      title: '合并分类',
-      message: '将「${source.name}」合并到「${target.name}」。\n'
-          '涉及账单约 $n 笔将改归目标分类${source.isRoot ? '，下级同名分类会并入目标同名项' : ''}。\n'
-          '合并后不可撤销，确定继续？',
-      confirmLabel: '合并',
+      title: s.categoryMergeTitle,
+      message: s.categoryMergeMessage(source.name, target.name, n,
+          source.isRoot ? s.categoryMergeRootClause : ''),
+      confirmLabel: s.categoryMergeAction,
       destructive: true,
     );
     if (ok != true || !context.mounted) return;
@@ -822,9 +823,10 @@ class _CategoryManagePageState extends ConsumerState<CategoryManagePage> {
       success: (r) {
         ref.invalidateData.bumpCategoriesMutated();
         ref.invalidateData.bumpEntryMutated();
-        showAppToast(context, '已合并，${r.movedEntries} 笔账单改归「${target.name}」');
+        showAppToast(
+            context, s.categoryMerged(r.movedEntries, target.name));
       },
-      failure: (f) => showAppToast(context, '合并失败: ${f.code}'),
+      failure: (f) => showAppToast(context, s.categoryMergeFailed(f.code)),
     );
   }
 
@@ -834,14 +836,15 @@ class _CategoryManagePageState extends ConsumerState<CategoryManagePage> {
     domain.Category source,
     domain.Category target,
   ) {
+    final s = AppStrings.of(context);
     Navigator.pop(context);
     showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('移动分类'),
-        content: Text('将「${source.name}」移动到「${target.name}」下？'),
+        title: Text(s.categoryMoveTitle),
+        content: Text(s.categoryMoveConfirm(source.name, target.name)),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('取消')),
+          TextButton(onPressed: () => Navigator.pop(ctx), child: Text(s.cancel)),
           FilledButton(
             onPressed: () async {
               Navigator.pop(ctx);
@@ -853,14 +856,14 @@ class _CategoryManagePageState extends ConsumerState<CategoryManagePage> {
               result.when(
                 success: (_) {
                   ref.invalidateData.bumpCategoriesMutated();
-                  showAppToast(context, '已移动到「${target.name}」');
+                  showAppToast(context, s.categoryMoved(target.name));
                 },
                 failure: (f) {
-                  showAppToast(context, '移动失败: ${f.code}');
+                  showAppToast(context, s.categoryMoveFailed(f.code));
                 },
               );
             },
-            child: const Text('移动'),
+            child: Text(s.categoryMoveAction),
           ),
         ],
       ),

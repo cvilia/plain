@@ -19,6 +19,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:plain/app/bootstrap.dart';
 import 'package:plain/app/breakpoints.dart';
 import 'package:plain/app/l10n/app_strings.dart';
+import 'package:plain/app/l10n/strings_settings_b.dart';
 import 'package:plain/app/l10n/strings_accounts.dart';
 import 'package:plain/app/theme/design_tokens.dart';
 import 'package:plain/core/constants/app_constants.dart';
@@ -371,7 +372,7 @@ class AccountsPage extends ConsumerWidget {
                 ), s: s);
                 if (result.isFailure) {
                   if (ctx.mounted) Navigator.pop(ctx);
-                  if (context.mounted) showAppToast(context, s.reconcileFailed(result.failureOrNull?.code ?? '未知错误'));
+                  if (context.mounted) showAppToast(context, s.reconcileFailed(result.failureOrNull?.code ?? s.unknownError));
                   return;
                 }
               }

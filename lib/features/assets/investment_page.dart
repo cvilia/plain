@@ -334,6 +334,7 @@ class _InvestmentPageState extends ConsumerState<InvestmentPage> {
   }
 
   Future<void> _showTrade(Holding h, {required bool isSell}) async {
+    final s = AppStrings.of(context);
     // ★ 用局部变量 + `onChanged` 取值，不在页面里创建 `TextEditingController`。
     // `showDialog` 的 future 在 pop 那一刻就返回，但弹窗**淡出动画期间**子树仍会
     // 重建（`TextField` 的装饰动画会重新订阅 controller），此时 dispose 会抛
@@ -351,7 +352,7 @@ class _InvestmentPageState extends ConsumerState<InvestmentPage> {
           children: [
             Text(
               isSell
-                  ? '当前持有 ${Quantity.label(h.sharesX10000)} 份'
+                  ? s.currentHolding(Quantity.label(h.sharesX10000))
                   : '当前持有 ${Quantity.label(h.sharesX10000)} 份，均价 ${formatAmountYuan(h.costPriceCents)}',
               style: TextStyle(fontSize: 12, color: context.colors.inkTertiary),
             ),
@@ -359,22 +360,22 @@ class _InvestmentPageState extends ConsumerState<InvestmentPage> {
             TextFormField(
               keyboardType: const TextInputType.numberWithOptions(decimal: true),
               onChanged: (v) => sharesText = v,
-              decoration: const InputDecoration(
-                  labelText: '份额', border: OutlineInputBorder()),
+              decoration: InputDecoration(
+                  labelText: s.shares, border: const OutlineInputBorder()),
             ),
             const SizedBox(height: Spacing.md),
             TextFormField(
               keyboardType: const TextInputType.numberWithOptions(decimal: true),
               onChanged: (v) => priceText = v,
               decoration: InputDecoration(
-                  labelText: isSell ? '卖价' : '买价',
+                  labelText: isSell ? s.sellPrice : s.buyPrice,
                   border: const OutlineInputBorder(),
                   prefixText: '¥'),
             ),
           ],
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('取消')),
+          TextButton(onPressed: () => Navigator.pop(ctx), child: Text( s.cancel)),
           FilledButton(
             onPressed: () async {
               final shares = double.tryParse(sharesText.trim()) ?? 0;
@@ -386,7 +387,7 @@ class _InvestmentPageState extends ConsumerState<InvestmentPage> {
 
               if (isSell && _svc.validateSell(h, sharesX).isFailure) {
                 if (ctx.mounted) Navigator.pop(ctx);
-                if (mounted) showAppToast(context, '卖出份额超过持有量');
+                if (mounted) showAppToast(context, s.sellExceedsHolding);
                 return;
               }
               final next = isSell
@@ -401,10 +402,10 @@ class _InvestmentPageState extends ConsumerState<InvestmentPage> {
               if (r.isSuccess) {
                 _reload();
               } else {
-                showAppToast(context, '操作失败');
+                showAppToast(context, s.operationFailed);
               }
             },
-            child: const Text('确定'),
+            child: Text( s.ok),
           ),
         ],
       ),

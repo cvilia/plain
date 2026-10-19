@@ -269,6 +269,7 @@ class _ImportPageState extends ConsumerState<ImportPage> {
   }
 
   Widget _buildColDropdown(String label, int? value, List<String> headers, ValueChanged<int?> onChanged, {bool optional = false}) {
+    final s = AppStrings.of(context);
     // 下标用 -1 作「（无）」哨兵：`showOptionPicker` 的取消也返回 null，
     // 与「明确选择无」无法区分，故不用 null 当值。
     final v = value;
@@ -277,14 +278,14 @@ class _ImportPageState extends ConsumerState<ImportPage> {
       padding: const EdgeInsets.only(bottom: Spacing.md),
       child: PickerField(
         label: label,
-        value: valid ? '$v: ${headers[v]}' : (optional ? '（无）' : '请选择'),
+        value: valid ? '$v: ${headers[v]}' : (optional ? s.none : s.pleaseSelect),
         onTap: () async {
           final picked = await showOptionPicker<int>(
             context: context,
             title: label,
             current: valid ? v : -1,
             options: [
-              if (optional) const PickerOption(value: -1, label: '（无）'),
+              if (optional) PickerOption(value: -1, label: s.none),
               for (var i = 0; i < headers.length; i++)
                 PickerOption(value: i, label: '$i: ${headers[i]}'),
             ],

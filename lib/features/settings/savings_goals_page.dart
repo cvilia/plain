@@ -214,7 +214,7 @@ class _SavingsGoalsPageState extends ConsumerState<SavingsGoalsPage> {
     );
     if (!mounted) return;
     if (res.isFailure) {
-      showAppToast(context, '设置失败：${res.failureOrNull!.code}');
+      showAppToast(context, s.goalSetFailed(res.failureOrNull!.code));
       return;
     }
     ref.invalidateData.bumpBudgetMutated();
@@ -247,7 +247,7 @@ class _SavingsGoalsPageState extends ConsumerState<SavingsGoalsPage> {
     );
     if (!mounted) return;
     if (res.isFailure) {
-      showAppToast(context, '修改失败：${res.failureOrNull!.code}');
+      showAppToast(context, s.goalUpdateFailed(res.failureOrNull!.code));
       return;
     }
     ref.invalidateData.bumpBudgetMutated();
@@ -261,6 +261,7 @@ class _SavingsGoalsPageState extends ConsumerState<SavingsGoalsPage> {
     int? initial,
     bool allowDelete = false,
   }) async {
+    final s = AppStrings.of(context);
     final ctrl = TextEditingController(
       text: initial == null ? '' : (initial / 100).toStringAsFixed(2),
     );
@@ -272,15 +273,16 @@ class _SavingsGoalsPageState extends ConsumerState<SavingsGoalsPage> {
           controller: ctrl,
           keyboardType: const TextInputType.numberWithOptions(decimal: true),
           decoration:
-              const InputDecoration(labelText: '金额', border: OutlineInputBorder()),
+              InputDecoration(
+                  labelText: s.amountFieldLabel, border: const OutlineInputBorder()),
         ),
         actions: [
           if (allowDelete)
             TextButton(
               onPressed: () => Navigator.pop(ctx, -1),
-              child: const Text('删除'),
+              child: Text(s.delete),
             ),
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('取消')),
+          TextButton(onPressed: () => Navigator.pop(ctx), child: Text(s.cancel)),
           FilledButton(
             onPressed: () {
               final v = double.tryParse(ctrl.text.trim());
@@ -290,7 +292,7 @@ class _SavingsGoalsPageState extends ConsumerState<SavingsGoalsPage> {
               }
               Navigator.pop(ctx, (v * 100).round());
             },
-            child: const Text('保存'),
+            child: Text( s.save),
           ),
         ],
       ),

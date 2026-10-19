@@ -623,9 +623,9 @@ class _MatchOperatorSuffix extends StatelessWidget {
   final String value;
   final ValueChanged<String> onChanged;
 
-  static const Map<String, String> _labels = {
-    'contains': '包含',
-    'eq': '等于',
+  Map<String, String> _labels(AppStrings s) => {
+    'contains': s.matchContains,
+    'eq': s.matchEquals,
   };
 
   @override
@@ -639,7 +639,7 @@ class _MatchOperatorSuffix extends StatelessWidget {
           title: s.matchMethod,
           current: value,
           options: [
-            for (final e in _labels.entries)
+            for (final e in _labels(s).entries)
               PickerOption(value: e.key, label: e.value),
           ],
         );
@@ -650,7 +650,7 @@ class _MatchOperatorSuffix extends StatelessWidget {
         children: [
           const SizedBox(width: 12),
           Text(
-            _labels[value] ?? s.matchContains,
+            _labels(s)[value] ?? s.matchContains,
             style: TextStyle(fontSize: 14, color: colors.primary),
           ),
           const SizedBox(width: 2),

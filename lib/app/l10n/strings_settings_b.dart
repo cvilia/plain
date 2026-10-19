@@ -205,6 +205,9 @@ extension SettingsBStrings on AppStrings {
   String get incrementalSyncDesc => isZh
       ? '按账单级变更同步：本机写入后立刻推送，前台每 10 秒拉取一次。'
       : 'Syncs entry-level changes: pushed immediately after local writes, pulled every 10 seconds while in the foreground.';
+  String get incrementalSyncAttachmentNote => isZh
+      ? '附件只同步「哪笔账单挂了附件」，图片本身不出设备。'
+      : 'For attachments only the link is synced; images never leave the device.';
   String get autoSync => isZh ? '自动同步' : 'Auto sync';
   String get syncOn => isZh ? '已开启' : 'On';
   String get syncOff => isZh ? '已关闭（手动同步仍可用）' : 'Off (manual sync still available)';
@@ -392,6 +395,10 @@ extension SettingsBStrings on AppStrings {
           '「储蓄」= 收入 − 总支出。可在分类管理里调整刚性标记。'
       : '"Needs" uses a category\'s rigid-expense flag ($rigidCount marked); the rest counts as "Wants", and "Savings" = income − total spending. Adjust the rigid flag in category management.';
   String get totalBudgetLabel => isZh ? '总预算' : 'Total budget';
+  String get deleteBudgetTitle => isZh ? '删除预算' : 'Delete budget';
+  String get deleteBudgetConfirm => isZh
+      ? '删除后不可恢复，确定删除这笔预算？'
+      : 'This cannot be undone. Delete this budget?';
   String get budgetAmountTitle => isZh ? '预算金额' : 'Budget amount';
   String get rolloverLabel => isZh ? '结余滚存' : 'Roll over leftover';
   String get rolloverSubtitle =>

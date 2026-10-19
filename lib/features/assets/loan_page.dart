@@ -332,10 +332,11 @@ class _LoanPageState extends ConsumerState<LoanPage> {
     int paid,
   ) {
     final rows = <(String, String, String, String)>[];
+    final s = AppStrings.of(context);
     for (var i = paid; i < schedule.periods.length && rows.length < 6; i++) {
       final p = schedule.periods[i];
       rows.add((
-        '第 ${p.index} 期',
+        s.periodNo(p.index),
         formatAmountYuan(p.principalCents),
         formatAmountYuan(p.interestCents),
         formatAmountYuan(p.remainingCents),

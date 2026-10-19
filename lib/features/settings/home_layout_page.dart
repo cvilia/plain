@@ -9,6 +9,8 @@ import 'package:plain/app/theme/design_tokens.dart';
 import 'package:plain/core/refresh/data_invalidation.dart';
 import 'package:plain/design_system/plain_ui.dart';
 import 'package:plain/app/l10n/app_strings.dart';
+import 'package:plain/app/l10n/strings_accounts.dart';
+import 'package:plain/app/l10n/strings_core.dart';
 import 'package:plain/app/l10n/strings_settings_a.dart';
 
 class HomeLayoutPage extends ConsumerStatefulWidget {
@@ -47,11 +49,13 @@ class _HomeLayoutPageState extends ConsumerState<HomeLayoutPage> {
     }
   }
 
-  int get _selectedCount => _designCards.where((c) => !_hidden.contains(c.id)).length;
+  int get _selectedCount =>
+      _designCards(AppStrings.of(context)).where((c) => !_hidden.contains(c.id)).length;
 
   @override
   Widget build(BuildContext context) {
     final s = AppStrings.of(context);
+    final cards = _designCards(s);
     return Scaffold(
       appBar: PlainTopBar(title: s.homeLayoutTitle, showBack: true),
       body: _loading
@@ -71,18 +75,18 @@ class _HomeLayoutPageState extends ConsumerState<HomeLayoutPage> {
                 PlainEyebrow(_selectedCount == 3 ? '可选卡片 · 已选 3 / 4' : s.homeLayoutOptionalCards(_selectedCount)),
                 PlainPanel(
                   children: [
-                    for (var i = 0; i < _designCards.length; i++)
+                    for (var i = 0; i < cards.length; i++)
                       _CardRow(
                         index: i + 1,
-                        spec: _designCards[i],
-                        enabled: !_hidden.contains(_designCards[i].id),
+                        spec: cards[i],
+                        enabled: !_hidden.contains(cards[i].id),
                         onChanged: (v) {
                           setState(() {
                             if (v) {
-                              _hidden.remove(_designCards[i].id);
+                              _hidden.remove(cards[i].id);
                             } else {
                               if (_selectedCount <= 1) return;
-                              _hidden.add(_designCards[i].id);
+                              _hidden.add(cards[i].id);
                             }
                           });
                           _save();
@@ -112,13 +116,13 @@ class _CardSpec {
   final String subtitle;
 }
 
-const _designCards = [
-  _CardSpec('monthly_balance', '记账月结余', '收入 / 支出 / 结余三数值'),
-  _CardSpec('budget_progress', '预算进度', '本月预算总进度条'),
-  _CardSpec('safe_to_spend', '安全可花', '扣除预留后的日均可支配'),
-  _CardSpec('savings_goals', '目标进度', '最近一个储蓄目标的进度'),
-  _CardSpec('net_assets', '净值', '净资产与较上月变化'),
-  _CardSpec('heat_7d', '近 7 天热力图', '按日消费强度色块'),
+List<_CardSpec> _designCards(AppStrings s) => [
+  _CardSpec('monthly_balance', s.homeLayoutCardMonthlyTitle, s.homeLayoutCardMonthlySub),
+  _CardSpec('budget_progress', s.homeCardBudgetProgress, s.homeLayoutCardBudgetSub),
+  _CardSpec('safe_to_spend', s.homeCardSafeToSpend, s.homeLayoutCardSafeSub),
+  _CardSpec('savings_goals', s.homeLayoutCardGoalTitle, s.homeLayoutCardGoalSub),
+  _CardSpec('net_assets', s.netWorth, s.homeLayoutCardNetSub),
+  _CardSpec('heat_7d', s.homeLayoutCardHeatTitle, s.homeLayoutCardHeatSub),
 ];
 
 class _CardRow extends StatelessWidget {

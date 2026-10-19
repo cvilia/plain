@@ -590,7 +590,7 @@ class _NotePanel extends StatelessWidget {
     final s = AppStrings.of(context);
     final colors = context.colors;
     final lines = <String>[
-      '当前维度：${dimension.label}。点任意节点条可看该节点的账单明细。',
+      s.sankeyNoteDimension(dimension.label(s)),
       s.sankeyNoteThreshold,
       if (graph.sources.any((n) => n.isOther) ||
           graph.targets.any((n) => n.isOther))

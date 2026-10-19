@@ -36,21 +36,21 @@ final _rulesProvider = FutureProvider<List<RecurringRule>>((ref) async {
 
 // 表单选项文案的唯一来源：底部弹层的候选行与字段回显都取自这里，
 // 避免出现「选的时候叫每月、显示成 Monthly」这类漂移。
-const Map<EntryType, String> _kEntryTypeLabels = {
-  EntryType.expense: '支出',
-  EntryType.income: '收入',
+Map<EntryType, String> _entryTypeLabels(AppStrings s) => {
+  EntryType.expense: s.expense,
+  EntryType.income: s.income,
 };
 
-const Map<RecurringFrequency, String> _kFrequencyLabels = {
-  RecurringFrequency.daily: '每天',
-  RecurringFrequency.weekly: '每周',
-  RecurringFrequency.monthly: '每月',
-  RecurringFrequency.yearly: '每年',
+Map<RecurringFrequency, String> _frequencyLabels(AppStrings s) => {
+  RecurringFrequency.daily: s.recurringFreqDaily,
+  RecurringFrequency.weekly: s.recurringFreqWeekly,
+  RecurringFrequency.monthly: s.recurringFreqMonthly,
+  RecurringFrequency.yearly: s.recurringFreqYearly,
 };
 
-const Map<RecurringEndType, String> _kEndLabels = {
-  RecurringEndType.never: '不结束',
-  RecurringEndType.count: '生成 N 次后结束',
+Map<RecurringEndType, String> _endLabels(AppStrings s) => {
+  RecurringEndType.never: s.recurringEndNever,
+  RecurringEndType.count: s.recurringEndCount,
 };
 
 class RecurringPage extends ConsumerStatefulWidget {
@@ -104,6 +104,7 @@ class _RecurringPageState extends ConsumerState<RecurringPage> {
   }
 
   Future<void> _confirmRule(RecurringRule rule, {bool skip = false}) async {
+    final s = AppStrings.of(context);
     final deps = ref.read(appDependenciesProvider);
     final res = await deps.confirmRecurringRule(rule,
         skip: skip, s: AppStrings.of(context));
@@ -112,7 +113,7 @@ class _RecurringPageState extends ConsumerState<RecurringPage> {
       ref.invalidateData.bumpEntryMutated();
       ref.invalidateData.bumpRecurringMutated();
       ref.invalidate(_rulesProvider);
-      showAppToast(context, skip ? '已跳过本期' : '已确认入账');
+      showAppToast(context, skip ? s.recurringSkipped : s.recurringConfirmed);
     } else {
       showAppToast(context, '操作失败: ${res.failureOrNull?.code ?? 'unknown'}');
     }
@@ -390,14 +391,14 @@ class _RecurringEditPageState extends ConsumerState<RecurringEditPage> {
               const SizedBox(height: Spacing.md),
               PickerField(
                 label: s.typeLabel,
-                value: _kEntryTypeLabels[_entryType] ?? s.expense,
+                value: _entryTypeLabels(s)[_entryType] ?? s.expense,
                 onTap: () async {
                   final picked = await showOptionPicker<EntryType>(
                     context: context,
                     title: s.typeLabel,
                     current: _entryType,
                     options: [
-                      for (final e in _kEntryTypeLabels.entries)
+                      for (final e in _entryTypeLabels(s).entries)
                         PickerOption(value: e.key, label: e.value),
                     ],
                   );
@@ -407,14 +408,14 @@ class _RecurringEditPageState extends ConsumerState<RecurringEditPage> {
               const SizedBox(height: Spacing.md),
               PickerField(
                 label: s.recurringFrequencyLabel,
-                value: _kFrequencyLabels[_frequency] ?? s.recurringFreqMonthly,
+                value: _frequencyLabels(s)[_frequency] ?? s.recurringFreqMonthly,
                 onTap: () async {
                   final picked = await showOptionPicker<RecurringFrequency>(
                     context: context,
                     title: s.recurringFrequencyLabel,
                     current: _frequency,
                     options: [
-                      for (final e in _kFrequencyLabels.entries)
+                      for (final e in _frequencyLabels(s).entries)
                         PickerOption(value: e.key, label: e.value),
                     ],
                   );
@@ -451,14 +452,14 @@ class _RecurringEditPageState extends ConsumerState<RecurringEditPage> {
               ),
               PickerField(
                 label: s.recurringEndLabel,
-                value: _kEndLabels[_endType] ?? s.recurringEndNever,
+                value: _endLabels(s)[_endType] ?? s.recurringEndNever,
                 onTap: () async {
                   final picked = await showOptionPicker<RecurringEndType>(
                     context: context,
                     title: s.recurringEndLabel,
                     current: _endType,
                     options: [
-                      for (final e in _kEndLabels.entries)
+                      for (final e in _endLabels(s).entries)
                         PickerOption(value: e.key, label: e.value),
                     ],
                   );

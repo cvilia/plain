@@ -179,7 +179,7 @@ class _EntryDetailPageState extends ConsumerState<EntryDetailPage> {
           // 报销 / 收支：本页只做**只读展示**——这两项原来各带一个就地切换的
           // Switch（点一下立刻写库），现按页面职责划分，改值统一去编辑页
           //（见 `entry_input_page.dart::_AttrBar` 的两个 chip）。
-          _DetailRow(label: s.reimburseFieldTitle, value: _reimburseLabel(entry.reimburseStatus)),
+          _DetailRow(label: s.reimburseFieldTitle, value: _reimburseLabel(s, entry.reimburseStatus)),
           // G-2：「不计入收支」只对手动录入的普通收支开放
           if (entry.canMarkExcluded)
             _DetailRow(
@@ -234,21 +234,14 @@ class _EntryDetailPageState extends ConsumerState<EntryDetailPage> {
   }
 
   String _sourceLabel(EntrySource source) => switch (source) {
-        EntrySource.manual => '手动录入',
-        EntrySource.reconcile => '对账',
-        EntrySource.import => '导入',
-        EntrySource.recurring => '周期',
+        EntrySource.manual => AppStrings.of(context).sourceManual,
+        EntrySource.reconcile => AppStrings.of(context).reconcile,
+        EntrySource.import => AppStrings.of(context).sourceImport,
+        EntrySource.recurring => AppStrings.of(context).sourceRecurring,
         _ => source.wire,
       };
 
-  static String _reimburseLabel(ReimburseStatus s) => switch (s) {
-        ReimburseStatus.none => '不报销',
-        ReimburseStatus.pending => '待报销',
-        ReimburseStatus.submitted => '已提交',
-        ReimburseStatus.partial => '部分回款',
-        ReimburseStatus.reimbursed => '已回款',
-        ReimburseStatus.abandoned => '已放弃',
-      };
+  static String _reimburseLabel(AppStrings appS, ReimburseStatus st) => st.label(appS);
 
   /// STORY-9.3 AC1：`$100.00 ≈ ¥720.00`（本位币金额是库里的 amount）。
   ///
@@ -370,7 +363,7 @@ class _EntryDetailPageState extends ConsumerState<EntryDetailPage> {
                         showAppToast(context, s.splitDone);
                         setState(() {});
                       },
-                      failure: (f) => showAppToast(context, '拆分失败: ${f.code}'),
+                      failure: (f) => showAppToast(context, s.splitFailed(f.code)),
                     );
                   },
                   child: Text(s.saveSplitAction),
@@ -399,7 +392,7 @@ class _EntryDetailPageState extends ConsumerState<EntryDetailPage> {
         showAppToast(context, s.mergeDone);
         setState(() {});
       },
-      failure: (f) => showAppToast(context, '合并失败: ${f.code}'),
+      failure: (f) => showAppToast(context, s.mergeFailed(f.code)),
     );
   }
 

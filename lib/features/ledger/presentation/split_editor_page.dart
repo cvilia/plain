@@ -40,14 +40,14 @@ class SplitEditorPage extends StatefulWidget {
 class _SplitEditorPageState extends State<SplitEditorPage> {
   late final List<SplitLine> _lines = [
     SplitLine(
-      title: '餐饮 · 午餐',
-      subtitle: '工作餐',
+      title: AppStrings.of(context).splitDemoTitle1,
+      subtitle: AppStrings.of(context).splitDemoSub1,
       cents: 6800,
       color: Color(categoryColorMap['food']!),
     ),
     SplitLine(
-      title: '人情 · 请客',
-      subtitle: '招待同事',
+      title: AppStrings.of(context).splitDemoTitle2,
+      subtitle: AppStrings.of(context).splitDemoSub2,
       cents: 10000,
       color: Color(categoryColorMap['social']!),
     ),

@@ -203,7 +203,7 @@ class _BudgetPageState extends ConsumerState<BudgetPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        PlainEyebrow('分类限额 · ${statuses.length} 类'),
+        PlainEyebrow(AppStrings.of(context).categoryLimitsEyebrow(statuses.length)),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: Spacing.lg),
           child: DecoratedBox(
@@ -243,6 +243,7 @@ class _BudgetPageState extends ConsumerState<BudgetPage> {
     List<BudgetStatus> statuses,
     bool hide,
   ) {
+    final appS = AppStrings.of(context);
     final envelopes = const BudgetMethodologyService().envelopes([
       for (final s in statuses)
         CategorySpendInput(
@@ -257,7 +258,7 @@ class _BudgetPageState extends ConsumerState<BudgetPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        PlainEyebrow('信封 · ${envelopes.length} 个${overs > 0 ? ' · $overs 个超支' : ''}'),
+        PlainEyebrow(appS.envelopeEyebrow(envelopes.length, overs)),
         PlainPanel(
           children: [
             for (var i = 0; i < envelopes.length; i++) ...[
@@ -282,7 +283,7 @@ class _BudgetPageState extends ConsumerState<BudgetPage> {
                         Text(
                           hide
                               ? '✱✱✱✱'
-                              : '余 ${formatAmountYuan(envelopes[i].remainingCents)}',
+                              : appS.envelopeRemaining(formatAmountYuan(envelopes[i].remainingCents)),
                           style: TextStyle(
                             fontSize: 15,
                             fontWeight: FontWeight.w600,
@@ -293,8 +294,8 @@ class _BudgetPageState extends ConsumerState<BudgetPage> {
                         ),
                         Text(
                           envelopes[i].isOver
-                              ? '已超支 ${formatAmountYuan(envelopes[i].overdraftCents)}，不可跨类挪用'
-                              : '已花 ${formatAmountYuan(envelopes[i].spentCents)}',
+                              ? appS.envelopeOver(formatAmountYuan(envelopes[i].overdraftCents))
+                              : appS.envelopeSpent(formatAmountYuan(envelopes[i].spentCents)),
                           style: TextStyle(
                               fontSize: 12, color: context.colors.inkTertiary),
                         ),
@@ -309,7 +310,7 @@ class _BudgetPageState extends ConsumerState<BudgetPage> {
         Padding(
           padding: const EdgeInsets.fromLTRB(Spacing.lg, Spacing.sm, Spacing.lg, 0),
           child: Text(
-            '信封法下每个信封独立滚存；某个信封超支时，不能把别类的额度挪过来。',
+            appS.envelopeNote,
             style: TextStyle(fontSize: 12, color: context.colors.inkTertiary),
           ),
         ),
@@ -323,6 +324,7 @@ class _BudgetPageState extends ConsumerState<BudgetPage> {
     int incomeCents,
     List<BudgetStatus> statuses,
   ) {
+    final appS = AppStrings.of(context);
     final view = const BudgetMethodologyService().zeroBased(
       incomeCents: incomeCents,
       items: [
@@ -352,8 +354,8 @@ class _BudgetPageState extends ConsumerState<BudgetPage> {
                 child: Text(
                   // AC3：待分配金额常驻页顶，直到归零
                   view.unallocatedCents > 0
-                      ? '待分配 ${formatAmountYuan(view.unallocatedCents)}'
-                      : '已超分配 ${formatAmountYuan(-view.unallocatedCents)}',
+                      ? appS.unallocated(formatAmountYuan(view.unallocatedCents))
+                      : appS.overAllocated(formatAmountYuan(-view.unallocatedCents)),
                   style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
@@ -363,13 +365,13 @@ class _BudgetPageState extends ConsumerState<BudgetPage> {
               ),
             ),
           ),
-        PlainEyebrow('分配明细'),
+        PlainEyebrow(appS.allocationDetail),
         PlainPanel(
           children: [
-            _PlainKV(label: '当期收入', value: formatAmountYuan(view.incomeCents)),
-            _PlainKV(label: '已分配到分类', value: formatAmountYuan(view.allocatedCents)),
+            _PlainKV(label: appS.currentIncome, value: formatAmountYuan(view.incomeCents)),
+            _PlainKV(label: appS.allocatedToCategories, value: formatAmountYuan(view.allocatedCents)),
             _PlainKV(
-              label: '待分配',
+              label: appS.unallocatedLabel,
               value: formatAmountYuan(view.unallocatedCents),
               bold: true,
             ),
@@ -378,7 +380,7 @@ class _BudgetPageState extends ConsumerState<BudgetPage> {
         Padding(
           padding: const EdgeInsets.fromLTRB(Spacing.lg, Spacing.sm, Spacing.lg, 0),
           child: Text(
-            '零基预算要求把收入分配干净（待分配为 0）。分配用的是同一批分类预算，不影响账单。',
+            appS.zeroBasedNote,
             style: TextStyle(fontSize: 12, color: context.colors.inkTertiary),
           ),
         ),
@@ -395,6 +397,7 @@ class _BudgetPageState extends ConsumerState<BudgetPage> {
     List<BudgetStatus> statuses,
     List<Category> categories,
   ) {
+    final s = AppStrings.of(context);
     final rigid = {for (final c in categories) c.id: c.isRigid};
     final buckets = const BudgetMethodologyService().ratioBuckets(
       incomeCents: incomeCents,
@@ -418,7 +421,7 @@ class _BudgetPageState extends ConsumerState<BudgetPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        PlainEyebrow('三档占比'),
+        PlainEyebrow(s.ratioBucketsEyebrow),
         PlainPanel(
           children: [
             for (final b in buckets)
@@ -434,8 +437,10 @@ class _BudgetPageState extends ConsumerState<BudgetPage> {
                                 fontSize: 15, fontWeight: FontWeight.w500)),
                       ),
                       Text(
-                        '${(b.actualRatio(incomeCents) * 100).toStringAsFixed(1)}%'
-                        ' / 目标 ${(b.targetRatio(incomeCents) * 100).toStringAsFixed(0)}%',
+                        s.ratioTargetLine(
+                          (b.actualRatio(incomeCents) * 100).toStringAsFixed(1),
+                          (b.targetRatio(incomeCents) * 100).toStringAsFixed(0),
+                        ),
                         style: TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w600,
@@ -445,9 +450,15 @@ class _BudgetPageState extends ConsumerState<BudgetPage> {
                     ]),
                     const SizedBox(height: 2),
                     Text(
-                      '${formatAmountYuan(b.actualCents)} · 目标 '
-                      '${formatAmountYuan(b.targetCents)}'
-                      '${b.deltaCents == 0 ? '' : b.deltaCents > 0 ? ' · 超出 ${formatAmountYuan(b.deltaCents)}' : ' · 低于 ${formatAmountYuan(-b.deltaCents)}'}',
+                      s.ratioActualLine(
+                        formatAmountYuan(b.actualCents),
+                        formatAmountYuan(b.targetCents),
+                        b.deltaCents == 0
+                            ? ''
+                            : b.deltaCents > 0
+                                ? s.ratioOver(formatAmountYuan(b.deltaCents))
+                                : s.ratioUnder(formatAmountYuan(-b.deltaCents)),
+                      ),
                       style: TextStyle(
                           fontSize: 12, color: context.colors.inkTertiary),
                     ),
@@ -459,8 +470,7 @@ class _BudgetPageState extends ConsumerState<BudgetPage> {
         Padding(
           padding: const EdgeInsets.fromLTRB(Spacing.lg, Spacing.sm, Spacing.lg, 0),
           child: Text(
-            '「需要」取分类的刚性支出标记（$rigidCount 条已标记），其余算「想要」，'
-            '「储蓄」= 收入 − 总支出。可在分类管理里调整刚性标记。',
+            s.ratioNote(rigidCount),
             style: TextStyle(fontSize: 12, color: context.colors.inkTertiary),
           ),
         ),
@@ -551,8 +561,8 @@ class _BudgetPageState extends ConsumerState<BudgetPage> {
     final s = AppStrings.of(context);
     final okDel = await showConfirmDialog(
       context,
-      title: '删除预算',
-      message: '删除后不可恢复，确定删除这笔预算？',
+      title: s.deleteBudgetTitle,
+      message: s.deleteBudgetConfirm,
       confirmLabel: s.delete,
       destructive: true,
     );
@@ -580,11 +590,12 @@ class _BudgetPageState extends ConsumerState<BudgetPage> {
   }) async {
     final controller = TextEditingController(text: initial == null ? '' : initial.toYuanString());
     var rollover = initialRollover;
+    final s = AppStrings.of(context);
     final result = await showDialog<({String text, bool rollover})>(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDialogState) => AlertDialog(
-          title: const Text('预算金额'),
+          title: Text(s.budgetAmountTitle),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -598,18 +609,18 @@ class _BudgetPageState extends ConsumerState<BudgetPage> {
               SwitchListTile(
                 contentPadding: EdgeInsets.zero,
                 dense: true,
-                title: const Text('结余滚存'),
-                subtitle: const Text('上期未用完的额度计入本期'),
+                title: Text(s.rolloverLabel),
+                subtitle: Text(s.rolloverSubtitle),
                 value: rollover,
                 onChanged: (v) => setDialogState(() => rollover = v),
               ),
             ],
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('取消')),
+            TextButton(onPressed: () => Navigator.pop(ctx), child: Text(s.cancel)),
             TextButton(
               onPressed: () => Navigator.pop(ctx, (text: controller.text, rollover: rollover)),
-              child: const Text('确定'),
+              child: Text(s.ok),
             ),
           ],
         ),

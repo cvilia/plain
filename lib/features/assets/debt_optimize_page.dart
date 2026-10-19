@@ -340,6 +340,7 @@ class _DebtRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final s = AppStrings.of(context);
     final rate = (debt.annualRateBp / 100).toStringAsFixed(2);
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -357,7 +358,7 @@ class _DebtRow extends StatelessWidget {
           ]),
           const SizedBox(height: 2),
           Text(
-            '年利率 $rate% · 最低还款 ${formatAmountYuan(debt.minPaymentCents)}',
+            s.debtRateLine(rate, formatAmountYuan(debt.minPaymentCents)),
             style: TextStyle(fontSize: 12, color: colors.inkTertiary),
           ),
         ],

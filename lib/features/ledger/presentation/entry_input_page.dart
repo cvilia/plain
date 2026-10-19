@@ -666,7 +666,7 @@ class _AmountDisplayState extends State<_AmountDisplay>
             if (hasHint)
               Text(
                 state.errorMessage != null
-                    ? _errorText(state.errorMessage!)
+                    ? _errorText(s, state.errorMessage!)
                     : s.incompleteExpr,
                 style: TextStyle(
                   fontSize: 12,
@@ -687,17 +687,17 @@ class _AmountDisplayState extends State<_AmountDisplay>
     );
   }
 
-  String _errorText(String code) => switch (code) {
-    'amount_over_limit' => '金额超出上限',
-    'amount_zero' => '请输入金额',
-    'category_required' => '请选择分类',
-    'expression_invalid' => '无法计算',
-    'transfer_accounts_required' => '请选择转出与转入账户',
+  String _errorText(AppStrings s, String code) => switch (code) {
+    'amount_over_limit' => s.amountOverLimit,
+    'amount_zero' => s.enterAmount,
+    'category_required' => s.selectCategory,
+    'expression_invalid' => s.cannotCompute,
+    'transfer_accounts_required' => s.transferAccountsRequired,
     // STORY-9.3：原币账户未设汇率时拦截（不用 0/1 悄悄记错金额）
-    'fx_rate_required' => '请先设定该币种的汇率',
+    'fx_rate_required' => s.fxRateRequired,
     // STORY-8.2 AC2：只读成员不能记账
-    'member_read_only' => '你是「只读」成员，没有记账权限',
-    _ => '输入有误',
+    'member_read_only' => s.readOnlyNoPermission,
+    _ => s.invalidInput,
   };
 }
 
@@ -1732,6 +1732,7 @@ class _AttrBar extends ConsumerWidget {
                 _AttrChip(
                   icon: PlainIconData.calendar,
                   label: _dateChipLabel(
+                    s,
                     state.occurredAt,
                     ref.read(appDependenciesProvider).clock.now(),
                   ),
@@ -1749,7 +1750,7 @@ class _AttrBar extends ConsumerWidget {
                 if (state.type == EntryType.expense)
                   _AttrChip(
                     icon: PlainIconData.receipt,
-                    label: _reimburseChipLabel(state.reimburseStatus),
+                    label: _reimburseChipLabel(s, state.reimburseStatus),
                     placeholder: state.reimburseStatus == ReimburseStatus.none,
                     onTap: () => _pickReimburse(context),
                   ),
@@ -1767,20 +1768,13 @@ class _AttrBar extends ConsumerWidget {
     );
   }
 
-  String _dateChipLabel(DateTime? at, DateTime now) {
-    if (at == null) return '今天';
-    if (isSameLocalDay(at, now)) return '今天';
+  String _dateChipLabel(AppStrings s, DateTime? at, DateTime now) {
+    if (at == null) return s.today;
+    if (isSameLocalDay(at, now)) return s.today;
     return shortDateLabel(at);
   }
 
-  String _reimburseChipLabel(ReimburseStatus s) => switch (s) {
-        ReimburseStatus.none => '不报销',
-        ReimburseStatus.pending => '待报销',
-        ReimburseStatus.submitted => '已提交',
-        ReimburseStatus.partial => '部分回款',
-        ReimburseStatus.reimbursed => '已回款',
-        ReimburseStatus.abandoned => '已放弃',
-      };
+  String _reimburseChipLabel(AppStrings s, ReimburseStatus st) => st.label(s);
 
   /// 报销：只提供「不报销 / 待报销」两态；若该笔已在报销流程中
   ///（已提交 / 部分回款 / 已回款…），把当前态一并列出，既不隐藏现状，
@@ -1794,7 +1788,7 @@ class _AttrBar extends ConsumerWidget {
           state.reimburseStatus != ReimburseStatus.pending)
         PickerOption(
           value: state.reimburseStatus,
-          label: _reimburseChipLabel(state.reimburseStatus),
+          label: _reimburseChipLabel(s, state.reimburseStatus),
         ),
     ];
     final picked = await showOptionPicker<ReimburseStatus>(
@@ -1836,6 +1830,7 @@ class _AttrBar extends ConsumerWidget {
     WidgetRef ref, {
     required bool isSource,
   }) {
+    final s = AppStrings.of(context);
     final db = ref.read(appDependenciesProvider).db;
     final rows = db.raw.select(
       'SELECT id, name, type FROM accounts WHERE deleted_at IS NULL ORDER BY sort_order ASC',
@@ -1850,13 +1845,13 @@ class _AttrBar extends ConsumerWidget {
             Padding(
               padding: const EdgeInsets.all(Spacing.lg),
               child: Text(
-                isSource ? '选择账户' : '选择转入账户',
+                isSource ? s.selectAccountTitle : s.selectToAccountTitle,
                 style: Theme.of(ctx).textTheme.titleMedium,
               ),
             ),
             PlainRow(
               leading: PlainIcon(PlainIconData.circleMinus),
-              title: '不指定账户',
+              title: s.noAccountSpecified,
               onTap: () {
                 if (isSource) {
                   controller.onAccountSelected(null);

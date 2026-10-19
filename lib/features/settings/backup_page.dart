@@ -384,6 +384,7 @@ class _BackupPageState extends ConsumerState<BackupPage> {
   }
 
   Future<String?> _askPassword({required String title, required String confirmLabel}) {
+    final s = AppStrings.of(context);
     final ctrl = TextEditingController();
     return showDialog<String>(
       context: context,
@@ -393,16 +394,16 @@ class _BackupPageState extends ConsumerState<BackupPage> {
           controller: ctrl,
           obscureText: true,
           maxLength: 64,
-          decoration: const InputDecoration(
-            labelText: '密码',
-            hintText: '至少 4 位',
-            helperText: '忘记密码将无法恢复备份',
+          decoration: InputDecoration(
+            labelText: s.password,
+            hintText: s.passwordMin4Hint,
+            helperText: s.forgotPasswordHint,
             helperMaxLines: 2,
             border: OutlineInputBorder(),
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('取消')),
+          TextButton(onPressed: () => Navigator.pop(ctx), child: Text( s.cancel)),
           FilledButton(
             onPressed: () => Navigator.pop(ctx, ctrl.text),
             child: Text(confirmLabel),
@@ -417,7 +418,7 @@ class _BackupPageState extends ConsumerState<BackupPage> {
     final ok = await showConfirmDialog(
       context,
       title: s.deleteBackupTitle,
-      message: '确定删除「${b.name}」？删除后无法恢复该备份。',
+      message: s.deleteBackupConfirm(b.name),
       confirmLabel: s.delete,
       destructive: true,
     );

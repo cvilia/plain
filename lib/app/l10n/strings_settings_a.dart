@@ -282,9 +282,11 @@ extension SettingsAStrings on AppStrings {
   String categoryMergeToTitle(String name) => isZh ? '将「$name」合并到：' : 'Merge "$name" into:';
   String get categoryMergeTitle => isZh ? '合并分类' : 'Merge Categories';
   String get categoryMergeRootClause => isZh ? '，下级同名分类会并入目标同名项' : '; subcategories with the same name merge into the target';
-  String categoryMergeMessage(String source, String target, int n) => isZh
-      ? '将「$source」合并到「$target」。\n涉及账单约 $n 笔将改归目标分类。\n合并后不可撤销，确定继续？'
-      : 'Merge "$source" into "$target".\nAbout $n entries will be reassigned to the target.\nThis cannot be undone — continue?';
+  String categoryMergeMessage(String source, String target, int n,
+          [String clause = '']) =>
+      isZh
+          ? '将「$source」合并到「$target」。\n涉及账单约 $n 笔将改归目标分类$clause。\n合并后不可撤销，确定继续？'
+          : 'Merge "$source" into "$target".\nAbout $n entries will be reassigned to the target$clause.\nThis cannot be undone — continue?';
   String get categoryMergeAction => isZh ? '合并' : 'Merge';
   String categoryMerged(int n, String name) => isZh ? '已合并，$n 笔账单改归「$name」' : 'Merged, $n entries moved to "$name"';
   String categoryMergeFailed(String code) => isZh ? '合并失败: $code' : 'Merge failed: $code';

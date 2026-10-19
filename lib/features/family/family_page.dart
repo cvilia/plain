@@ -326,7 +326,7 @@ class _MemberRow extends ConsumerWidget {
     if (agg != null && agg!.txCount > 0) {
       subtitle.write(' · $periodLabel ${agg!.txCount} 笔');
       if (agg!.expenseCents > 0) {
-        subtitle.write(' 支出 ¥${formatAmount(agg!.expenseCents, hide: false)}');
+        subtitle.write(s.expenseWithAmount(formatAmount(agg!.expenseCents, hide: false)));
       }
     } else {
       subtitle.write(' · $periodLabel 暂无记录');
@@ -390,7 +390,7 @@ void _showMemberSheet(BuildContext context, WidgetRef ref, Member member) {
                     if (!ctx.mounted) return;
                     Navigator.pop(ctx);
                     if (res.isFailure) {
-                      showAppToast(context, _memberError(res.failureOrNull!.code));
+                      showAppToast(context, _memberError(s, res.failureOrNull!.code));
                     } else {
                       showAppToast(context, s.roleSetTo(role.label(s)));
                     }
@@ -407,7 +407,7 @@ void _showMemberSheet(BuildContext context, WidgetRef ref, Member member) {
                   if (!ctx.mounted) return;
                   Navigator.pop(ctx);
                   if (res.isFailure) {
-                    showAppToast(context, _memberError(res.failureOrNull!.code));
+                    showAppToast(context, _memberError(s, res.failureOrNull!.code));
                   } else {
                     showAppToast(context, s.memberLeft(member.name));
                   }
@@ -480,7 +480,7 @@ void _showJoinSheet(BuildContext context, WidgetRef ref) {
                 );
                 if (!ctx.mounted) return;
                 if (res.isFailure) {
-                  showAppToast(context, _memberError(res.failureOrNull!.code));
+                  showAppToast(context, _memberError(s, res.failureOrNull!.code));
                   return;
                 }
                 Navigator.pop(ctx);
@@ -507,23 +507,23 @@ Future<void> _copyCode(BuildContext context, WidgetRef ref, String code) async {
 }
 
 Future<void> _refreshCode(BuildContext context, WidgetRef ref) async {
-  final s = AppStrings.of(context);
   final code = await ref.read(appDependenciesProvider).memberService.inviteCode();
   ref.invalidate(_familyProvider);
   if (context.mounted) {
+    final s = AppStrings.of(context);
     showAppToast(context, code.isEmpty ? s.inviteCodeGenFailed : s.inviteCodeIs(code));
   }
 }
 
-String _memberError(String code) => switch (code) {
-      'member.too_many' => '最多 ${MemberRules.maxActiveMembers} 人',
-      'member.invite_code_invalid' => '邀请码不正确',
-      'member.name_required' => '请填写成员称呼',
-      'member.name_taken' => '已经有同名成员了',
-      'member.last_owner' => '最后一名所有者不能退出，请先转让',
-      'member.cannot_delete_me' => '「我」不能删除',
-      'member.cannot_leave_me' => '「我」不能退出',
-      _ => '操作失败，请重试',
+String _memberError(AppStrings s, String code) => switch (code) {
+      'member.too_many' => s.maxMembers(MemberRules.maxActiveMembers),
+      'member.invite_code_invalid' => s.inviteCodeInvalid,
+      'member.name_required' => s.memberNameRequired,
+      'member.name_taken' => s.memberNameTaken,
+      'member.last_owner' => s.lastOwnerCannotLeave,
+      'member.cannot_delete_me' => s.cannotDeleteMe,
+      'member.cannot_leave_me' => s.cannotLeaveMe,
+      _ => s.operationFailedRetry,
     };
 
 class _MemberAvatar extends StatelessWidget {
