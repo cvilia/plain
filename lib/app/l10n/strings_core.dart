@@ -73,4 +73,8 @@ extension CoreStrings on AppStrings {
 
   String pushException(Object e) => isZh ? '推送异常: $e' : 'Push error: $e';
   String pullException(Object e) => isZh ? '拉取异常: $e' : 'Pull error: $e';
+
+  // ── design_system/category_create_sheet.dart ──
+
+  String get createCategoryAction => isZh ? '创建' : 'Create';
 }

@@ -20,6 +20,7 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:plain/app/l10n/app_strings.dart';
+import 'package:plain/app/l10n/strings_core.dart';
 import 'package:plain/app/theme/app_colors.dart';
 import 'package:plain/app/theme/design_tokens.dart';
 import 'package:plain/design_system/app_toast.dart';
@@ -55,7 +56,7 @@ Future<NewRootCategoryDraft?> showCreateRootCategorySheet({
   required BuildContext context,
   required List<Category> existing,
   CategoryKind? lockedKind,
-  String submitLabel = '创建',
+  String? submitLabel,
 }) {
   return showModalBottomSheet<NewRootCategoryDraft>(
     context: context,
@@ -64,7 +65,7 @@ Future<NewRootCategoryDraft?> showCreateRootCategorySheet({
       child: _CreateRootCategorySheet(
         existing: existing,
         lockedKind: lockedKind,
-        submitLabel: submitLabel,
+        submitLabel: submitLabel ?? AppStrings.of(ctx).createCategoryAction,
       ),
     ),
   );

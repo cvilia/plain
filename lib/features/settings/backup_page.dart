@@ -117,10 +117,7 @@ class _BackupPageState extends ConsumerState<BackupPage> {
                         color: colors.inkSecondary,
                       ),
                     ),
-                    const TextSpan(
-                      text: '，包含全部账单、分类、账户与设置。'
-                          '通过系统分享保存到网盘或电脑。',
-                    ),
+                    TextSpan(text: s.noteBackupRest),
                   ],
                 ),
               ),
@@ -157,7 +154,8 @@ class _BackupPageState extends ConsumerState<BackupPage> {
           if (_lastExportPath != null) ...[
             const SizedBox(height: 8),
             Text(
-              '上次导出成功${_lastExportSize == null ? '' : ' · $_lastExportSize KB'}',
+              s.lastExportOk(
+                  _lastExportSize == null ? '' : ' · $_lastExportSize KB'),
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w600,

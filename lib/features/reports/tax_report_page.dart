@@ -203,7 +203,9 @@ class _TaxReportPageState extends ConsumerState<TaxReportPage> {
                   Row(children: [
                     Text(
                       _summary.isFiled
-                          ? '已申报（${_summary.filedAt == null ? '' : _fmtDay(_summary.filedAt!)}）'
+                          ? s.taxFiledStatus(_summary.filedAt == null
+                              ? ''
+                              : _fmtDay(_summary.filedAt!))
                           : s.taxUnfiledStatus,
                       style: TextStyle(
                         fontSize: 14,
@@ -224,8 +226,7 @@ class _TaxReportPageState extends ConsumerState<TaxReportPage> {
                     AppEmptyState(
                       icon: PlainIconData.receipt,
                       title: s.taxEmptyTitle,
-                      subtitle: '在分类管理里把相关分类标为「可抵扣」后，'
-                          '它们的支出会自动汇总到这里',
+                      subtitle: s.taxEmptySubtitle,
                     )
                   else ...[
                     PlainEyebrow(s.taxLinesEyebrow(_summary.lines.length)),

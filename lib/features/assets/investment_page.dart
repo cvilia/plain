@@ -285,8 +285,8 @@ class _InvestmentPageState extends ConsumerState<InvestmentPage> {
             ListTile(
               title: Text(h.name, style: const TextStyle(fontWeight: FontWeight.w600)),
               subtitle: Text(
-                '${Quantity.label(h.sharesX10000)} 份 · 成本 '
-                '${formatAmountYuan(h.costPriceCents)}',
+                s.holdingSubtitle(Quantity.label(h.sharesX10000),
+                    formatAmountYuan(h.costPriceCents)),
               ),
             ),
             const Divider(height: 1),
@@ -353,7 +353,8 @@ class _InvestmentPageState extends ConsumerState<InvestmentPage> {
             Text(
               isSell
                   ? s.currentHolding(Quantity.label(h.sharesX10000))
-                  : '当前持有 ${Quantity.label(h.sharesX10000)} 份，均价 ${formatAmountYuan(h.costPriceCents)}',
+                  : s.currentHoldingWithAvg(Quantity.label(h.sharesX10000),
+                      formatAmountYuan(h.costPriceCents)),
               style: TextStyle(fontSize: 12, color: context.colors.inkTertiary),
             ),
             const SizedBox(height: Spacing.md),
@@ -612,8 +613,9 @@ class _HoldingRow extends StatelessWidget {
             Row(children: [
               Expanded(
                 child: Text(
-                  '${h.assetType.label} · ${Quantity.label(h.sharesX10000)} 份 · '
-                  '成本 ${formatAmountYuan(h.costPriceCents)}',
+                  s.holdingSummary(h.assetType.label(s),
+                      Quantity.label(h.sharesX10000),
+                      formatAmountYuan(h.costPriceCents)),
                   style: TextStyle(fontSize: 12, color: colors.inkTertiary),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,

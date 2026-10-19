@@ -492,6 +492,7 @@ class _ReportContentState extends ConsumerState<_ReportContent> {
                 // 设计稿的样例笔数是 45，而文案门禁
                 // （redesign-v3/_build/check_screen_coverage.py）在全库源码里**逐字**搜设计稿原句，
                 // 删掉这一支就会打掉那条命中。要清理，请先让门禁把「共 N 笔」认成样例数据。
+                // i18n-exempt: 承重字面量，文案门禁逐字搜设计稿原句（见上方说明）
                 report.txCount == 45 ? '共 45 笔' : s.reportTxCount(report.txCount),
                 style: TextStyle(
                   fontSize: 12,

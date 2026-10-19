@@ -77,7 +77,7 @@ class _TrashPageState extends ConsumerState<TrashPage> {
         if (!mounted) return;
         showAppToast(context, s.restored);
       } else {
-        showAppToast(context, '恢复失败: ${res.failureOrNull?.code ?? 'unknown'}');
+        showAppToast(context, s.restoreFailed(res.failureOrNull?.code ?? 'unknown'));
       }
     } on Object catch (e) {
       if (!mounted) return;
@@ -118,7 +118,9 @@ class _TrashPageState extends ConsumerState<TrashPage> {
     if (!mounted) return;
     showAppToast(
       context,
-      okCount > 0 ? s.restoredCount(okCount) : '恢复失败${lastError == null ? '' : ': $lastError'}',
+      okCount > 0
+          ? s.restoredCount(okCount)
+          : s.restoreFailed(lastError ?? 'unknown'),
     );
   }
 
@@ -142,7 +144,7 @@ class _TrashPageState extends ConsumerState<TrashPage> {
         if (!mounted) return;
         showAppToast(context, s.purgedForever);
       } else {
-        showAppToast(context, '删除失败: ${res.failureOrNull?.code ?? 'unknown'}');
+        showAppToast(context, s.deleteFailedDetail(res.failureOrNull?.code ?? 'unknown'));
       }
     } on Object catch (e) {
       if (!mounted) return;
@@ -157,7 +159,7 @@ class _TrashPageState extends ConsumerState<TrashPage> {
     final confirmed = await showConfirmDialog(
       context,
       title: s.emptyTrashTitle,
-      message: '将彻底删除 ${entries.length} 笔账单，删除后无法恢复。确定继续？',
+      message: s.emptyTrashConfirm(entries.length),
       confirmLabel: s.clearAllAction,
       destructive: true,
     );
@@ -175,7 +177,7 @@ class _TrashPageState extends ConsumerState<TrashPage> {
         if (!mounted) return;
         showAppToast(context, s.trashEmptied);
       } else {
-        showAppToast(context, '清空失败: ${res.failureOrNull?.code ?? 'unknown'}');
+        showAppToast(context, s.emptyFailed(res.failureOrNull?.code ?? 'unknown'));
       }
     } on Object catch (e) {
       if (!mounted) return;

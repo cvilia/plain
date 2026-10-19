@@ -36,6 +36,7 @@ class _SyncPageState extends ConsumerState<SyncPage> {
   bool _testing = false;
   bool _syncing = false;
   String? _status;
+  bool _statusOk = true;
   bool _configured = false;
 
   /// STORY-8.1：增量同步开关与待裁决冲突数
@@ -93,6 +94,7 @@ class _SyncPageState extends ConsumerState<SyncPage> {
     if (config == null) {
       setState(() {
         _syncing = false;
+        _statusOk = false;
         _status = s.saveServerFirst;
       });
       return;
@@ -107,10 +109,10 @@ class _SyncPageState extends ConsumerState<SyncPage> {
       ref.invalidateData.bumpBudgetMutated();
       ref.invalidateData.bumpRecurringMutated();
       setState(() {
+        _statusOk = result.success;
         _status = result.success
-            ? '增量同步成功：上传 ${result.pushed} 条 · 应用 ${result.pulled} 条'
-                '${result.conflicts > 0 ? ' · 新冲突 ${result.conflicts} 条' : ''}'
-            : '增量同步失败：${result.message ?? '未知错误'}';
+            ? s.incrSyncSuccess(result.pushed, result.pulled, result.conflicts)
+            : s.incrSyncFailed(result.message ?? s.unknownError);
       });
     } finally {
       service.dispose();
@@ -154,7 +156,10 @@ class _SyncPageState extends ConsumerState<SyncPage> {
     );
     try {
       final ok = await service.testConnection(_buildConfig());
-      setState(() => _status = ok ? s.connectOk : s.connectFail);
+      setState(() {
+        _statusOk = ok;
+        _status = ok ? s.connectOk : s.connectFail;
+      });
     } finally {
       setState(() => _testing = false);
       client.dispose();
@@ -162,6 +167,7 @@ class _SyncPageState extends ConsumerState<SyncPage> {
   }
 
   Future<void> _upload() async {
+    final s = AppStrings.of(context);
     setState(() { _syncing = true; _status = null; });
     final client = WebDavClient();
     final service = WebDavSyncService(
@@ -171,8 +177,10 @@ class _SyncPageState extends ConsumerState<SyncPage> {
     try {
       final result = await service.upload(_buildConfig());
       setState(() {
+        _statusOk = result.success;
         _status = result.success
-            ? '${result.message} (${((result.fileSize ?? 0) / 1024).toStringAsFixed(1)} KB)'
+            ? s.uploadedWithSize(result.message ?? '',
+                ((result.fileSize ?? 0) / 1024).toStringAsFixed(1))
             : result.message;
       });
     } finally {
@@ -200,7 +208,10 @@ class _SyncPageState extends ConsumerState<SyncPage> {
     );
     try {
       final result = await service.download(_buildConfig());
-      setState(() => _status = result.message);
+      setState(() {
+        _statusOk = result.success;
+        _status = result.message;
+      });
     } finally {
       setState(() => _syncing = false);
       client.dispose();
@@ -359,7 +370,7 @@ class _SyncPageState extends ConsumerState<SyncPage> {
                       Container(
                         padding: const EdgeInsets.all(Spacing.md),
                         decoration: BoxDecoration(
-                          color: _status!.contains('成功')
+                          color: _statusOk
                               ? context.colors.income.withValues(alpha: 0.08)
                               : context.colors.expense.withValues(alpha: 0.08),
                           borderRadius: BorderRadius.circular(Radii.sm),
@@ -434,10 +445,7 @@ class _SyncPageState extends ConsumerState<SyncPage> {
                     Text(s.notesSection, style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
                     const SizedBox(height: Spacing.sm),
                     Text(
-                      '• 同步基于整库备份文件，适合个人多设备使用\n'
-                      '• 恢复后需重启应用生效\n'
-                      '• 密码仅存储在本地设备，不会上传到任何第三方服务器\n'
-                      '• 坚果云用户请在「安全设置」中生成应用专用密码',
+                      s.syncNotesBody,
                       style: TextStyle(fontSize: 12, color: context.colors.inkSecondary, height: 1.6),
                     ),
                   ],

@@ -62,7 +62,7 @@ class FlowListPage extends ConsumerWidget {
     // 本页是「这个月的流水」，不是日历浏览器。原左上角日历按钮（跳报表）已移除，
     // 不要再补月份选择器——要跨月看的是报表页（按月份/区间汇总），不是这里。
     final now = DateTime.now();
-    final monthTitle = '${now.year}年${now.month}月';
+    final monthTitle = s.yearMonth(now);
 
     return Scaffold(
       backgroundColor: colors.surface,
@@ -103,7 +103,8 @@ class FlowListPage extends ConsumerWidget {
           children: [
             if (filterCatId != null)
               _FilterStrip(
-                label: '已筛选：${state.categoryMap[filterCatId]?.name ?? '该分类'}',
+                label: s.filteredBy(
+                    state.categoryMap[filterCatId]?.name ?? s.thisCategory),
                 onClear: () {
                   ref.read(flowCategoryFilterProvider.notifier).clear();
                   controller.refresh();

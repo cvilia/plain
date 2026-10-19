@@ -16,6 +16,7 @@ import 'package:plain/design_system/plain_ui.dart';
 import 'package:plain/domain/entities/enums.dart';
 import 'package:plain/domain/services/csv_importer.dart';
 import 'package:plain/app/l10n/app_strings.dart';
+import 'package:plain/app/l10n/strings_domain.dart';
 import 'package:plain/app/l10n/strings_ledger.dart';
 import 'package:plain/app/l10n/strings_settings_b.dart';
 
@@ -67,6 +68,7 @@ class _ImportPageState extends ConsumerState<ImportPage> {
     final header = rows.first;
     for (var i = 0; i < header.length; i++) {
       final h = header[i].toLowerCase();
+      // i18n-exempt: CSV 表头别名，属于数据而非界面文案
       if (h.contains(s.date) || h.contains('时间') || h.contains('date')) return i;
     }
     return 0;
@@ -119,7 +121,7 @@ class _ImportPageState extends ConsumerState<ImportPage> {
       _step = 3;
     });
     if (result.isFailure && _report == null) {
-      showAppToast(context, '导入失败: ${result.failureOrNull?.message ?? ''}');
+      showAppToast(context, s.importFailed(result.failureOrNull?.message ?? ''));
     }
   }
 
@@ -410,9 +412,12 @@ class _ImportPageState extends ConsumerState<ImportPage> {
             Text(s.importDone, style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
             const SizedBox(height: Spacing.lg),
             if (r != null) ...[
-              _ResultRow(s.resultSuccess, '${r.successCount} 条', context.colors.income),
-              _ResultRow(s.resultDeduped, '${r.dedupedCount} 条', context.colors.inkSecondary),
-              _ResultRow(s.resultFailed, '${r.failedCount} 条', context.colors.expense),
+              _ResultRow(s.resultSuccess, s.importResultCount(r.successCount),
+                  context.colors.income),
+              _ResultRow(s.resultDeduped, s.importResultCount(r.dedupedCount),
+                  context.colors.inkSecondary),
+              _ResultRow(s.resultFailed, s.importResultCount(r.failedCount),
+                  context.colors.expense),
               if (r.errors.isNotEmpty) ...[
                 const SizedBox(height: Spacing.md),
                 Text(s.errorDetails, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: context.colors.expense)),

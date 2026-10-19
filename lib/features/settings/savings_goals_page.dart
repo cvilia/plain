@@ -372,8 +372,7 @@ class _SavingsGoalsPageState extends ConsumerState<SavingsGoalsPage> {
                   Padding(
                     padding: const EdgeInsets.only(bottom: Spacing.sm),
                     child: Text(
-                      '${_foreignDebtGoals.join('、')} 关联的是外币贷款，'
-                      '未参与进度测算（本金外币、流水本位币对不上），请手动维护还款进度。',
+                      s.goalForeignDebtNote(_foreignDebtGoals.join('、')),
                       style: TextStyle(
                         fontSize: 12,
                         height: designLineHeight(12) * 1.4,
@@ -391,8 +390,7 @@ class _SavingsGoalsPageState extends ConsumerState<SavingsGoalsPage> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            '想控制某类开销（例如「本月餐饮 ≤ 2000」）就建一个限额目标。'
-                            '它的底层就是分类预算，和预算页看到的是同一份数据。',
+                            s.goalLimitEmptyNote,
                             style: TextStyle(
                               fontSize: 12,
                               height: designLineHeight(12) * 1.4,
@@ -430,8 +428,7 @@ class _SavingsGoalsPageState extends ConsumerState<SavingsGoalsPage> {
                         children: [
                           Expanded(
                             child: Text(
-                              '限额目标复用分类预算，不产生第二套数据；'
-                              '切换预算方法论时它照常生效。',
+                              s.goalLimitReuseNote,
                               style: TextStyle(
                                 fontSize: 12,
                                 height: designLineHeight(12),
@@ -966,9 +963,14 @@ class _GoalRow extends StatelessWidget {
           if (g.isDebt && debt != null) ...[
             const SizedBox(height: Spacing.sm),
             Text(
-              '剩余 ${debt!.progress.remainingMonths} 期 · '
-              '剩余利息 ${formatAmountYuan(debt!.progress.remainingInterestCents)} · '
-              '预计还清 ${debt!.progress.payoffDate == null ? '已结清' : '${debt!.progress.payoffDate!.year}-${debt!.progress.payoffDate!.month.toString().padLeft(2, '0')}'}',
+              s.goalDebtRemaining(
+                debt!.progress.remainingMonths,
+                formatAmountYuan(debt!.progress.remainingInterestCents),
+                debt!.progress.payoffDate == null
+                    ? s.goalDebtSettled
+                    : '${debt!.progress.payoffDate!.year}-'
+                        '${debt!.progress.payoffDate!.month.toString().padLeft(2, '0')}',
+              ),
               style: TextStyle(fontSize: 12, color: colors.inkTertiary),
             ),
           ],

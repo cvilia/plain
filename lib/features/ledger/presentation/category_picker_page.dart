@@ -62,7 +62,7 @@ class _CategoryPickerPageState extends ConsumerState<CategoryPickerPage> {
         actions: [
           PlainTopBarAction(
             icon: PlainIconData.plus,
-            tooltip: '新增分类',
+            tooltip: s.addCategory,
             onTap: () => _showAddSheet(context, ref),
           ),
         ],

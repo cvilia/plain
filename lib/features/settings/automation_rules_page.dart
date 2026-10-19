@@ -137,10 +137,7 @@ class _AutomationRulesPageState extends ConsumerState<AutomationRulesPage> {
                               color: colors.inkSecondary,
                             ),
                           ),
-                          const TextSpan(
-                            text: '。一条账单可在保存时命中多条规则，'
-                                '按优先级顺序执行，后者可覆盖前者。',
-                          ),
+                          TextSpan(text: s.automationRuleEqSuffix),
                         ],
                       ),
                     ),
@@ -318,7 +315,7 @@ class _AutomationRulesPageState extends ConsumerState<AutomationRulesPage> {
     await showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text('试运行 · ${r.name ?? '规则'}'),
+        title: Text(s.automationDryRunTitle(r.name ?? s.automationRuleFallback)),
         content: SizedBox(
           width: double.maxFinite,
           child: hits.isEmpty

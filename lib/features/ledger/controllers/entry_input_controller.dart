@@ -445,7 +445,7 @@ class EntryInputController extends Notifier<EntryInputState> {
     final target = calendar.periodFor(date.year, date.month, day: date.day);
     if (target.label != cur.label) {
       state = state.copyWith(
-        toastMessage: '该账单计入 ${target.month} 月',
+        toastMessage: _strings.entryCountsInMonth(target.month),
       );
     }
   }
@@ -578,7 +578,7 @@ class EntryInputController extends Notifier<EntryInputState> {
         success: (entry) {
           _editingEntry = entry;
           state = state.copyWith(
-            toastMessage: '已保存',
+            toastMessage: _strings.entrySavedToast,
             isSubmitting: false,
             clearError: true,
           );

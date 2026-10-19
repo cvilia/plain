@@ -79,8 +79,7 @@ class _CurrencyRatePageState extends ConsumerState<CurrencyRatePage> {
                     AppEmptyState(
                       icon: PlainIconData.cloud,
                       title: s.noLockedRate,
-                      subtitle: '给外币账户设定「1 单位外币 = 多少 $base」后，'
-                          '用该账户记账时会自动折算成本位币',
+                      subtitle: s.noLockedRateHint(base),
                       action: FilledButton.icon(
                         onPressed: () => _edit(null),
                         icon: const PlainIcon(PlainIconData.plus),
@@ -230,7 +229,7 @@ class _RateEditDialogState extends ConsumerState<_RateEditDialog> {
         // 失败时不关弹窗，用户可直接改数重试。
         setState(() {
           _saving = false;
-          _error = '保存失败：${r.failureOrNull?.code ?? 'unknown'}';
+          _error = s.saveFailedDetail(r.failureOrNull?.code ?? 'unknown');
         });
         return;
       }
@@ -390,8 +389,7 @@ class _NotePanel extends StatelessWidget {
     final colors = context.colors;
     final lines = <String>[
       s.rateNoteSource,
-      '锁定后，用该外币账户记账时按此汇率折成本位币 $base；'
-          '本位币金额用于所有统计，原币金额单独保留并双显示。',
+      s.rateNoteConvert(base),
       s.rateNotePerEntry,
     ];
     return PlainPanel(

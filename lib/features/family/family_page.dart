@@ -176,8 +176,7 @@ class FamilyPage extends ConsumerWidget {
               Padding(
                 padding: const EdgeInsets.only(left: 2, top: 6),
                 child: Text(
-                  '跨设备加入需要官方云同步（8.1）——当前邀请码用于线下告知家人，'
-                  '校验后在本机登记成员。',
+                  s.crossDeviceJoinNote,
                   style: TextStyle(
                     fontSize: 12,
                     height: designLineHeight(12),
@@ -222,7 +221,7 @@ class FamilyPage extends ConsumerWidget {
                     PlainRow(
                       title: data.left[i].name,
                       subtitle:
-                          '${data.left[i].attributionLabel} · 历史账单归属保留、不占名额',
+                          '${data.left[i].attributionLabel(s)} · ${s.leftMemberHint}',
                     ),
                   ],
                 ]),
@@ -321,15 +320,15 @@ class _MemberRow extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final s = AppStrings.of(context);
     final colors = context.colors;
-    final subtitle = StringBuffer(member.role.label);
-    if (member.isMe) subtitle.write(' · 我');
+    final subtitle = StringBuffer(member.role.label(s));
+    if (member.isMe) subtitle.write(' · ${s.me}');
     if (agg != null && agg!.txCount > 0) {
-      subtitle.write(' · $periodLabel ${agg!.txCount} 笔');
+      subtitle.write(' · $periodLabel ${s.entriesCount(agg!.txCount)}');
       if (agg!.expenseCents > 0) {
         subtitle.write(s.expenseWithAmount(formatAmount(agg!.expenseCents, hide: false)));
       }
     } else {
-      subtitle.write(' · $periodLabel 暂无记录');
+      subtitle.write(' · $periodLabel ${s.noRecordsShort}');
     }
     return PlainRow(
       title: member.name,

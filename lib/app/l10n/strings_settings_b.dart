@@ -254,6 +254,7 @@ extension SettingsBStrings on AppStrings {
   String moreCount(int n) => isZh ? '... 共 $n 条' : '... $n total';
   String importCount(int n) => isZh ? '导入 $n 条' : 'Import $n';
   String get importDone => isZh ? '导入完成' : 'Import complete';
+  String importResultCount(int n) => isZh ? '$n 条' : '$n';
   String get resultSuccess => isZh ? '成功导入' : 'Imported';
   String get resultDeduped => isZh ? '去重跳过' : 'Skipped (duplicate)';
   String get resultFailed => isZh ? '失败/异常' : 'Failed/invalid';

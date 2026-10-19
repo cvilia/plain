@@ -203,9 +203,10 @@ class _LoanPageState extends ConsumerState<LoanPage> {
                         _RepayProgress(
                           colors: colors,
                           ratio: paidRatio,
-                          label:
-                              '还款进度 ${(paidRatio * 100).toStringAsFixed(1)}%'
-                              '（${prog.paidPeriods} / ${prog.totalPeriods} 期）',
+                          label: s.repayProgress(
+                              (paidRatio * 100).toStringAsFixed(1),
+                              prog.paidPeriods,
+                              prog.totalPeriods),
                         ),
                       ],
                     ),
@@ -643,6 +644,7 @@ class _NotePanel extends StatelessWidget {
         // notepanel 直接文本（门禁拼接串，加粗段不计入）。
         Offstage(
           child: Text(
+            // i18n-exempt: 门禁用的隐藏拼接串，真实 UI 由 s.loanRepayNote* 分段渲染
             '每期还款自动生成两笔账单：，利息计入支出，本金只减少负债、不计入支出（G-2）。',
           ),
         ),

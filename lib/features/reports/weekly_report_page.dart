@@ -130,8 +130,7 @@ class _WeeklyReportPageState extends ConsumerState<WeeklyReportPage> {
                     Padding(
                       padding: const EdgeInsets.only(top: Spacing.md),
                       child: Text(
-                        '推送时间：${report.weekEnd} 周日 20:00 起，'
-                        '到点后首次打开素记时送达（素记不常驻后台）。',
+                        s.weeklyPushNote(report.weekEnd),
                         style: TextStyle(
                           fontSize: 12,
                           height: designLineHeight(12),
@@ -195,8 +194,12 @@ class _Hero extends ConsumerWidget {
           Padding(
             padding: const EdgeInsets.only(left: 2),
             child: Text(
-              '${report.weekStart} ~ ${report.weekEnd} · 共 ${report.entryCount} 笔'
-              ' · 收入 ¥${formatAmount(report.totalIncomeCents, hide: hide)}',
+              s.weeklyRangeLine(
+                report.weekStart,
+                report.weekEnd,
+                report.entryCount,
+                formatAmount(report.totalIncomeCents, hide: hide),
+              ),
               style: TextStyle(
                 fontSize: 12,
                 height: designLineHeight(12),
@@ -208,8 +211,10 @@ class _Hero extends ConsumerWidget {
             Padding(
               padding: const EdgeInsets.only(left: 2, top: Spacing.xs),
               child: Text(
-                '与上周同期相比：${report.expenseChangePercent >= 0 ? '上升' : '下降'} '
-                '${report.expenseChangePercent.abs().toStringAsFixed(0)}%',
+                s.weeklyCompareLine(
+                  report.expenseChangePercent >= 0 ? s.wrUp : s.wrDown,
+                  report.expenseChangePercent.abs().toStringAsFixed(0),
+                ),
                 style: TextStyle(
                   fontSize: 14,
                   height: designLineHeight(14),

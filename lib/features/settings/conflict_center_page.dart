@@ -60,8 +60,7 @@ class ConflictCenterPage extends ConsumerWidget {
             padding: const EdgeInsets.fromLTRB(Spacing.lg, Spacing.md, Spacing.lg, Spacing.xl),
             children: [
               Text(
-                '共 ${conflicts.length} 条待裁决。合并时默认取了「最后写入」的一版，'
-                '下面可以改成另一版；选「都保留」会另存一笔冲突副本。',
+                s.conflictBanner(conflicts.length),
                 style: TextStyle(
                   fontSize: 12,
                   height: designLineHeight(12) * 1.4,

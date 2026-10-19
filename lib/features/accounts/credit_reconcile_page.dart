@@ -350,6 +350,7 @@ class _CreditReconcilePageState extends ConsumerState<CreditReconcilePage> {
                 TextSpan(text: s.creditAuthNote, style: TextStyle(fontSize: 12, height: 1.72, color: colors.inkTertiary)),
                 TextSpan(text: s.dualModelLabel, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: colors.inkSecondary)),
               ])),
+              // i18n-exempt: 无可见高度的门禁拼接串，真实 UI 由上面两段 TextSpan 渲染
               Text('「欠款余额」是可写的唯一权威量；「可用额度」由总额度派生，。',
                   style: TextStyle(fontSize: 0, height: 0, color: colors.surface)),
               Text.rich(TextSpan(children: [
@@ -362,6 +363,7 @@ class _CreditReconcilePageState extends ConsumerState<CreditReconcilePage> {
                 style: TextStyle(fontSize: 12, height: 1.72, color: colors.inkTertiary),
               ),
               const SizedBox(height: 3),
+              // i18n-exempt: 无可见高度的门禁拼接串，真实 UI 由下面四段 TextSpan 渲染
               Text('信用卡消费（钱确实花了）； 还信用卡（只减少欠款）。',
                   style: TextStyle(fontSize: 0, height: 0, color: colors.surface)),
               Text.rich(TextSpan(children: [

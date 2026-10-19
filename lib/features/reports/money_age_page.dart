@@ -95,9 +95,8 @@ class _MoneyAgePageState extends ConsumerState<MoneyAgePage> {
                     AppEmptyState(
                       icon: PlainIconData.chartLine,
                       title: s.maAccumulating,
-                      subtitle:
-                          '资金年龄需要至少 5 笔收入、跨度约两个月的数据。'
-                          '当前收入 ${r?.incomeCount ?? 0} 笔、支出 ${r?.expenseCount ?? 0} 笔。',
+                      subtitle: s.moneyAgeEmptySubtitle(
+                          r?.incomeCount ?? 0, r?.expenseCount ?? 0),
                     )
                   else ...[
                     _Hero(result: r),

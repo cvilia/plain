@@ -704,8 +704,7 @@ class _SavePanel extends StatelessWidget {
       padding: const EdgeInsets.all(Spacing.lg),
       children: [
         Text(
-          '把当前的行列组合与筛选存成「我的报表」，下次一键复现。'
-          '已保存 $savedCount 份。',
+          s.reportSavePanelHint(savedCount),
           style: TextStyle(fontSize: 14, height: 1.65, color: colors.inkSecondary),
         ),
         const SizedBox(height: Spacing.md),

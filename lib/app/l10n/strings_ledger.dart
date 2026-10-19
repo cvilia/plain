@@ -212,6 +212,9 @@ extension LedgerStrings on AppStrings {
   String get addChildAction => isZh ? '加子笔' : 'Add child';
   String get splitDone => isZh ? '已拆分' : 'Split done';
   String splitFailed(String code) => isZh ? '拆分失败: $code' : 'Split failed: $code';
+  String get entrySavedToast => isZh ? '已保存' : 'Saved';
+  String entryCountsInMonth(int month) =>
+      isZh ? '该账单计入 $month 月' : 'This entry counts toward month $month';
   String get saveSplitAction => isZh ? '保存拆分' : 'Save split';
   String get mergeDone => isZh ? '已合并回父笔，请补充分类' : 'Merged back into parent — please add a category';
   String mergeFailed(String code) => isZh ? '合并失败: $code' : 'Merge failed: $code';

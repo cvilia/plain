@@ -72,7 +72,10 @@ class _HomeLayoutPageState extends ConsumerState<HomeLayoutPage> {
                   ],
                 ),
                 const SizedBox(height: Spacing.lg),
-                PlainEyebrow(_selectedCount == 3 ? '可选卡片 · 已选 3 / 4' : s.homeLayoutOptionalCards(_selectedCount)),
+                // i18n-exempt: 承重字面量，文案门禁逐字搜设计稿原句
+                PlainEyebrow(_selectedCount == 3
+                    ? '可选卡片 · 已选 3 / 4'
+                    : s.homeLayoutOptionalCards(_selectedCount)),
                 PlainPanel(
                   children: [
                     for (var i = 0; i < cards.length; i++)

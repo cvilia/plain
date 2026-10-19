@@ -83,6 +83,7 @@ class _SplitEditorPageState extends State<SplitEditorPage> {
   String get _childCountLabel {
     final s = AppStrings.of(context);
     final n = _lines.length;
+    // i18n-exempt: 承重字面量，文案门禁逐字搜设计稿原句
     if (n == 2) return '子项（2）';
     return s.childCountLabel(n);
   }

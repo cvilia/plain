@@ -115,7 +115,8 @@ class _RecurringPageState extends ConsumerState<RecurringPage> {
       ref.invalidate(_rulesProvider);
       showAppToast(context, skip ? s.recurringSkipped : s.recurringConfirmed);
     } else {
-      showAppToast(context, '操作失败: ${res.failureOrNull?.code ?? 'unknown'}');
+      showAppToast(context,
+          s.recurringOpFailed(res.failureOrNull?.code ?? 'unknown'));
     }
   }
 

@@ -365,6 +365,7 @@ class AccountsPage extends ConsumerWidget {
                   type: isExpense ? EntryType.expense : EntryType.income,
                   categoryId: isExpense ? 'preset_other' : 'preset_income_other',
                   accountId: account.id,
+                  // i18n-exempt: 写库系统备注，属数据非界面文案
                   note: '对账调整',
                   source: EntrySource.reconcile,
                   bookId: deps.bookId,
@@ -753,8 +754,7 @@ class _AddAccountSheetState extends ConsumerState<_AddAccountSheet> {
               Padding(
                 padding: const EdgeInsets.only(top: 6),
                 child: Text(
-                  '外币账户的期初按 $_currency 记，不并入本位币余额；'
-                  '净值里按「汇率锁定」设定的人民币汇率折算参与。',
+                  s.foreignOpeningNote(_currency),
                   style: TextStyle(fontSize: 12, color: context.colors.inkTertiary),
                 ),
               ),
@@ -1200,7 +1200,8 @@ class _AddAccountSheetState extends ConsumerState<_AddAccountSheet> {
           interestCategoryId: _interestCategoryId ?? 'preset_other',
         );
         if (r.isFailure && mounted) {
-          showAppToast(context, '还款计划建立失败：${r.failureOrNull?.code ?? '未知'}');
+          showAppToast(context,
+              s.repayScheduleFailed(r.failureOrNull?.code ?? s.unknownError));
         }
       }
     }

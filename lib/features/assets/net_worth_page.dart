@@ -473,7 +473,7 @@ class _EntryRow extends StatelessWidget {
             const SizedBox(height: 2),
             Text(
               [
-                e.bucket.label,
+                e.bucket.label(s),
                 if (e.detail != null) e.detail!,
                 // 固定资产并列展示原始成本（AC1）
                 if (e.costCents != null)
@@ -590,16 +590,11 @@ class _NotePanel extends StatelessWidget {
     }
     if (unconvertedRates.isNotEmpty) {
       // 口径：外币账户按锁定汇率折算参与净值；没汇率就不参与（不混加原币）
-      lines.add('${unconvertedRates.join('、')} 是外币账户，'
-          '还没有设定「原币 → 本位币」的锁定汇率，因此未计入净值'
-          '（账户余额本身不受影响，只算本位币口径）。'
-          '在设置 → 记账 → 汇率锁定里填一次即可参与。');
+      lines.add(s.unconvertedRatesNote(unconvertedRates.join('、')));
     }
     if (skippedForeignDebts > 0) {
       // 外币负债不参与净值：本金原币、流水本位币，硬算会得出 0 或混加出来的假数字
-      lines.add('有 $skippedForeignDebts 个外币负债账户未计入净值'
-          '（贷款本金是原币、流水是本位币，折算不出可信的剩余本金），'
-          '这部分请手动核对维护。');
+      lines.add(s.skippedForeignDebtsNote(skippedForeignDebts));
     }
     if (hasValuation) {
       lines.add(s.valuationNote);

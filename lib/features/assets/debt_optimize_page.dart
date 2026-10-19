@@ -154,7 +154,7 @@ class _DebtOptimizePageState extends ConsumerState<DebtOptimizePage> {
                       title: s.noDebtsToCalc,
                       subtitle: _incomplete.isEmpty
                           ? s.noDebtsHint
-                          : '以下账户缺少年利率/最低还款：${_incomplete.join('、')}',
+                          : s.incompleteDebtsHint(_incomplete.join('、')),
                     )
                   else ...[
                     PlainEyebrow(s.extraMonthlyRepay),
@@ -197,8 +197,7 @@ class _DebtOptimizePageState extends ConsumerState<DebtOptimizePage> {
                     const SizedBox(height: Spacing.md),
                     _NotePanel(
                       lines: [
-                        '以下账户缺少年利率或最低还款，未参与测算：${_incomplete.join('、')}。'
-                            '在账户里补全后即可加入对比。',
+                        s.incompleteNote(_incomplete.join('、')),
                       ],
                     ),
                   ],
@@ -208,21 +207,17 @@ class _DebtOptimizePageState extends ConsumerState<DebtOptimizePage> {
                       // 结合实际场景：外币贷款常见于海外房贷/留学贷款，
                       // 这类债务的剩余本金要用户自己盯，不能让测算给个假数字
                       lines: [
-                        '以下外币负债未参与测算：${_foreignDebts.join('、')}。'
-                            '它们的本金是外币、流水记的是本位币，折算不出可信的剩余本金，'
-                            '请手动维护余额与还款计划。',
+                        s.foreignDebtsNote(_foreignDebts.join('、')),
                       ],
                     ),
                   ],
                   const SizedBox(height: Spacing.md),
                   _NotePanel(
                     lines: [
-                      '两种方法都是「每月预算固定 = Σ最低还款 + 额外还款」，'
-                          '某笔结清后它让出的最低还款自动滚向下一个目标。',
+                      s.debtMethodNoteA,
                       s.debtMethodNoteB,
                       if (_extraCents == 0)
-                        '当前未填额外还款：此时没有余钱可调度，两种方法的推进方式相同，'
-                            '要看出差异请填入额外还款。',
+                        s.debtMethodNoteC,
                     ],
                   ),
                 ],
@@ -283,7 +278,7 @@ class _PlanBlock extends StatelessWidget {
     final s = AppStrings.of(context);
     final orderText = plan.order.isEmpty
         ? '—'
-        : plan.order.map((s) => '${s.name}(${s.month}月)').join(' → ');
+        : plan.order.map((o) => s.orderItem(o.name, o.month)).join(' → ');
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: Column(
