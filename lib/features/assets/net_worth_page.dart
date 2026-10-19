@@ -9,6 +9,7 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:plain/app/bootstrap.dart';
 import 'package:plain/app/breakpoints.dart';
 import 'package:plain/app/settings/ledger_settings.dart';
@@ -18,6 +19,7 @@ import 'package:plain/core/constants/app_constants.dart';
 import 'package:plain/core/format/amount_formatter.dart';
 import 'package:plain/design_system/amount_display.dart';
 import 'package:plain/design_system/app_empty_state.dart';
+import 'package:plain/design_system/app_error_state.dart';
 import 'package:plain/design_system/plain_icons_v3.dart';
 import 'package:plain/design_system/plain_ui.dart';
 import 'package:plain/domain/entities/category.dart';
@@ -46,6 +48,7 @@ class NetWorthPage extends ConsumerStatefulWidget {
 
 class _NetWorthPageState extends ConsumerState<NetWorthPage> {
   bool _loading = true;
+  Object? _loadError;
   NetWorthSnapshot? _snapshot;
   List<NetWorthPoint> _points = const [];
   List<Account> _accounts = const [];
@@ -61,7 +64,10 @@ class _NetWorthPageState extends ConsumerState<NetWorthPage> {
   }
 
   Future<void> _reload() async {
-    setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+      _loadError = null;
+    });
     final deps = ref.read(appDependenciesProvider);
 
     final accountsRes = await deps.accountRepository.listWithBalances();
@@ -71,6 +77,18 @@ class _NetWorthPageState extends ConsumerState<NetWorthPage> {
     // 外币账户折算要用用户手填的锁定汇率（STORY-9.3）
     final ratesRes = await deps.currencyRateRepository.listByBook(deps.bookId);
     if (!mounted) return;
+
+    final loadFailure = accountsRes.failureOrNull ??
+        holdingsRes.failureOrNull ??
+        ledgerRes.failureOrNull ??
+        ratesRes.failureOrNull;
+    if (loadFailure != null) {
+      setState(() {
+        _loadError = loadFailure;
+        _loading = false;
+      });
+      return;
+    }
 
     final all = accountsRes.successOrNull ?? const <AccountWithBalance>[];
     final holdings = holdingsRes.successOrNull ?? const <Holding>[];
@@ -184,7 +202,9 @@ class _NetWorthPageState extends ConsumerState<NetWorthPage> {
           ),
         ],
       ),
-      body: _loading
+      body: _loadError != null
+          ? AppErrorState.of(context, _loadError!, onRetry: _reload)
+          : _loading
           ? const Center(child: CircularProgressIndicator())
           : ContentWidthConstraint(
               child: ListView(
@@ -195,7 +215,11 @@ class _NetWorthPageState extends ConsumerState<NetWorthPage> {
                     _Hero(snapshot: _snapshot!),
                     PlainEyebrow(s.accounts),
                     if (_snapshot!.assets.isEmpty)
-                      _EmptyRow(text: s.noAssetAccounts)
+                      _EmptyRow(
+                        text: s.noAssetAccounts,
+                        actionLabel: s.addAccount,
+                        onAction: () => context.push('/accounts'),
+                      )
                     else
                       PlainPanel(
                         children: [
@@ -550,15 +574,27 @@ class _TrendPanel extends StatelessWidget {
 }
 
 class _EmptyRow extends StatelessWidget {
-  const _EmptyRow({required this.text});
+  const _EmptyRow({required this.text, this.actionLabel, this.onAction});
   final String text;
+
+  /// 空态不能是死胡同：能给出下一步时传 label + 回调。
+  final String? actionLabel;
+  final VoidCallback? onAction;
 
   @override
   Widget build(BuildContext context) => Padding(
         padding: const EdgeInsets.all(Spacing.lg),
-        child: Text(text,
-            style: TextStyle(
-                fontSize: 14, color: context.colors.inkTertiary)),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(text,
+                  style: TextStyle(
+                      fontSize: 14, color: context.colors.inkTertiary)),
+            ),
+            if (actionLabel != null && onAction != null)
+              TextButton(onPressed: onAction, child: Text(actionLabel!)),
+          ],
+        ),
       );
 }
 

@@ -17,6 +17,7 @@ import 'package:plain/core/format/amount_formatter.dart';
 import 'package:plain/core/refresh/data_invalidation.dart';
 import 'package:plain/design_system/amount_display.dart';
 import 'package:plain/design_system/app_empty_state.dart';
+import 'package:plain/design_system/app_error_state.dart';
 import 'package:plain/design_system/app_toast.dart';
 import 'package:plain/design_system/confirm_dialog.dart';
 import 'package:plain/design_system/plain_icons_v3.dart';
@@ -41,6 +42,7 @@ class InvestmentPage extends ConsumerStatefulWidget {
 
 class _InvestmentPageState extends ConsumerState<InvestmentPage> {
   bool _loading = true;
+  Object? _loadError;
   String _accountName = '';
   List<Holding> _holdings = const [];
   HoldingsSummary _summary =
@@ -54,12 +56,25 @@ class _InvestmentPageState extends ConsumerState<InvestmentPage> {
 
   Future<void> _reload() async {
     final s = AppStrings.of(context);
-    setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+      _loadError = null;
+    });
     final deps = ref.read(appDependenciesProvider);
     final acct = await deps.accountRepository.getById(widget.accountId);
     final bal = await deps.accountRepository.balanceOf(widget.accountId);
     final list = await deps.holdingRepository.listByAccount(widget.accountId);
     if (!mounted) return;
+    final loadFailure = acct.failureOrNull ??
+        bal.failureOrNull ??
+        list.failureOrNull;
+    if (loadFailure != null) {
+      setState(() {
+        _loadError = loadFailure;
+        _loading = false;
+      });
+      return;
+    }
     final account = acct.successOrNull;
     final holdings = list.successOrNull ?? const <Holding>[];
     // 现金余额取自账户派生余额（持仓市值是另一块，不重复计）
@@ -108,7 +123,9 @@ class _InvestmentPageState extends ConsumerState<InvestmentPage> {
           ),
         ],
       ),
-      body: _loading
+      body: _loadError != null
+          ? AppErrorState.of(context, _loadError!, onRetry: _reload)
+          : _loading
           ? const Center(child: CircularProgressIndicator())
           : ContentWidthConstraint(
               child: ListView(

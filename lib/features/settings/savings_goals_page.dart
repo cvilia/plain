@@ -14,6 +14,7 @@ import 'package:plain/core/time/date_format.dart';
 import 'package:plain/design_system/amount_display.dart';
 import 'package:plain/design_system/app_date_picker.dart';
 import 'package:plain/design_system/app_empty_state.dart';
+import 'package:plain/design_system/app_error_state.dart';
 import 'package:plain/design_system/app_toast.dart';
 import 'package:plain/design_system/picker_sheet.dart';
 import 'package:plain/design_system/plain_icons_v3.dart';
@@ -70,6 +71,7 @@ class _SavingsGoalsPageState extends ConsumerState<SavingsGoalsPage> {
   /// 关联了外币贷款的还债目标名（不参与测算，需手动维护）。
   List<String> _foreignDebtGoals = const [];
   bool _loading = true;
+  Object? _loadError;
 
   @override
   void initState() {
@@ -79,12 +81,23 @@ class _SavingsGoalsPageState extends ConsumerState<SavingsGoalsPage> {
 
   Future<void> _reload() async {
     final s = AppStrings.of(context);
-    setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+      _loadError = null;
+    });
     final deps = ref.read(appDependenciesProvider);
     final res = await deps.savingsGoalRepository.listByBook(deps.bookId);
     // 目标进度读**目标虚拟账户的派生余额**（V3.0 口径），
     // 因此这里要一次性拿全账户余额（`listWithBalances` 一条聚合查询）。
     final accRes = await deps.accountRepository.listWithBalances();
+    final loadFailure = res.failureOrNull ?? accRes.failureOrNull;
+    if (loadFailure != null) {
+      setState(() {
+        _loadError = loadFailure;
+        _loading = false;
+      });
+      return;
+    }
     final rows = accRes.successOrNull ?? const <AccountWithBalance>[];
     final all = [for (final r in rows) r.account];
     final goals = res.successOrNull ?? const <SavingsGoal>[];
@@ -325,7 +338,9 @@ class _SavingsGoalsPageState extends ConsumerState<SavingsGoalsPage> {
           ),
         ],
       ),
-      body: _loading
+      body: _loadError != null
+          ? AppErrorState.of(context, _loadError!, onRetry: _reload)
+          : _loading
           ? const Center(child: CircularProgressIndicator())
           : ListView(
               padding: const EdgeInsets.all(Spacing.lg),

@@ -6,6 +6,7 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:plain/app/bootstrap.dart';
 import 'package:plain/app/breakpoints.dart';
 import 'package:plain/app/settings/ledger_settings.dart';
@@ -13,6 +14,7 @@ import 'package:plain/app/theme/app_colors.dart';
 import 'package:plain/app/theme/design_tokens.dart';
 import 'package:plain/app/theme/typography.dart';
 import 'package:plain/design_system/app_empty_state.dart';
+import 'package:plain/design_system/app_error_state.dart';
 import 'package:plain/design_system/plain_icons_v3.dart';
 import 'package:plain/design_system/plain_ui.dart';
 import 'package:plain/domain/entities/enums.dart';
@@ -32,6 +34,7 @@ class MoneyAgePage extends ConsumerStatefulWidget {
 
 class _MoneyAgePageState extends ConsumerState<MoneyAgePage> {
   bool _loading = true;
+  Object? _loadError;
   MoneyAgeResult? _result;
 
   @override
@@ -41,11 +44,21 @@ class _MoneyAgePageState extends ConsumerState<MoneyAgePage> {
   }
 
   Future<void> _load() async {
-    setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+      _loadError = null;
+    });
     final deps = ref.read(appDependenciesProvider);
     // 取全量账单：FIFO 需要从最早的收入开始排队，不能只取当月
     final page = await deps.ledgerRepository.listPage(limit: 5000);
     if (!mounted) return;
+    if (page.isFailure) {
+      setState(() {
+        _loadError = page.failureOrNull;
+        _loading = false;
+      });
+      return;
+    }
     final entries = page.successOrNull?.items ?? const [];
 
     // G-2：只有真正计入收支的账单参与（排除对账调整、拆分子笔、转账等）
@@ -84,7 +97,9 @@ class _MoneyAgePageState extends ConsumerState<MoneyAgePage> {
     final r = _result;
     return Scaffold(
       appBar: PlainTopBar(title: s.reportMoneyAgeTitle, showBack: true),
-      body: _loading
+      body: _loadError != null
+          ? AppErrorState.of(context, _loadError!, onRetry: _load)
+          : _loading
           ? const Center(child: CircularProgressIndicator())
           : ContentWidthConstraint(
               child: ListView(
@@ -97,6 +112,12 @@ class _MoneyAgePageState extends ConsumerState<MoneyAgePage> {
                       title: s.maAccumulating,
                       subtitle: s.moneyAgeEmptySubtitle(
                           r?.incomeCount ?? 0, r?.expenseCount ?? 0),
+                      // 空态不能是死胡同：数据不够时有下一步
+                      action: FilledButton.icon(
+                        onPressed: () => context.push('/entry'),
+                        icon: const PlainIcon(PlainIconData.plus),
+                        label: Text(s.recordEntry),
+                      ),
                     )
                   else ...[
                     _Hero(result: r),

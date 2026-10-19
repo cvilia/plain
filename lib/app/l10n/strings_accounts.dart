@@ -172,6 +172,8 @@ extension AccountsStrings on AppStrings {
       : 'Prices are entered manually with an update time; this app uses no market data source and makes no network requests.';
 
   // ─────────────────────── 贷款摊销（loan_page） ───────────────────────
+  /// 空态的下一步：跳到账户页补全信息
+  String get goToAccounts => isZh ? '去账户页补全' : 'Open accounts';
   String get loanAmortization => isZh ? '贷款摊销' : 'Loan amortization';
   String get accountNotFound => isZh ? '账户不存在' : 'Account not found';
   String get noLoanParams => isZh ? '还没有贷款参数' : 'No loan parameters yet';

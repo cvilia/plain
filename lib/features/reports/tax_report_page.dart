@@ -20,6 +20,7 @@ import 'package:plain/app/theme/design_tokens.dart';
 import 'package:plain/core/format/amount_formatter.dart';
 import 'package:plain/design_system/amount_display.dart';
 import 'package:plain/design_system/app_empty_state.dart';
+import 'package:plain/design_system/app_error_state.dart';
 import 'package:plain/design_system/app_toast.dart';
 import 'package:plain/design_system/confirm_dialog.dart';
 import 'package:plain/design_system/plain_icons_v3.dart';
@@ -47,6 +48,7 @@ class TaxReportPage extends ConsumerStatefulWidget {
 
 class _TaxReportPageState extends ConsumerState<TaxReportPage> {
   bool _loading = true;
+  Object? _loadError;
   TaxPeriodKind _kind = TaxPeriodKind.month;
   String? _periodKey;
 
@@ -69,12 +71,26 @@ class _TaxReportPageState extends ConsumerState<TaxReportPage> {
       );
 
   Future<void> _load() async {
-    setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+      _loadError = null;
+    });
     final deps = ref.read(appDependenciesProvider);
     final page = await deps.ledgerRepository.listPage(limit: 5000);
     final cats = await deps.categoryRepository.listAll();
     final filings = await deps.taxFilingRepository.listByBook(deps.bookId);
     if (!mounted) return;
+
+    final loadFailure = page.failureOrNull ??
+        cats.failureOrNull ??
+        filings.failureOrNull;
+    if (loadFailure != null) {
+      setState(() {
+        _loadError = loadFailure;
+        _loading = false;
+      });
+      return;
+    }
 
     final catList = cats.successOrNull ?? const <Category>[];
     final byId = {for (final c in catList) c.id: c};
@@ -154,7 +170,9 @@ class _TaxReportPageState extends ConsumerState<TaxReportPage> {
           ),
         ],
       ),
-      body: _loading
+      body: _loadError != null
+          ? AppErrorState.of(context, _loadError!, onRetry: _load)
+          : _loading
           ? const Center(child: CircularProgressIndicator())
           : ContentWidthConstraint(
               child: ListView(

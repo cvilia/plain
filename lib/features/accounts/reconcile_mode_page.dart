@@ -4,6 +4,7 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:plain/app/bootstrap.dart';
 import 'package:plain/app/theme/app_colors.dart';
 import 'package:plain/app/theme/design_tokens.dart';
@@ -123,6 +124,11 @@ class _ReconcileModePageState extends ConsumerState<ReconcileModePage> {
                   icon: PlainIconData.listCheck,
                   title: s.noBills,
                   subtitle: s.reconcileEmptyHint,
+                  action: FilledButton.icon(
+                    onPressed: () => context.push('/entry'),
+                    icon: const PlainIcon(PlainIconData.plus),
+                    label: Text(s.recordEntry),
+                  ),
                 )
               : ListView.builder(
                   padding: const EdgeInsets.symmetric(vertical: Spacing.sm),
