@@ -385,7 +385,8 @@ class _ReportsPageState extends ConsumerState<ReportsPage> {
                 icon: PlainIconData.chartPie,
                 title: s.noRecords,
                 action: FilledButton.icon(
-                  onPressed: () => context.go(Routes.home),
+                  // 直接进「记一笔」，别跳去流水页多一步
+                  onPressed: () => context.push(Routes.entry),
                   icon: const PlainIcon(PlainIconData.plus),
                   label: Text(s.recordEntry),
                 ),

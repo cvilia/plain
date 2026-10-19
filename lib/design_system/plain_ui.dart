@@ -2,6 +2,8 @@
 /// See redesign-v3/05-COMPONENT-SPECS.md — panel / row / eyebrow / type-tab / switch.
 library;
 
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:plain/app/theme/app_colors.dart';
@@ -538,14 +540,47 @@ class PlainTopBar extends StatelessWidget implements PreferredSizeWidget {
   /// 标题至少要有这么宽才值得居中；再窄就不如退回老布局（否则标题被压成一条缝）。
   static const double _minCenteredTitleWidth = 48;
 
-  /// 右侧动作区宽度估算：[PlainTopBarAction] 是 44，其余（页面自绘文字按钮）按 64 估。
+  /// 右侧动作区宽度估算：[PlainTopBarAction] 是 44，文字动作用 TextPainter 实测
+  /// （以前一律按 64 估，「已对账至 10-19」这类状态文本实际 ~105 → 估窄了，
+  /// 误判成放得下居中标题 → Stack 居中模式标题压在状态文字上）。
   double get _estimatedActionsWidth {
     if (actions.isEmpty) return 44;
     var w = 0.0;
     for (final a in actions) {
-      w += a is PlainTopBarAction ? 44 : 64;
+      if (a is PlainTopBarAction) {
+        w += 44;
+      } else if (a is Text) {
+        w += _measureTextWidth(a) + 4;
+      } else {
+        w += 64;
+      }
     }
     return w + 2 * (actions.length - 1); // 动作之间的 spacing
+  }
+
+  /// 单行实测一段文字的宽度（含内边距）。
+  static double _measureTextWidth(Text text) {
+    final span = text.textSpan ?? TextSpan(text: text.data ?? '');
+    if (span.toPlainText().trim().isEmpty) return 0;
+    final tp = TextPainter(
+      text: span,
+      textDirection: TextDirection.ltr,
+      maxLines: 1,
+    )..layout();
+    return tp.width + (text.style?.fontSize ?? 0) * 0.1;
+  }
+
+  /// 标题单行实测宽度（fontSize 20 / w600，与 [_title] 一致）。
+  static double _measureTitleWidth(String title) {
+    if (title.isEmpty) return 0;
+    final tp = TextPainter(
+      text: TextSpan(
+          text: title,
+          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w600)),
+      textDirection: TextDirection.ltr,
+      maxLines: 1,
+    )..layout();
+    return tp.width + 8; // `.topbar h1{padding:0 4px}` 左右各 4
   }
 
   @override
@@ -575,8 +610,11 @@ class PlainTopBar extends StatelessWidget implements PreferredSizeWidget {
             final sideReserve = _estimatedActionsWidth > 44
                 ? _estimatedActionsWidth
                 : 44.0;
+            // 居中还要求**标题本身**放得下：标题比剩余空间宽就退回老布局
+            // （老布局里标题吃剩余空间、动作区按真实宽度排，两边都不重叠）。
             final centered = centerTitle &&
-                c.maxWidth - 2 * sideReserve >= _minCenteredTitleWidth;
+                c.maxWidth - 2 * sideReserve >=
+                    math.max(_measureTitleWidth(title), _minCenteredTitleWidth);
             if (!centered) {
               return Row(
                 spacing: 4,
@@ -603,10 +641,12 @@ class PlainTopBar extends StatelessWidget implements PreferredSizeWidget {
                     _actionsSlot(),
                   ],
                 ),
-                // 绝对居中；标题框按估算的侧边宽度收窄，长标题先省略号截断
+                // 绝对居中；标题框按实测的侧边宽度收窄（动作里有文字时
+                // 固定 56 不够 —— 见 [_estimatedActionsWidth]），长标题先省略号截断
                 Padding(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: _centerTitleSideInset),
+                  padding: EdgeInsets.symmetric(
+                      horizontal:
+                          math.max(_centerTitleSideInset, sideReserve)),
                   child: _title(context),
                 ),
               ],

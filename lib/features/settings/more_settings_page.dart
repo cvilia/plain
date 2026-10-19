@@ -6,10 +6,12 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:plain/app/breakpoints.dart';
 import 'package:plain/app/l10n/app_strings.dart';
 import 'package:plain/app/l10n/strings_settings_b.dart';
 import 'package:plain/app/settings/display_prefs.dart';
+import 'package:plain/app/theme/app_colors.dart';
 import 'package:plain/app/theme/design_tokens.dart';
 import 'package:plain/design_system/plain_ui.dart';
 import 'package:plain/domain/services/emotion_feedback_service.dart';
@@ -118,7 +120,24 @@ class MoreSettingsPage extends ConsumerWidget {
                 showChevron: true,
                 onTap: () => _open(context, const PrivacyPolicyPage()),
               ),
-              PlainRow(title: s.version, value: 'V1.0.0'),
+              // 版本号从构建元数据（pubspec `version: 2.0.0+5`）实时读取，
+              // 不再硬编码 —— 以前写死 'V1.0.0'，升版后页面不跟着变。
+              PlainRow(
+                title: s.version,
+                trailing: FutureBuilder<PackageInfo>(
+                  future: PackageInfo.fromPlatform(),
+                  builder: (context, snap) {
+                    final info = snap.data;
+                    return Text(
+                      info == null
+                          ? '…'
+                          : 'V${info.version} (${info.buildNumber})',
+                      style: TextStyle(
+                          fontSize: 15, color: context.colors.inkTertiary),
+                    );
+                  },
+                ),
+              ),
               PlainRow(
                 title: s.openSource,
                 showChevron: true,

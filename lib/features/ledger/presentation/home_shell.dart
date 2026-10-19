@@ -203,6 +203,10 @@ class _NavItem extends StatelessWidget {
     // `.navitem{color:var(--muted)}` / `.navitem.on{color:var(--primary-ink)}`。
     // ⚠️ 选中色是 `primary-ink`（在主色底上可读的那一档），不是 `primary` 本体 ——
     // 用 `primary` 在浅主题下对比度不够，深主题下又会糊在底上。
+    //
+    // ⚠️ 但素白这类「炭黑主色」主题里，primaryInk(#27272A) 与 inkTertiary(灰)
+    // 色差太小，光靠文字颜色看不出选中了谁 —— 补一枚 4px 圆点指示器（所有主题
+    // 通用，仍用 primaryInk，不加新色）。
     final fg = selected ? colors.primaryInk : colors.inkTertiary;
     return Expanded(
       child: InkWell(
@@ -224,6 +228,19 @@ class _NavItem extends StatelessWidget {
                 fontWeight: FontWeight.w500,
                 color: fg,
               ),
+            ),
+            // 选中指示点：未选中时用同尺寸占位，避免选中/切换时整列跳动。
+            SizedBox(
+              width: 4,
+              height: 4,
+              child: selected
+                  ? DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: colors.primaryInk,
+                        shape: BoxShape.circle,
+                      ),
+                    )
+                  : null,
             ),
           ],
         ),

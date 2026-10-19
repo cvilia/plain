@@ -554,7 +554,9 @@ class _Matrix extends StatelessWidget {
           Row(children: [
             SizedBox(
               width: _rowLabelWidth,
-              child: Text('${table.rowDim.label} \\ ${table.colDim.label}',
+              // ⚠️ `label` 是 `(AppStrings) => String` 方法，必须传 `s` 调用；
+              // 直接插值得到的是闭包，界面会打出 "Closure: (AppStrings) => String"。
+              child: Text('${table.rowDim.label(s)} \\ ${table.colDim.label(s)}',
                   style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,

@@ -204,8 +204,11 @@ class _SankeyPageState extends ConsumerState<SankeyPage> {
                   if (!_graph.isEmpty) ...[
                     PlainEyebrow(s.sankeyFlowEyebrow),
                     PlainPanel(children: [
+                      // 水平 16：左源/右汇节点柱是按画布 0 / width-14 定位的，
+                      // 不给内边距会贴面板边框（左竖线贴左边、支出红柱贴右边）。
                       Padding(
-                        padding: const EdgeInsets.symmetric(vertical: Spacing.md),
+                        padding: const EdgeInsets.fromLTRB(
+                            Spacing.lg, Spacing.md, Spacing.lg, Spacing.md),
                         child: SizedBox(
                           height: 260,
                           child: _SankeyChart(
