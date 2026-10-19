@@ -8,6 +8,7 @@ import 'package:plain/app/bootstrap.dart';
 import 'package:plain/app/theme/app_colors.dart';
 import 'package:plain/core/refresh/data_invalidation.dart';
 import 'package:plain/design_system/app_empty_state.dart';
+import 'package:plain/design_system/app_error_state.dart';
 import 'package:plain/design_system/app_toast.dart';
 import 'package:plain/design_system/confirm_dialog.dart';
 import 'package:plain/design_system/plain_icons_v3.dart';
@@ -71,6 +72,7 @@ class AutomationRulesPage extends ConsumerStatefulWidget {
 class _AutomationRulesPageState extends ConsumerState<AutomationRulesPage> {
   List<AutomationRule> _rules = const [];
   bool _loading = true;
+  Object? _loadError;
 
   @override
   void initState() {
@@ -79,11 +81,15 @@ class _AutomationRulesPageState extends ConsumerState<AutomationRulesPage> {
   }
 
   Future<void> _reload() async {
-    setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+      _loadError = null;
+    });
     final deps = ref.read(appDependenciesProvider);
     final res = await deps.automationRuleRepository.listAll(bookId: deps.bookId);
     if (!mounted) return;
     setState(() {
+      _loadError = res.failureOrNull;
       _rules = res.successOrNull ?? const [];
       _loading = false;
     });
@@ -105,7 +111,9 @@ class _AutomationRulesPageState extends ConsumerState<AutomationRulesPage> {
           PlainTopBarTextAction(label: s.newAction, onTap: _showCreateSheet),
         ],
       ),
-      body: _loading
+      body: _loadError != null
+          ? AppErrorState.of(context, _loadError!, onRetry: _reload)
+          : _loading
           ? const Center(child: CircularProgressIndicator())
           : ListView(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),

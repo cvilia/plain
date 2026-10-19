@@ -10,6 +10,7 @@ import 'package:plain/app/bootstrap.dart';
 import 'package:plain/app/theme/app_colors.dart';
 import 'package:plain/core/constants/app_constants.dart';
 import 'package:plain/design_system/app_toast.dart';
+import 'package:plain/design_system/app_error_state.dart';
 import 'package:plain/design_system/plain_ui.dart';
 import 'package:plain/domain/entities/recurring_rule.dart';
 import 'package:plain/domain/entities/reminder.dart';
@@ -63,6 +64,7 @@ class _RemindersPageState extends ConsumerState<RemindersPage> {
   /// 近 90 天的提醒历史（含已读/未读），最新在前。
   List<AppReminder> _items = const [];
   bool _loading = true;
+  Object? _loadError;
   int _segIndex = 0;
 
   @override
@@ -72,7 +74,23 @@ class _RemindersPageState extends ConsumerState<RemindersPage> {
   }
 
   Future<void> _reload() async {
-    setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+      _loadError = null;
+    });
+    try {
+      await _loadOnce();
+    } on Object catch (e) {
+      // 提醒采集要读分类/预算/周期多张表，任何一步抛异常都不能让页面卡在转圈
+      if (!mounted) return;
+      setState(() {
+        _loadError = e;
+        _loading = false;
+      });
+    }
+  }
+
+  Future<void> _loadOnce() async {
     final deps = ref.read(appDependenciesProvider);
     final prefs = ref.read(reminderPrefsProvider);
     final service = deps.reminderService;
@@ -92,6 +110,7 @@ class _RemindersPageState extends ConsumerState<RemindersPage> {
     if (!mounted) return;
     setState(() {
       _items = history.successOrNull ?? fresh;
+      _loadError = history.failureOrNull;
       _loading = false;
     });
   }
@@ -197,7 +216,9 @@ class _RemindersPageState extends ConsumerState<RemindersPage> {
               ),
             ),
           Expanded(
-            child: _loading
+            child: _loadError != null
+                ? AppErrorState.of(context, _loadError!, onRetry: _reload)
+                : _loading
                 ? const Center(child: CircularProgressIndicator())
                 : ListView(
                     padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),

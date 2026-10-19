@@ -102,6 +102,15 @@ class _ImportPageState extends ConsumerState<ImportPage> {
 
     // Build category name → id map
     final catRes = await deps.categoryRepository.listAll();
+    if (catRes.isFailure) {
+      // 分类表拿不到就中止：否则每条都会因 resolveCategoryId 返回 null 而丢分类
+      if (mounted) {
+        setState(() => _importing = false);
+        showAppToast(
+            context, s.importFailed(catRes.failureOrNull?.code ?? 'unknown'));
+      }
+      return;
+    }
     final cats = catRes.successOrNull ?? const [];
     final catMap = {for (final c in cats) c.name: c.id};
 
