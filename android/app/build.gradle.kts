@@ -92,8 +92,8 @@ android {
 
     packaging {
         jniLibs {
-            // Uncompressed JNI can help install size on some devices; keep default package.
-            useLegacyPackaging = false
+            // 对照实验：true = .so 在 APK 内 deflate 压缩（下载体积小、安装时解压）
+            useLegacyPackaging = true
         }
     }
 }
