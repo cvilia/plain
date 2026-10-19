@@ -1,7 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" role="img" aria-label="ic_cat_fruit">
-  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
-  <circle cx="12" cy="14" r="6"/>
-  <path d="M12 8V10"/>
-  <path d="M12 9c1.25-2 3.25-2.25 4-3.5"/>
-  </g>
-</svg>

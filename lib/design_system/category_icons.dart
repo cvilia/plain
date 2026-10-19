@@ -1,7 +1,8 @@
 /// 分类图标选择器的 **可选 ref 清单**（v3 图标集）。
 ///
 /// ref → `PlainIconData` 的映射在 `category_icon_v3.dart`（`plainIconForRef`）：
-/// v3 图标集共 100 枚（12 枚一级 + 88 枚 cat 细分，见 04-ICON-SYSTEM/svg）。
+/// v3 分类图标共 **31 枚**（30 个支出一级各一枚 + 收入「红包」），
+/// 见 `redesign-v3/04-ICON-SYSTEM/svg/`。
 /// 近 300 个语义 ref 归并到最接近的一枚；同一枚图标可能对应多个 ref。
 /// 本文件只回答「选择器里列出哪些 ref」，不持有任何图标几何，也不依赖字体。
 library;

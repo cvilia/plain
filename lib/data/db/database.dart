@@ -4,9 +4,10 @@ library;
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:plain/core/security/db_passphrase.dart';
+import 'package:plain/data/seed/preset_promotions.dart';
 import 'package:sqlite3/sqlite3.dart';
 
-const int kSchemaVersion = 25;
+const int kSchemaVersion = 26;
 
 class AppDatabase {
   AppDatabase._(this._db);
@@ -309,6 +310,27 @@ class AppDatabase {
     final uqSql = uqCat.isEmpty ? null : uqCat.first['sql'] as String?;
     if (uqSql != null && !uqSql.contains('kind')) {
       _db.execute('DROP INDEX uq_category_name');
+    }
+
+    // v26（2026-10-19）：分类树重构 —— 30 个支出一级 + 每个一级都有二级。
+    //
+    // 老库里 9 个预置二级（服饰/美妆/数码/家居/游戏/旅行/运动健身/书籍/水电气）
+    // 被提升为一级：只把 parent_id 置空，**id 不变** → 账单引用、change_log、
+    // 同步数据全部照旧。判据是「父级仍是当初那个」，用户手动挪过的绝不覆盖。
+    // 新结构下这些分类的二级由 `backfillPresetCategories` 在首帧后补插。
+    for (final entry in kPromotedPresetIds.entries) {
+      _db.execute(
+        'UPDATE categories SET parent_id = NULL WHERE id = ? AND parent_id = ?',
+        [entry.key, entry.value],
+      );
+    }
+    // 同步改名（只在用户没改过名时生效）
+    for (final entry in kRenamedPresetIds.entries) {
+      final (oldName, newName) = entry.value;
+      _db.execute(
+        'UPDATE categories SET name = ? WHERE id = ? AND name = ?',
+        [newName, entry.key, oldName],
+      );
     }
   }
 

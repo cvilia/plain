@@ -1515,9 +1515,24 @@ class _CategoryGrid extends ConsumerWidget {
       if (c != null && !visible.contains(c)) visible.add(c);
       if (visible.length >= 11) break;
     }
+    // 首次使用 / 最近列表没填满时，**按一级分组轮流取**（2026-10-19）：
+    // 30 个一级每个至少 2 个二级，顺序取前 11 个 leaf 会全是「餐饮」的
+    // 早餐/午餐/晚餐…，第一屏被一类占满。轮流取保证 11 格覆盖 11 个场景。
+    final groups = <String, List<domain.Category>>{};
     for (final c in leaves) {
-      if (visible.length >= 11) break;
-      if (!visible.contains(c)) visible.add(c);
+      groups.putIfAbsent(c.parentId ?? c.id, () => []).add(c);
+    }
+    for (var round = 0; visible.length < 11; round++) {
+      var progressed = false;
+      for (final list in groups.values) {
+        if (visible.length >= 11) break;
+        if (round >= list.length) continue;
+        final c = list[round];
+        if (visible.contains(c)) continue;
+        visible.add(c);
+        progressed = true;
+      }
+      if (!progressed) break; // 叶子取完了（理论上不会，兜底防死循环）
     }
 
     // spec 08-03 §5：.catgrid{display:grid;grid-template-columns:repeat(4,1fr);

@@ -43,94 +43,25 @@ class PlainIconData {
   static const PlainIconData catSocial = PlainIconData._('ic_cat_social');
   static const PlainIconData catOther = PlainIconData._('ic_cat_other');
   static const PlainIconData catCoffee = PlainIconData._('ic_cat_coffee');
-  static const PlainIconData catTea = PlainIconData._('ic_cat_tea');
-  static const PlainIconData catFastfood = PlainIconData._('ic_cat_fastfood');
-  static const PlainIconData catNoodle = PlainIconData._('ic_cat_noodle');
-  static const PlainIconData catSushi = PlainIconData._('ic_cat_sushi');
-  static const PlainIconData catHotpot = PlainIconData._('ic_cat_hotpot');
-  static const PlainIconData catCake = PlainIconData._('ic_cat_cake');
-  static const PlainIconData catBread = PlainIconData._('ic_cat_bread');
-  static const PlainIconData catBeer = PlainIconData._('ic_cat_beer');
-  static const PlainIconData catWine = PlainIconData._('ic_cat_wine');
-  static const PlainIconData catTakeout = PlainIconData._('ic_cat_takeout');
-  static const PlainIconData catFruit = PlainIconData._('ic_cat_fruit');
-  static const PlainIconData catVegetable = PlainIconData._('ic_cat_vegetable');
-  static const PlainIconData catMeat = PlainIconData._('ic_cat_meat');
-  static const PlainIconData catSeafood = PlainIconData._('ic_cat_seafood');
   static const PlainIconData catClothes = PlainIconData._('ic_cat_clothes');
-  static const PlainIconData catShoes = PlainIconData._('ic_cat_shoes');
-  static const PlainIconData catBag = PlainIconData._('ic_cat_bag');
-  static const PlainIconData catMall = PlainIconData._('ic_cat_mall');
   static const PlainIconData catCosmetics = PlainIconData._('ic_cat_cosmetics');
-  static const PlainIconData catPerfume = PlainIconData._('ic_cat_perfume');
-  static const PlainIconData catWatch = PlainIconData._('ic_cat_watch');
-  static const PlainIconData catJewelry = PlainIconData._('ic_cat_jewelry');
   static const PlainIconData catUmbrella = PlainIconData._('ic_cat_umbrella');
-  static const PlainIconData catCleaning = PlainIconData._('ic_cat_cleaning');
-  static const PlainIconData catLaundry = PlainIconData._('ic_cat_laundry');
-  static const PlainIconData catBeauty = PlainIconData._('ic_cat_beauty');
-  static const PlainIconData catHaircut = PlainIconData._('ic_cat_haircut');
   static const PlainIconData catPet = PlainIconData._('ic_cat_pet');
   static const PlainIconData catBaby = PlainIconData._('ic_cat_baby');
-  static const PlainIconData catTools = PlainIconData._('ic_cat_tools');
   static const PlainIconData catFurniture = PlainIconData._('ic_cat_furniture');
   static const PlainIconData catCar = PlainIconData._('ic_cat_car');
-  static const PlainIconData catTaxi = PlainIconData._('ic_cat_taxi');
-  static const PlainIconData catTrain = PlainIconData._('ic_cat_train');
-  static const PlainIconData catPlane = PlainIconData._('ic_cat_plane');
-  static const PlainIconData catBike = PlainIconData._('ic_cat_bike');
-  static const PlainIconData catGas = PlainIconData._('ic_cat_gas');
-  static const PlainIconData catParking = PlainIconData._('ic_cat_parking');
-  static const PlainIconData catShip = PlainIconData._('ic_cat_ship');
-  static const PlainIconData catCharging = PlainIconData._('ic_cat_charging');
-  static const PlainIconData catTicket = PlainIconData._('ic_cat_ticket');
-  static const PlainIconData catRent = PlainIconData._('ic_cat_rent');
-  static const PlainIconData catWater = PlainIconData._('ic_cat_water');
   static const PlainIconData catElectricity = PlainIconData._(
     'ic_cat_electricity',
   );
-  static const PlainIconData catWifi = PlainIconData._('ic_cat_wifi');
-  static const PlainIconData catBed = PlainIconData._('ic_cat_bed');
-  static const PlainIconData catHotel = PlainIconData._('ic_cat_hotel');
-  static const PlainIconData catBox = PlainIconData._('ic_cat_box');
-  static const PlainIconData catRouter = PlainIconData._('ic_cat_router');
-  static const PlainIconData catSim = PlainIconData._('ic_cat_sim');
-  static const PlainIconData catEmail = PlainIconData._('ic_cat_email');
-  static const PlainIconData catHeadphone = PlainIconData._('ic_cat_headphone');
-  static const PlainIconData catMovie = PlainIconData._('ic_cat_movie');
-  static const PlainIconData catMusic = PlainIconData._('ic_cat_music');
   static const PlainIconData catGame = PlainIconData._('ic_cat_game');
   static const PlainIconData catSports = PlainIconData._('ic_cat_sports');
   static const PlainIconData catTravel = PlainIconData._('ic_cat_travel');
-  static const PlainIconData catCamping = PlainIconData._('ic_cat_camping');
-  static const PlainIconData catMic = PlainIconData._('ic_cat_mic');
-  static const PlainIconData catMuseum = PlainIconData._('ic_cat_museum');
-  static const PlainIconData catGym = PlainIconData._('ic_cat_gym');
-  static const PlainIconData catSwim = PlainIconData._('ic_cat_swim');
   static const PlainIconData catTv = PlainIconData._('ic_cat_tv');
-  static const PlainIconData catPharmacy = PlainIconData._('ic_cat_pharmacy');
-  static const PlainIconData catDoctor = PlainIconData._('ic_cat_doctor');
-  static const PlainIconData catHeart = PlainIconData._('ic_cat_heart');
-  static const PlainIconData catBandage = PlainIconData._('ic_cat_bandage');
-  static const PlainIconData catHealth = PlainIconData._('ic_cat_health');
-  static const PlainIconData catSchool = PlainIconData._('ic_cat_school');
-  static const PlainIconData catCourse = PlainIconData._('ic_cat_course');
   static const PlainIconData catLaptop = PlainIconData._('ic_cat_laptop');
-  static const PlainIconData catKeyboard = PlainIconData._('ic_cat_keyboard');
   static const PlainIconData catPrinter = PlainIconData._('ic_cat_printer');
   static const PlainIconData catLibrary = PlainIconData._('ic_cat_library');
-  static const PlainIconData catExam = PlainIconData._('ic_cat_exam');
-  static const PlainIconData catParty = PlainIconData._('ic_cat_party');
   static const PlainIconData catRedpacket = PlainIconData._('ic_cat_redpacket');
-  static const PlainIconData catFlowers = PlainIconData._('ic_cat_flowers');
-  static const PlainIconData catDonation = PlainIconData._('ic_cat_donation');
-  static const PlainIconData catCouple = PlainIconData._('ic_cat_couple');
-  static const PlainIconData catSafe = PlainIconData._('ic_cat_safe');
-  static const PlainIconData catPiggy = PlainIconData._('ic_cat_piggy');
-  static const PlainIconData catCoins = PlainIconData._('ic_cat_coins');
   static const PlainIconData catBill = PlainIconData._('ic_cat_bill');
-  static const PlainIconData catInvoice = PlainIconData._('ic_cat_invoice');
-  static const PlainIconData catCard = PlainIconData._('ic_cat_card');
   static const PlainIconData catPercent = PlainIconData._('ic_cat_percent');
 
   // ── op · 操作 ──
@@ -255,92 +186,23 @@ class PlainIconData {
     'ic_cat_social': catSocial,
     'ic_cat_other': catOther,
     'ic_cat_coffee': catCoffee,
-    'ic_cat_tea': catTea,
-    'ic_cat_fastfood': catFastfood,
-    'ic_cat_noodle': catNoodle,
-    'ic_cat_sushi': catSushi,
-    'ic_cat_hotpot': catHotpot,
-    'ic_cat_cake': catCake,
-    'ic_cat_bread': catBread,
-    'ic_cat_beer': catBeer,
-    'ic_cat_wine': catWine,
-    'ic_cat_takeout': catTakeout,
-    'ic_cat_fruit': catFruit,
-    'ic_cat_vegetable': catVegetable,
-    'ic_cat_meat': catMeat,
-    'ic_cat_seafood': catSeafood,
     'ic_cat_clothes': catClothes,
-    'ic_cat_shoes': catShoes,
-    'ic_cat_bag': catBag,
-    'ic_cat_mall': catMall,
     'ic_cat_cosmetics': catCosmetics,
-    'ic_cat_perfume': catPerfume,
-    'ic_cat_watch': catWatch,
-    'ic_cat_jewelry': catJewelry,
     'ic_cat_umbrella': catUmbrella,
-    'ic_cat_cleaning': catCleaning,
-    'ic_cat_laundry': catLaundry,
-    'ic_cat_beauty': catBeauty,
-    'ic_cat_haircut': catHaircut,
     'ic_cat_pet': catPet,
     'ic_cat_baby': catBaby,
-    'ic_cat_tools': catTools,
     'ic_cat_furniture': catFurniture,
     'ic_cat_car': catCar,
-    'ic_cat_taxi': catTaxi,
-    'ic_cat_train': catTrain,
-    'ic_cat_plane': catPlane,
-    'ic_cat_bike': catBike,
-    'ic_cat_gas': catGas,
-    'ic_cat_parking': catParking,
-    'ic_cat_ship': catShip,
-    'ic_cat_charging': catCharging,
-    'ic_cat_ticket': catTicket,
-    'ic_cat_rent': catRent,
-    'ic_cat_water': catWater,
     'ic_cat_electricity': catElectricity,
-    'ic_cat_wifi': catWifi,
-    'ic_cat_bed': catBed,
-    'ic_cat_hotel': catHotel,
-    'ic_cat_box': catBox,
-    'ic_cat_router': catRouter,
-    'ic_cat_sim': catSim,
-    'ic_cat_email': catEmail,
-    'ic_cat_headphone': catHeadphone,
-    'ic_cat_movie': catMovie,
-    'ic_cat_music': catMusic,
     'ic_cat_game': catGame,
     'ic_cat_sports': catSports,
     'ic_cat_travel': catTravel,
-    'ic_cat_camping': catCamping,
-    'ic_cat_mic': catMic,
-    'ic_cat_museum': catMuseum,
-    'ic_cat_gym': catGym,
-    'ic_cat_swim': catSwim,
     'ic_cat_tv': catTv,
-    'ic_cat_pharmacy': catPharmacy,
-    'ic_cat_doctor': catDoctor,
-    'ic_cat_heart': catHeart,
-    'ic_cat_bandage': catBandage,
-    'ic_cat_health': catHealth,
-    'ic_cat_school': catSchool,
-    'ic_cat_course': catCourse,
     'ic_cat_laptop': catLaptop,
-    'ic_cat_keyboard': catKeyboard,
     'ic_cat_printer': catPrinter,
     'ic_cat_library': catLibrary,
-    'ic_cat_exam': catExam,
-    'ic_cat_party': catParty,
     'ic_cat_redpacket': catRedpacket,
-    'ic_cat_flowers': catFlowers,
-    'ic_cat_donation': catDonation,
-    'ic_cat_couple': catCouple,
-    'ic_cat_safe': catSafe,
-    'ic_cat_piggy': catPiggy,
-    'ic_cat_coins': catCoins,
     'ic_cat_bill': catBill,
-    'ic_cat_invoice': catInvoice,
-    'ic_cat_card': catCard,
     'ic_cat_percent': catPercent,
     'ic_back': back,
     'ic_chevron_right': chevronRight,

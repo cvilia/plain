@@ -18,8 +18,8 @@ import 'package:plain/design_system/plain_icons_v3.dart';
 
 /// 选择器展示的 ref 清单。
 ///
-/// `kAllCategoryIconRefs` 是近 300 个**语义 ref**，而 v3 图标是 100 枚
-/// （外加收入侧复用的几枚通用图标），ref → 图标是**多对一**映射。若直接遍历
+/// `kAllCategoryIconRefs` 是近 300 个**语义 ref**，而 v3 图标是 31 枚
+/// （30 个支出一级 + 收入「红包」），ref → 图标是**多对一**映射。若直接遍历
 /// ref 列表，同一枚图标会在网格里重复出现几十次（曾出现一整排相同的碗）。
 /// 这里按解析后的图标去重，每枚图标取第一个出现的 ref 作为代表。
 final List<String> kPickerCategoryIconRefs = () {
@@ -68,7 +68,6 @@ class CategoryIconPicker extends StatelessWidget {
             physics: const ClampingScrollPhysics(),
             padding: const EdgeInsets.symmetric(vertical: Spacing.sm),
             gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              // 图标已从 12 枚扩到 100+ 枚，7 列会让网格变得很长；
               // 8 列在 393pt 宽下每格约 41pt，图标 20 仍有足够留白。
               crossAxisCount: crossAxisCount,
               mainAxisSpacing: spacing,

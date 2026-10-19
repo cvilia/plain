@@ -1,9 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" role="img" aria-label="ic_cat_bike">
-  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
-  <circle cx="6.5" cy="16.5" r="4"/>
-  <circle cx="17.5" cy="16.5" r="4"/>
-  <path d="M6.5 16.5 10 10h4.5l3.5 3"/>
-  <path d="M9 10h2"/>
-  <path d="M15.5 10h2.5"/>
-  </g>
-</svg>
