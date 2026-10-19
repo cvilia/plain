@@ -203,7 +203,11 @@ class _BudgetPageState extends ConsumerState<BudgetPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        PlainEyebrow(AppStrings.of(context).categoryLimitsEyebrow(statuses.length)),
+        PlainEyebrow(
+            AppStrings.of(context).categoryLimitsEyebrow(statuses.length),
+            // 本页 ListView 无水平 padding，eyebrow 要自己补 16 与面板对齐
+            padding: const EdgeInsets.fromLTRB(Spacing.lg, 16, Spacing.lg, 8),
+          ),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: Spacing.lg),
           child: DecoratedBox(
@@ -258,7 +262,10 @@ class _BudgetPageState extends ConsumerState<BudgetPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        PlainEyebrow(appS.envelopeEyebrow(envelopes.length, overs)),
+        PlainEyebrow(
+          appS.envelopeEyebrow(envelopes.length, overs),
+          padding: const EdgeInsets.fromLTRB(Spacing.lg, 16, Spacing.lg, 8),
+        ),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: Spacing.lg),
           child: PlainPanel(
@@ -368,7 +375,10 @@ class _BudgetPageState extends ConsumerState<BudgetPage> {
               ),
             ),
           ),
-        PlainEyebrow(appS.allocationDetail),
+        PlainEyebrow(
+          appS.allocationDetail,
+          padding: const EdgeInsets.fromLTRB(Spacing.lg, 16, Spacing.lg, 8),
+        ),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: Spacing.lg),
           child: PlainPanel(
@@ -427,7 +437,11 @@ class _BudgetPageState extends ConsumerState<BudgetPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        PlainEyebrow(s.ratioBucketsEyebrow),
+        PlainEyebrow(
+          s.ratioBucketsEyebrow,
+          // 与下方面板（水平 16）左对齐
+          padding: const EdgeInsets.fromLTRB(Spacing.lg, 16, Spacing.lg, 8),
+        ),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: Spacing.lg),
           child: PlainPanel(
