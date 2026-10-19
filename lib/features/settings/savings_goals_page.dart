@@ -926,7 +926,8 @@ class _GoalRow extends StatelessWidget {
     final remaining = (view.targetCents - view.savedCents).clamp(0, view.targetCents).toInt();
     final pct = (view.progress * 100).round();
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: Spacing.md),
+      // 水平 16：卡片内标题/金额/进度条不能贴卡片边框（对齐 _LimitRow 的口径）
+      padding: const EdgeInsets.fromLTRB(16, Spacing.md, 16, Spacing.md),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
