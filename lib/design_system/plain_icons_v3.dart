@@ -30,7 +30,6 @@ class PlainIconData {
   // ── category · 一级分类 ──
   static const PlainIconData catFood = PlainIconData._('ic_cat_food');
   static const PlainIconData catGrocery = PlainIconData._('ic_cat_grocery');
-  static const PlainIconData catShopping = PlainIconData._('ic_cat_shopping');
   static const PlainIconData catDaily = PlainIconData._('ic_cat_daily');
   static const PlainIconData catTransport = PlainIconData._('ic_cat_transport');
   static const PlainIconData catHousing = PlainIconData._('ic_cat_housing');
@@ -42,10 +41,11 @@ class PlainIconData {
   static const PlainIconData catStudy = PlainIconData._('ic_cat_study');
   static const PlainIconData catSocial = PlainIconData._('ic_cat_social');
   static const PlainIconData catOther = PlainIconData._('ic_cat_other');
-  static const PlainIconData catCoffee = PlainIconData._('ic_cat_coffee');
   static const PlainIconData catClothes = PlainIconData._('ic_cat_clothes');
   static const PlainIconData catCosmetics = PlainIconData._('ic_cat_cosmetics');
   static const PlainIconData catUmbrella = PlainIconData._('ic_cat_umbrella');
+  static const PlainIconData catCleaning = PlainIconData._('ic_cat_cleaning');
+  static const PlainIconData catHaircut = PlainIconData._('ic_cat_haircut');
   static const PlainIconData catPet = PlainIconData._('ic_cat_pet');
   static const PlainIconData catBaby = PlainIconData._('ic_cat_baby');
   static const PlainIconData catFurniture = PlainIconData._('ic_cat_furniture');
@@ -175,7 +175,6 @@ class PlainIconData {
     'ic_nav_profile': navProfile,
     'ic_cat_food': catFood,
     'ic_cat_grocery': catGrocery,
-    'ic_cat_shopping': catShopping,
     'ic_cat_daily': catDaily,
     'ic_cat_transport': catTransport,
     'ic_cat_housing': catHousing,
@@ -185,10 +184,11 @@ class PlainIconData {
     'ic_cat_study': catStudy,
     'ic_cat_social': catSocial,
     'ic_cat_other': catOther,
-    'ic_cat_coffee': catCoffee,
     'ic_cat_clothes': catClothes,
     'ic_cat_cosmetics': catCosmetics,
     'ic_cat_umbrella': catUmbrella,
+    'ic_cat_cleaning': catCleaning,
+    'ic_cat_haircut': catHaircut,
     'ic_cat_pet': catPet,
     'ic_cat_baby': catBaby,
     'ic_cat_furniture': catFurniture,

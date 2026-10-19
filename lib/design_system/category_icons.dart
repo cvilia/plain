@@ -11,8 +11,9 @@ library;
 const List<String> kAllCategoryIconRefs = [
   // 餐饮
   'food', 'dining', 'coffee', 'tea', 'fastfood', 'cake', 'pizza', 'grocery',
-  // 购物
+  // 服饰（购物已并入服饰/家居/日用，不再单列一级）
   'shopping', 'mall', 'clothes', 'shoes', 'bag', 'gift', 'luxury',
+  'haircut',
   // 日用
   'daily', 'home_goods', 'cleaning', 'beauty', 'pet', 'baby', 'repair',
   // 交通

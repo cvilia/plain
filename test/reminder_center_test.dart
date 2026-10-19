@@ -629,10 +629,10 @@ void main() {
     expect(empty.successOrNull, isEmpty);
   });
 
-  // ── ⑦ schema v26：提醒历史表进得了还原清单 ──
+  // ── ⑦ schema v27：提醒历史表进得了还原清单 ──
 
-  test('reminders 表与索引已建立（schema v26）', () async {
-    expect(kSchemaVersion, 26);
+  test('reminders 表与索引已建立（schema v27）', () async {
+    expect(kSchemaVersion, 27);
     final tables = db.raw
         .select("SELECT name FROM sqlite_master WHERE type='table'")
         .map((r) => r['name'] as String)

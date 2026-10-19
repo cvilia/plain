@@ -33,10 +33,10 @@ const Map<String, PlainIconData> kCategoryPlainIcons = {
   'noodle': PlainIconData.catFood,
   'sushi': PlainIconData.catFood,
   'hotpot': PlainIconData.catFood,
-  'coffee': PlainIconData.catCoffee,
-  'coffee_shop': PlainIconData.catCoffee,
-  'milk': PlainIconData.catCoffee,
-  'tea': PlainIconData.catCoffee,
+  'coffee': PlainIconData.catFood,
+  'coffee_shop': PlainIconData.catFood,
+  'milk': PlainIconData.catFood,
+  'tea': PlainIconData.catFood,
   'bar': PlainIconData.catFood,
   'beer': PlainIconData.catFood,
   'wine': PlainIconData.catFood,
@@ -58,12 +58,12 @@ const Map<String, PlainIconData> kCategoryPlainIcons = {
   'seafood': PlainIconData.catGrocery,
   'meat': PlainIconData.catGrocery,
   // ── 购物 ────────────────────────────────────────────────────────────
-  'shopping': PlainIconData.catShopping,
-  'toy': PlainIconData.catShopping,
-  'toy_blocks': PlainIconData.catShopping,
+  'shopping': PlainIconData.catDaily,
+  'toy': PlainIconData.catBaby,
+  'toy_blocks': PlainIconData.catBaby,
   'bag': PlainIconData.catClothes,
   'souvenir': PlainIconData.catClothes,
-  'mall': PlainIconData.catShopping,
+  'mall': PlainIconData.catDaily,
   'clothes': PlainIconData.catClothes,
   'shoes': PlainIconData.catClothes,
   'shoe_repair': PlainIconData.catClothes,
@@ -82,7 +82,7 @@ const Map<String, PlainIconData> kCategoryPlainIcons = {
   'household': PlainIconData.catDaily,
   'home_goods': PlainIconData.catDaily,
   'bottle': PlainIconData.catDaily,
-  'cleaning': PlainIconData.catDaily,
+  'cleaning': PlainIconData.catCleaning,
   'clean_house': PlainIconData.catDaily,
   'deep_clean': PlainIconData.catDaily,
   'pest_control': PlainIconData.catDaily,
@@ -91,7 +91,7 @@ const Map<String, PlainIconData> kCategoryPlainIcons = {
   'dry_clean': PlainIconData.catDaily,
   'beauty': PlainIconData.catCosmetics,
   'spa': PlainIconData.catCosmetics,
-  'haircut': PlainIconData.catCosmetics,
+  'haircut': PlainIconData.catHaircut,
   'barber': PlainIconData.catCosmetics,
   'nail': PlainIconData.catCosmetics,
   'pet': PlainIconData.catPet,
@@ -235,7 +235,7 @@ const Map<String, PlainIconData> kCategoryPlainIcons = {
   'date': PlainIconData.catMedical,
   // ── 学习 ────────────────────────────────────────────────────────────
   'study': PlainIconData.catStudy,
-  'book': PlainIconData.catStudy,
+  'book': PlainIconData.catLibrary,
   'learn': PlainIconData.catStudy,
   'textbook': PlainIconData.catStudy,
   'school': PlainIconData.catStudy,
@@ -340,16 +340,16 @@ const Map<String, PlainIconData> kCategoryPlainIcons = {
 const Map<String, String> kIconPaletteKey = {
   // 餐饮
   'ic_cat_food': 'food',
-  'ic_cat_coffee': 'food',
   // 食材
   'ic_cat_grocery': 'fruit',
-  // 购物
-  'ic_cat_shopping': 'shopping',
+  // 服饰 / 美妆 / 美容
   'ic_cat_clothes': 'shopping',
+  'ic_cat_haircut': 'shopping',
   'ic_cat_cosmetics': 'shopping',
   'ic_cat_umbrella': 'shopping',
   // 日用
   'ic_cat_daily': 'daily',
+  'ic_cat_cleaning': 'daily',
   'ic_cat_pet': 'daily',
   'ic_cat_baby': 'daily',
   'ic_cat_furniture': 'daily',
@@ -401,7 +401,7 @@ Color categoryDotColor(String ref) {
 
 /// ref → 12 色板键：先取它对应的图标，再由图标查色板分组。
 ///
-/// ⚠️ 键是 `icon.name`（如 `ic_cat_coffee`）而不是 ref —— 因为近 300 个 ref
+/// ⚠️ 键是 `icon.name`（如 `ic_cat_food`）而不是 ref —— 因为近 300 个 ref
 /// 是多对一映射到 100 枚图标的，按图标查才能一次覆盖全部。
 String _canonRef(String ref) {
   final icon = kCategoryPlainIcons[ref];

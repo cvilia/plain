@@ -4,10 +4,9 @@ library;
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:plain/core/security/db_passphrase.dart';
-import 'package:plain/data/seed/preset_promotions.dart';
 import 'package:sqlite3/sqlite3.dart';
 
-const int kSchemaVersion = 26;
+const int kSchemaVersion = 27;
 
 class AppDatabase {
   AppDatabase._(this._db);
@@ -312,25 +311,69 @@ class AppDatabase {
       _db.execute('DROP INDEX uq_category_name');
     }
 
-    // v26（2026-10-19）：分类树重构 —— 30 个支出一级 + 每个一级都有二级。
+    // v27（2026-10-19）：分类目录第二版 —— 删掉第一版里边界重叠的两个一级
+    // （「购物」和「咖啡茶饮」）。
     //
-    // 老库里 9 个预置二级（服饰/美妆/数码/家居/游戏/旅行/运动健身/书籍/水电气）
-    // 被提升为一级：只把 parent_id 置空，**id 不变** → 账单引用、change_log、
-    // 同步数据全部照旧。判据是「父级仍是当初那个」，用户手动挪过的绝不覆盖。
-    // 新结构下这些分类的二级由 `backfillPresetCategories` 在首帧后补插。
-    for (final entry in kPromotedPresetIds.entries) {
+    // 第一版为了让每笔支出"都有地方放"，把购物做成了筐，又把餐饮里的饮品
+    // 拆成独立一级（学习 / 书籍阅读同理）。结果是同一笔支出能放进三四个分类，
+    // 边界全靠猜。第二版按「一个一级 = 一个生活场景」重排，这两个一级已并入
+    // 服饰 / 家居 / 人情 / 餐饮。
+    //
+    // 本机还没有真实用户，这里直接清理：先把挂在这些分类上的账单改挂
+    // 「其他 · 杂项支出」，再删分类行（含子级）与统计/预算的引用。
+    // 全新库里一条都匹配不到，等于空跑。
+    const retiredRoots = <String>['preset_shopping', 'preset_coffee'];
+    // 这几个 id 在新目录里是**独立一级**，只是历史上曾经是 `preset_shopping`
+    // 的二级。若库是从更早的版本直接升上来的（跳过了提升步骤），它们仍挂在
+    // 下面 —— 必须保住，否则会把「服饰/数码/家居」整棵树删掉。
+    const promotedKeep = <String>{
+      'preset_shopping_clothes',
+      'preset_shopping_beauty',
+      'preset_shopping_digital',
+      'preset_shopping_home',
+      'preset_ent_game',
+      'preset_ent_travel',
+      'preset_ent_sport',
+      'preset_study_book',
+      'preset_housing_water',
+    };
+    final retired = <String>{...retiredRoots};
+    for (final root in retiredRoots) {
+      final rows =
+          _db.select('SELECT id FROM categories WHERE parent_id = ?', [root]);
+      for (final row in rows) {
+        final id = row['id']! as String;
+        if (!promotedKeep.contains(id)) retired.add(id);
+      }
+    }
+    for (final id in promotedKeep) {
       _db.execute(
-        'UPDATE categories SET parent_id = NULL WHERE id = ? AND parent_id = ?',
-        [entry.key, entry.value],
+        'UPDATE categories SET parent_id = NULL WHERE id = ?',
+        [id],
       );
     }
-    // 同步改名（只在用户没改过名时生效）
-    for (final entry in kRenamedPresetIds.entries) {
-      final (oldName, newName) = entry.value;
-      _db.execute(
-        'UPDATE categories SET name = ? WHERE id = ? AND name = ?',
-        [newName, entry.key, oldName],
-      );
+    if (retired.isNotEmpty) {
+      final hasFallback = _db
+          .select("SELECT 1 FROM categories WHERE id = 'preset_other_misc'")
+          .isNotEmpty;
+      final fallback = hasFallback ? 'preset_other_misc' : 'preset_other';
+      bool hasColumn(String table, String column) =>
+          _db.select('PRAGMA table_info($table)').any((r) => r['name'] == column);
+      for (final id in retired) {
+        _db.execute(
+            'UPDATE transactions SET category_id = ? WHERE category_id = ?',
+            [fallback, id]);
+        _db.execute('DELETE FROM daily_stats WHERE category_id = ?', [id]);
+        if (hasColumn('budgets', 'category_id')) {
+          _db.execute('DELETE FROM budgets WHERE category_id = ?', [id]);
+        }
+        if (hasColumn('recurring_rules', 'category_id')) {
+          _db.execute(
+              'UPDATE recurring_rules SET category_id = NULL WHERE category_id = ?',
+              [id]);
+        }
+        _db.execute('DELETE FROM categories WHERE id = ?', [id]);
+      }
     }
   }
 
