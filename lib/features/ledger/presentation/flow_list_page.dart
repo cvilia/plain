@@ -85,12 +85,8 @@ class FlowListPage extends ConsumerWidget {
               MaterialPageRoute(builder: (_) => const AdvancedFilterPage()),
             ),
           ),
-          PlainTopBarAction(
-            icon: PlainIconData.more,
-            iconSize: 20,
-            tooltip: s.more,
-            onTap: () {},
-          ),
+          // 原「更多」按钮（空 onTap）已移除（2026-10-19 爸爸拍板）：设计稿从未
+          // 定义它， SPEC 里只是空的 iconbtn。顶栏只留搜索。
         ],
       ),
       // ⚠️ `top: false` 是必须的，别顺手改成 `SafeArea(...)`：

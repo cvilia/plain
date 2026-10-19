@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:plain/app/breakpoints.dart';
 import 'package:plain/app/settings/display_prefs.dart';
+import 'package:plain/app/settings/locale_prefs.dart';
 import 'package:plain/app/settings/ledger_settings.dart';
 import 'package:plain/app/theme/app_colors.dart';
 import 'package:plain/app/theme/theme_prefs.dart';
@@ -57,6 +58,7 @@ class SettingsPage extends ConsumerWidget {
     final hideAmounts = ref.watch(hideAmountsProvider);
     final appLockEnabled = ref.watch(appLockEnabledProvider);
     final prefs = ref.watch(themePrefsProvider);
+    final languagePrefs = ref.watch(languagePrefsProvider);
     final monthStartDay = ref.watch(monthStartDayProvider);
     final display = ref.watch(displayPrefsProvider);
     final colors = context.colors;
@@ -227,6 +229,29 @@ class SettingsPage extends ConsumerWidget {
                 value: '',
                 showChevron: true,
                 onTap: () => _open(context, const HomeLayoutPage()),
+              ),
+              PlainRow(
+                title: s.languageLabel,
+                value: switch (languagePrefs.language) {
+                  AppLanguage.zh => s.languageChinese,
+                  AppLanguage.en => s.languageEnglish,
+                  AppLanguage.system => s.languageFollowSystem,
+                },
+                showChevron: true,
+                onTap: () async {
+                  final i = await showPlainPickerSheet<int>(
+                    context: context,
+                    title: s.languageLabel,
+                    selected: languagePrefs.language.index,
+                    options: [
+                      (AppLanguage.system.index, s.languageFollowSystem),
+                      (AppLanguage.zh.index, s.languageChinese),
+                      (AppLanguage.en.index, s.languageEnglish),
+                    ],
+                  );
+                  if (i == null) return;
+                  ref.read(languagePrefsProvider.notifier).set(AppLanguage.values[i]);
+                },
               ),
             ]),
 

@@ -26,6 +26,13 @@ Widget _app({required bool onboarding}) {
 
 void main() {
   testWidgets('PlainApp smoke: phone shell + bottom nav render', (tester) async {
+    // App 默认「跟随系统」；CI/开发机的系统 locale 可能是英文，
+    // 冒烟断言的是中文 nav 文案，这里把测试 locale 钉到 zh-CN。
+    // 注意必须改 locales 列表 —— MaterialApp 的 locale 解析读的是列表，
+    // 只改 `localeTestValue` 单值不会参与解析。
+    tester.platformDispatcher.localesTestValue = const [Locale('zh', 'CN')];
+    addTearDown(tester.platformDispatcher.clearLocalesTestValue);
+
     // Phone portrait so compact layout (Quiet Ledger bottom nav) is used.
     await tester.binding.setSurfaceSize(const Size(390, 844));
     addTearDown(() => tester.binding.setSurfaceSize(null));

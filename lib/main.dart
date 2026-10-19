@@ -12,6 +12,7 @@ import 'package:plain/app/first_launch.dart';
 import 'package:plain/app/l10n/app_strings.dart';
 import 'package:plain/app/router/app_router.dart';
 import 'package:plain/app/settings/display_prefs.dart';
+import 'package:plain/app/settings/locale_prefs.dart';
 import 'package:plain/app/theme/theme_prefs.dart';
 import 'package:plain/app/theme/theme_resolver.dart';
 import 'package:plain/core/id/uuid_v7.dart';
@@ -32,6 +33,7 @@ Future<void> main() async {
   // Theme prefs must be known before first frame (§5.2). Failure → defaults.
   await preloadThemePrefs();
   await preloadDisplayPrefs();
+  await preloadLanguagePrefs();
   final appLock = await AppLockPrefs.load();
   final onboardPending = await isOnboardingPending();
 
@@ -200,6 +202,7 @@ class _PlainAppState extends ConsumerState<PlainApp> with WidgetsBindingObserver
   Widget build(BuildContext context) {
     final lockState = ref.watch(appLockControllerProvider);
     final prefs = ref.watch(themePrefsProvider);
+    final languagePrefs = ref.watch(languagePrefsProvider);
 
 
 
@@ -214,6 +217,14 @@ class _PlainAppState extends ConsumerState<PlainApp> with WidgetsBindingObserver
         theme: lightTheme,
         darkTheme: darkTheme,
         themeMode: prefs.themeMode,
+        locale: languagePrefs.locale,
+        localizationsDelegates: const [
+          AppStrings.delegate,
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
+        supportedLocales: AppStrings.supportedLocales,
         home: OnboardingPage(
           onDone: () async {
             await markOnboardingDone();
@@ -229,7 +240,8 @@ class _PlainAppState extends ConsumerState<PlainApp> with WidgetsBindingObserver
       theme: lightTheme,
       darkTheme: darkTheme,
       themeMode: prefs.themeMode,
-      locale: const Locale('zh', 'CN'),
+      // locale 为 null（跟随系统）时交给 MaterialApp 按 supportedLocales 分辨。
+      locale: languagePrefs.locale,
       localizationsDelegates: const [
         AppStrings.delegate,
         GlobalMaterialLocalizations.delegate,

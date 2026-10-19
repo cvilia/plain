@@ -7,6 +7,7 @@ library;
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:plain/app/l10n/app_strings.dart';
+import 'package:plain/app/settings/locale_prefs.dart';
 
 /// 无 `BuildContext` 的调用方（后台同步等）使用的兜底文案包。
 ///
@@ -16,9 +17,11 @@ const AppStrings kDefaultAppStrings = AppStrings(Locale('zh', 'CN'));
 
 /// 全局文案包：给拿不到 `BuildContext` 的 Notifier / 后台任务取文案用。
 ///
-/// TODO(i18n)：等 `supportedLocales` 放开 en-US 后改成读系统 locale provider；
-/// 目前与 UI 层 `AppStrings.of(context)` 的 fallback 一致（zh-CN）。
-final appStringsProvider = Provider<AppStrings>((ref) => kDefaultAppStrings);
+/// 跟随用户在设置里选的语言；`system`（拿不到系统 locale）回落 zh-CN。
+final appStringsProvider = Provider<AppStrings>((ref) {
+  final locale = ref.watch(languagePrefsProvider).locale;
+  return locale == null ? kDefaultAppStrings : AppStrings(locale);
+});
 
 extension CoreStrings on AppStrings {
   // ── Date (core/time/date_format.dart) ──
@@ -41,6 +44,13 @@ extension CoreStrings on AppStrings {
   String get fontScaleSmall => isZh ? '小' : 'Small';
   String get fontScaleStandard => isZh ? '标准' : 'Standard';
   String get fontScaleLarge => isZh ? '大' : 'Large';
+
+  // ── Language prefs (app/settings/locale_prefs.dart) ──
+
+  String get languageLabel => isZh ? '语言' : 'Language';
+  String get languageFollowSystem => isZh ? '跟随系统' : 'Follow system';
+  String get languageChinese => '简体中文';
+  String get languageEnglish => 'English';
 
   // ── Home layout cards (app/settings/home_layout_prefs.dart) ──
 

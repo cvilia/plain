@@ -50,45 +50,62 @@ class CategoryIconPicker extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      padding: const EdgeInsets.symmetric(vertical: Spacing.sm),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        // 图标已从 12 枚扩到 100+ 枚，7 列会让网格变得很长；
-        // 8 列在 393pt 宽下每格约 41pt，图标 20 仍有足够留白。
-        crossAxisCount: 8,
-        mainAxisSpacing: 8,
-        crossAxisSpacing: 8,
-        childAspectRatio: 1,
-      ),
-      itemCount: kPickerCategoryIconRefs.length,
-      itemBuilder: (context, i) {
-        final r = kPickerCategoryIconRefs[i];
-        final icon = plainIconForRef(r)!;
-        // 按「图标」而非 ref 判选中：多个 ref 解析到同一枚图标时仍能高亮。
-        final selected = plainIconForRef(value)?.name == icon.name;
-        return InkWell(
-          borderRadius: BorderRadius.circular(10),
-          onTap: () => onChanged(r),
-          child: Container(
-            // 必须居中：否则子级收到 tight 约束被拉伸到整格，
-            // 图标放大约 2 倍、描边等比变粗。
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: selected
-                  ? context.colors.primary.withValues(alpha: 0.15)
-                  : context.colors.surfaceMuted,
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(
-                color: selected ? context.colors.primary : context.colors.divider,
-              ),
+    const crossAxisCount = 8;
+    const spacing = 8.0;
+
+    // 限高 5 行（2026-10-19 爸爸反馈）：100 枚图标全展开会把表单拉得极长，
+    // 改成固定 5 行高、网格内部自行滚动。行高按实际宽度算（393pt 下约 38pt），
+    // 平板等宽屏自动变大，不写死像素。
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final cell =
+            (constraints.maxWidth - spacing * (crossAxisCount - 1)) /
+                crossAxisCount;
+        final height = cell * 5 + spacing * 4 + Spacing.sm * 2;
+        return SizedBox(
+          height: height,
+          child: GridView.builder(
+            physics: const ClampingScrollPhysics(),
+            padding: const EdgeInsets.symmetric(vertical: Spacing.sm),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              // 图标已从 12 枚扩到 100+ 枚，7 列会让网格变得很长；
+              // 8 列在 393pt 宽下每格约 41pt，图标 20 仍有足够留白。
+              crossAxisCount: crossAxisCount,
+              mainAxisSpacing: spacing,
+              crossAxisSpacing: spacing,
+              childAspectRatio: 1,
             ),
-            child: PlainIcon(
-              icon,
-              size: 20,
-              color: context.colors.primary,
-            ),
+            itemCount: kPickerCategoryIconRefs.length,
+            itemBuilder: (context, i) {
+              final r = kPickerCategoryIconRefs[i];
+              final icon = plainIconForRef(r)!;
+              // 按「图标」而非 ref 判选中：多个 ref 解析到同一枚图标时仍能高亮。
+              final selected = plainIconForRef(value)?.name == icon.name;
+              return InkWell(
+                borderRadius: BorderRadius.circular(10),
+                onTap: () => onChanged(r),
+                child: Container(
+                  // 必须居中：否则子级收到 tight 约束被拉伸到整格，
+                  // 图标放大约 2 倍、描边等比变粗。
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: selected
+                        ? context.colors.primary.withValues(alpha: 0.15)
+                        : context.colors.surfaceMuted,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color:
+                          selected ? context.colors.primary : context.colors.divider,
+                    ),
+                  ),
+                  child: PlainIcon(
+                    icon,
+                    size: 20,
+                    color: context.colors.primary,
+                  ),
+                ),
+              );
+            },
           ),
         );
       },

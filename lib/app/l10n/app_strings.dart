@@ -1,8 +1,7 @@
 /// Localization delegates and strings. See 06-C1, 04-9.
 ///
-/// V1.0 ships zh-CN only — `supportedLocales` is deliberately a single
-/// locale so the app never shows a half-translated UI. The `isZh ? :`
-/// branches remain for a future en-US pass.
+/// 2026-10-19 起双语（zh-CN / en）：英文分支早随 `isZh ? :` 写在各 strings
+/// 文件里；`supportedLocales` 放开 en，用户可在设置-外观里切换或跟随系统。
 library;
 
 import 'package:flutter/foundation.dart';
@@ -26,6 +25,7 @@ class AppStrings {
 
   static const List<Locale> supportedLocales = [
     Locale('zh', 'CN'),
+    Locale('en'),
   ];
 
   bool get isZh => locale.languageCode == 'zh';
@@ -93,7 +93,6 @@ class AppStrings {
   String get expenseByCategory => isZh ? '分类支出占比' : 'Expense by Category';
   String get vsLastMonth => isZh ? '与上月对比' : 'vs Last Month';
   String get balance => isZh ? '结余' : 'Balance';
-  String get transactions => isZh ? '笔交易' : 'transactions';
   String get collapse => isZh ? '收起' : 'Collapse';
   String expandRemaining(int count) => isZh ? '展开其余 $count 类' : 'Expand remaining $count';
 
