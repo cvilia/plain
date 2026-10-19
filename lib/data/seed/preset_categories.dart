@@ -532,5 +532,17 @@ Future<void> backfillPresetCategories(AppDatabase db, Clock clock) async {
         [ref, id],
       );
     });
+    // 2026-10-19：被提升为一级的那几个，图标 ref 还是当年的旧值，会与其它一级
+    // 撞同一枚图标（如「书籍」的 `book` 与「学习」同图标）。只在用户没改过时换。
+    const promotedIconUpgrades = <String, (String, String)>{
+      'preset_study_book': ('book', 'library'),
+      'preset_housing_water': ('utilities', 'electricity'),
+    };
+    promotedIconUpgrades.forEach((id, refs) {
+      db.raw.execute(
+        'UPDATE categories SET icon_ref = ? WHERE id = ? AND icon_ref = ?',
+        [refs.$2, id, refs.$1],
+      );
+    });
   });
 }
