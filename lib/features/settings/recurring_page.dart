@@ -134,8 +134,7 @@ class _RecurringPageState extends ConsumerState<RecurringPage> {
   }
 
   Future<void> _create() async {
-    await Navigator.push<bool>(
-      context,
+    await Navigator.of(context, rootNavigator: true).push<bool>(
       MaterialPageRoute(builder: (_) => const RecurringEditPage()),
     );
   }

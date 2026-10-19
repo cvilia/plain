@@ -17,6 +17,13 @@ extension SettingsBStrings on AppStrings {
   String get privacyPledge => isZh ? '隐私承诺' : 'Privacy promise';
   String get privacyPledgeDesc => isZh ? '无广告、无外联、无埋点上报' : 'No ads, no tracking, no telemetry';
   String get secLedger => isZh ? '记账' : 'Ledger';
+  // ── 「我的」改版（2026-10-19）：常用宫格 + 更多设置二级页 ──
+  String get commonFeatures => isZh ? '常用功能' : 'Quick actions';
+  String get moreSettings => isZh ? '更多设置' : 'More settings';
+  String get moreSettingsSubtitle => isZh ? '汇率、声音、成员、成就、关于' : 'Rates, sound, members, awards, about';
+  String get entryPrefs => isZh ? '记账偏好' : 'Entry preferences';
+  String get recordsAndFamily => isZh ? '记录与家庭' : 'Records & family';
+
   String get monthStartDay => isZh ? '月起始日' : 'Month start day';
   String monthStartDayValue(int n) => isZh ? '$n 日' : 'Day $n';
   String monthStartOption(int n) => isZh ? '每月 $n 日' : 'Day $n each month';

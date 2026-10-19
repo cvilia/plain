@@ -9,8 +9,10 @@ import 'package:plain/design_system/amount_text.dart';
 import 'package:plain/design_system/app_empty_state.dart';
 import 'package:plain/design_system/app_error_state.dart';
 import 'package:plain/design_system/app_toast.dart';
+import 'package:plain/features/accounts/account_entries_page.dart';
 import 'package:plain/features/accounts/credit_reconcile_page.dart';
 import 'package:plain/features/accounts/reconcile_mode_page.dart';
+import 'package:plain/features/assets/debt_optimize_page.dart';
 import 'package:plain/features/assets/investment_page.dart';
 import 'package:plain/features/assets/loan_page.dart';
 import 'package:plain/features/assets/net_worth_page.dart';
@@ -88,6 +90,33 @@ class _AccountWithBalance {
       );
 }
 
+/// 账户行的操作面板要做的动作。
+enum _AccountAction {
+  entries,
+  adjust,
+  reconcileMode,
+  creditBill,
+  loanPlan,
+  holdings,
+  edit,
+}
+
+/// 负债组 = 负余额 / 贷款 / 信用卡。
+///
+/// 信用卡按**账户类型**归类，不只看余额：刚开卡还没欠款时余额是 0，
+/// 只看符号会把它放进「资产账户」，看起来像一张存款卡。
+bool _isLiability(_AccountWithBalance a) =>
+    a.balance < 0 || a.isLoan || a.isCredit;
+
+/// 二级页/全屏页一律走根 Navigator。
+///
+/// 资产页在 `StatefulShellRoute` 的 branch 里，branch 自带嵌套 Navigator；
+/// 用 `Navigator.of(context)` 推页只会盖住 body，底部导航条仍留在屏幕上。
+void _push(BuildContext context, Widget page) {
+  Navigator.of(context, rootNavigator: true)
+      .push<void>(MaterialPageRoute<void>(builder: (_) => page));
+}
+
 class AccountsPage extends ConsumerWidget {
   const AccountsPage({super.key});
 
@@ -102,48 +131,110 @@ class AccountsPage extends ConsumerWidget {
         // 底部 Tab 页是导航终点，没有「上一页」可回 —— 不放返回箭头
         // （标题居中由 PlainTopBar 的默认行为统一负责）
         actions: [
-          // STORY-10.4：净值追踪入口
-          Material(
-            color: const Color(0x00000000),
-            borderRadius: BorderRadius.circular(12),
-            child: InkWell(
-              onTap: () => Navigator.push<void>(
-                context,
-                MaterialPageRoute(builder: (_) => const NetWorthPage()),
-              ),
-              borderRadius: BorderRadius.circular(12),
-              child: SizedBox(
-                width: 52,
-                height: 44,
-                child: Center(
-                  child: Text(s.netWorth,
-                      style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w500,
-                          color: context.colors.primary)),
-                ),
-              ),
-            ),
-          ),
-          Material(
-            color: const Color(0x00000000),
-            borderRadius: BorderRadius.circular(12),
-            child: InkWell(
-              onTap: () => _showAddSheet(context, ref),
-              borderRadius: BorderRadius.circular(12),
-              child: const SizedBox(
-                width: 44,
-                height: 44,
-                child: Center(child: PlainIcon(PlainIconData.plus, size: 22)),
-              ),
-            ),
+          PlainTopBarAction(
+            icon: PlainIconData.plus,
+            tooltip: s.addAccount,
+            onTap: () => _showAddSheet(context, ref),
           ),
         ],
       ),
       body: accountsAsync.when(
-        data: (accounts) {
-          if (accounts.isEmpty) {
-            return ContentWidthConstraint(
+        // 没有账户时也走同一个列表：概览与「净值走势 / 债务优化」入口始终在，
+        // 下面再给一块空态 + 添加按钮 —— 否则新用户连净值追踪都点不到。
+        data: (accounts) => _AccountsBody(accounts: accounts),
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (e, _) => AppErrorState.of(context, e,
+            onRetry: () => ref.invalidateData.bumpEverything()),
+      ),
+    );
+  }
+}
+
+class _AccountsBody extends ConsumerWidget {
+  const _AccountsBody({required this.accounts});
+  final List<_AccountWithBalance> accounts;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final s = AppStrings.of(context);
+    final colors = context.colors;
+    final assets = accounts.where((a) => !_isLiability(a)).toList();
+    final debts = accounts.where(_isLiability).toList();
+    final totalAssets = assets.fold<int>(0, (sum, a) => sum + a.balance);
+    final totalDebts = debts.fold<int>(0, (sum, a) => sum + a.balance);
+
+    return ContentWidthConstraint(
+      child: ListView(
+        padding: const EdgeInsets.fromLTRB(
+            Spacing.lg, 0, Spacing.lg, Spacing.xl),
+        children: [
+          // ── 概览：净资产 + 资产/负债两个分项（纯排印，无卡片）──
+          Padding(
+            padding: const EdgeInsets.only(top: 14, bottom: 14),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  s.netAssets,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 0.08 * 12,
+                    color: colors.inkTertiary,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                AmountDisplay(
+                  cents: totalAssets + totalDebts,
+                  fontSize: 34,
+                  integerWeight: FontWeight.w700,
+                ),
+                const SizedBox(height: 14),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _Stat(
+                        label: s.totalAssets,
+                        cents: totalAssets,
+                      ),
+                    ),
+                    Expanded(
+                      child: _Stat(
+                        label: s.totalLiabilities,
+                        cents: totalDebts.abs(),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          Divider(height: 1, thickness: 1, color: colors.border),
+          const SizedBox(height: Spacing.md),
+          // 两个「看数」入口，替代原先顶栏一个含义不明的「净值」文字按钮。
+          Row(
+            children: [
+              Expanded(
+                child: _Shortcut(
+                  icon: PlainIconData.chartLine,
+                  label: s.netWorthTracking,
+                  onTap: () => _push(context, const NetWorthPage()),
+                ),
+              ),
+              const SizedBox(width: Spacing.sm),
+              Expanded(
+                child: _Shortcut(
+                  icon: PlainIconData.chartBars,
+                  label: s.debtOptimize,
+                  onTap: () => _push(context, const DebtOptimizePage()),
+                ),
+              ),
+            ],
+          ),
+
+          if (accounts.isEmpty)
+            SizedBox(
+              height: 300,
               child: AppEmptyState(
                 icon: PlainIconData.wallet,
                 title: s.noAccounts,
@@ -154,254 +245,129 @@ class AccountsPage extends ConsumerWidget {
                   label: Text(s.addAccount),
                 ),
               ),
-            );
-          }
-
-          final netAssets = accounts.fold(0, (sum, a) => sum + a.balance);
-
-          return ContentWidthConstraint(
-            child: ListView(
-              padding: const EdgeInsets.all(Spacing.lg),
-              children: [
-                // Quiet Ledger: 净资产纯排印，无卡片
-                Padding(
-                  padding: const EdgeInsets.only(top: 14, bottom: 20),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        s.netAssets,
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          letterSpacing: 0.08 * 12,
-                          color: context.colors.inkTertiary,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      AmountDisplay(
-                        cents: netAssets,
-                        fontSize: 34,
-                        integerWeight: FontWeight.w700,
-                      ),
-                      const SizedBox(height: 16),
-                      Divider(height: 1, thickness: 1, color: context.colors.border),
-                    ],
-                  ),
-                ),
-                // 资产
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(2, 8, 2, 8),
-                  child: Text(
-                    s.accounts,
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      letterSpacing: 0.08 * 12,
-                      color: context.colors.inkTertiary,
+            )
+          else ...[
+            // ── 资产账户 ──
+            PlainEyebrow('${s.assetAccounts} · ${assets.length}'),
+            if (assets.isEmpty)
+              _EmptyGroup(text: s.noAssetAccounts)
+            else
+              PlainPanel(
+                children: [
+                  for (final a in assets)
+                    _AccountRow(
+                      account: a,
+                      onTap: () => _showAccountActions(context, ref, a),
                     ),
-                  ),
-                ),
-                DecoratedBox(
-                  decoration: BoxDecoration(
-                    color: context.colors.surface,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: context.colors.border),
-                  ),
-                  child: Column(
-                    children: [
-                      for (final a in accounts.where((x) => x.balance >= 0))
-                        _AccountTile(
-                          account: a,
-                          onRefresh: () => ref.invalidateData.bumpAccountsMutated(),
-                          onReconcile: () {
-                            if (a.type == AccountType.credit) {
-                              _openCreditReconcile(context, a.id);
-                            } else if (a.isLoan) {
-                              // STORY-10.2：贷款账户进摊销页
-                              Navigator.push<void>(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => LoanPage(accountId: a.id),
-                                ),
-                              );
-                            } else if (a.type == AccountType.investment) {
-                              // STORY-10.1：投资账户进持仓页
-                              Navigator.push<void>(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => InvestmentPage(accountId: a.id),
-                                ),
-                              );
-                            } else {
-                              _showReconcileDialog(context, ref, a);
-                            }
-                          },
-                        ),
-                    ],
-                  ),
-                ),
-                // 负债
-                if (accounts.any((x) => x.balance < 0)) ...[
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(2, 24, 2, 8),
-                    child: Text(
-                      s.liabilities,
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        letterSpacing: 0.08 * 12,
-                        color: context.colors.inkTertiary,
-                      ),
-                    ),
-                  ),
-                  DecoratedBox(
-                    decoration: BoxDecoration(
-                      color: context.colors.surface,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: context.colors.border),
-                    ),
-                    child: Column(
-                      children: [
-                        for (final a in accounts.where((x) => x.balance < 0))
-                          _AccountTile(
-                            account: a,
-                            onRefresh: () => ref.invalidateData.bumpAccountsMutated(),
-                            onReconcile: () {
-                              if (a.type == AccountType.credit) {
-                                _openCreditReconcile(context, a.id);
-                              } else if (a.isLoan) {
-                                Navigator.push<void>(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => LoanPage(accountId: a.id),
-                                  ),
-                                );
-                              } else {
-                                _showReconcileDialog(context, ref, a);
-                              }
-                            },
-                          ),
-                      ],
-                    ),
-                  ),
                 ],
-              ],
-            ),
-          );
-        },
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => AppErrorState.of(context, e,
-            onRetry: () => ref.invalidateData.bumpEverything()),
-      ),
-    );
-  }
+              ),
 
-  void _showAddSheet(BuildContext context, WidgetRef ref) {
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      builder: (ctx) => SafeArea(
-        child: _AddAccountSheet(onSaved: () {
-          ref.invalidateData.bumpAccountsMutated();
-        }),
-      ),
-    );
-  }
-
-  void _openCreditReconcile(BuildContext context, String accountId) {
-    Navigator.push<void>(
-      context,
-      MaterialPageRoute(
-        builder: (_) => CreditReconcilePage(accountId: accountId),
-      ),
-    );
-  }
-
-  void _showReconcileDialog(BuildContext context, WidgetRef ref, _AccountWithBalance account) {
-    final s = AppStrings.of(context);
-    final ctrl = TextEditingController(text: formatAmount(account.balance));
-    showDialog<void>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(s.reconcile),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(children: [
-              Text('${s.currentBalance}: ', style: TextStyle(color: context.colors.inkSecondary)),
-              AmountWithCurrency(cents: account.balance),
-            ]),
-            const SizedBox(height: Spacing.md),
-            TextField(
-              controller: ctrl,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              decoration: InputDecoration(labelText: s.actualBalance, border: const OutlineInputBorder(), prefixText: '\u00a5'),
-            ),
+            // ── 负债账户 ──
+            PlainEyebrow('${s.liabilityAccounts} · ${debts.length}'),
+            if (debts.isEmpty)
+              _EmptyGroup(text: s.noLiabilityAccounts)
+            else
+              PlainPanel(
+                children: [
+                  for (final a in debts)
+                    _AccountRow(
+                      account: a,
+                      onTap: () => _showAccountActions(context, ref, a),
+                    ),
+                ],
+              ),
           ],
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: Text(s.cancel)),
-          FilledButton(
-            onPressed: () async {
-              final text = ctrl.text.trim();
-              if (text.isEmpty) return;
-              final int actualCents;
-              try {
-                actualCents = Money.parseYuan(text).cents;
-              } on FormatException {
-                return;
-              }
-              final diff = actualCents - account.balance;
-
-              if (diff != 0) {
-                // Route through CreateEntryUseCase so change_log / daily_stats /
-                // UUID / revision are all written (raw INSERT used to skip them).
-                final deps = ref.read(appDependenciesProvider);
-                final isExpense = diff < 0;
-                final result = await deps.createEntry(CreateEntryInput(
-                  amountExpression: formatAmount(diff.abs()),
-                  type: isExpense ? EntryType.expense : EntryType.income,
-                  categoryId: isExpense ? 'preset_other' : 'preset_income_other',
-                  accountId: account.id,
-                  // i18n-exempt: 写库系统备注，属数据非界面文案
-                  note: '对账调整',
-                  source: EntrySource.reconcile,
-                  bookId: deps.bookId,
-                  deviceId: deps.deviceId,
-                ), s: s);
-                if (result.isFailure) {
-                  if (ctx.mounted) Navigator.pop(ctx);
-                  if (context.mounted) showAppToast(context, s.reconcileFailed(result.failureOrNull?.code ?? s.unknownError));
-                  return;
-                }
-              }
-
-              if (ctx.mounted) Navigator.pop(ctx);
-              ref.invalidateData.bumpAccountsMutated();
-              ref.invalidateData.bumpEntryMutated();
-            },
-            child: Text(s.reconcile),
-          ),
         ],
       ),
     );
   }
 }
 
-class _AccountTile extends ConsumerWidget {
-  const _AccountTile({
-    required this.account,
-    required this.onRefresh,
-    required this.onReconcile,
-  });
-  final _AccountWithBalance account;
-  final VoidCallback onRefresh;
-  final VoidCallback onReconcile;
+/// 净资产下面的「资产合计 / 负债合计」分项。
+class _Stat extends StatelessWidget {
+  const _Stat({required this.label, required this.cents});
+  final String label;
+  final int cents;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w500,
+            color: colors.inkTertiary,
+          ),
+        ),
+        const SizedBox(height: 4),
+        AmountDisplay(cents: cents, fontSize: 15),
+      ],
+    );
+  }
+}
+
+/// 44 高的描边快捷入口（净值走势 / 债务优化）。
+class _Shortcut extends StatelessWidget {
+  const _Shortcut({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+  final PlainIconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    return Material(
+      color: colors.surface,
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          height: 44,
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: colors.border),
+          ),
+          child: Row(
+            children: [
+              PlainIcon(icon, size: 18, color: colors.primary),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                    color: colors.inkSecondary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _AccountRow extends StatelessWidget {
+  const _AccountRow({required this.account, required this.onTap});
+  final _AccountWithBalance account;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
     final s = AppStrings.of(context);
     final colors = context.colors;
     final typeLabel = switch (account.type) {
@@ -414,39 +380,27 @@ class _AccountTile extends ConsumerWidget {
       AccountType.goal => s.accountTypeGoal,
       _ => s.account,
     };
-    final iconRef = switch (account.type) {
-      AccountType.cash => 'wallet',
-      AccountType.debit => 'card',
-      AccountType.credit => 'receipt',
-      AccountType.investment => 'chartLine',
-      AccountType.loanIn => 'chartLine',
-      AccountType.loanOut => 'chartLine',
-      _ => 'other',
+    final icon = switch (account.type) {
+      AccountType.cash => PlainIconData.wallet,
+      AccountType.debit => PlainIconData.card,
+      AccountType.credit => PlainIconData.receipt,
+      AccountType.investment => PlainIconData.trendUp,
+      AccountType.loanIn || AccountType.loanOut => PlainIconData.chartLine,
+      AccountType.goal => PlainIconData.goal,
+      _ => PlainIconData.wallet,
     };
+    // 副标题只留账户类型。待对账笔数挪进操作面板 —— 每行都挂一条强调色小字
+    // 会让整页变吵，而且那个数字对「这个账户是什么」毫无帮助。
+    final sub = typeLabel;
 
     return InkWell(
-      onTap: () => _showReconcileDialog(context, ref, account),
+      onTap: onTap,
       child: Container(
-        constraints: const BoxConstraints(minHeight: 60),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
-        decoration: BoxDecoration(
-          border: Border(top: BorderSide(color: colors.divider, width: 1)),
-        ),
+        constraints: const BoxConstraints(minHeight: 64),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         child: Row(
           children: [
-            PlainIcon(
-              iconRef == 'wallet'
-                  ? PlainIconData.wallet
-                  : iconRef == 'card'
-                      ? PlainIconData.card
-                      : iconRef == 'receipt'
-                          ? PlainIconData.receipt
-                          : iconRef == 'chartLine'
-                              ? PlainIconData.chartLine
-                              : PlainIconData.wallet,
-              size: 22,
-              color: colors.inkSecondary,
-            ),
+            PlainIcon(icon, size: 22, color: colors.inkSecondary),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
@@ -463,41 +417,15 @@ class _AccountTile extends ConsumerWidget {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    typeLabel,
+                    sub,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w500,
                       color: colors.inkTertiary,
                     ),
                   ),
-                  // STORY-2.3 AC1/AC3：待对账 N 笔角标（全部勾完即消失）。
-                  // 点它进逐笔对账模式，与整行的「数字对账」是两条不同路径。
-                  if (account.pendingReconcile > 0)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 4),
-                      child: InkWell(
-                        onTap: () => Navigator.push<void>(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => ReconcileModePage(
-                              accountId: account.id,
-                              accountName: account.name,
-                            ),
-                          ),
-                        ),
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 2),
-                          child: Text(
-                            s.pendingReconcileCount(account.pendingReconcile),
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: colors.accent,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
                 ],
               ),
             ),
@@ -513,15 +441,318 @@ class _AccountTile extends ConsumerWidget {
       ),
     );
   }
+}
 
-  void _showReconcileDialog(BuildContext context, WidgetRef ref, dynamic a) {
-    // keep existing dialog via parent callback style — simplified
-    onReconcile();
+class _EmptyGroup extends StatelessWidget {
+  const _EmptyGroup({required this.text});
+  final String text;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: Spacing.md),
+        child: Text(
+          text,
+          style: TextStyle(fontSize: 14, color: context.colors.inkTertiary),
+        ),
+      );
+}
+
+/// 点某一行账户 → 操作面板。
+///
+/// 之前是「点行 = 直接弹对账输入框」，这是本页最让人看不懂的地方：
+/// 想看一眼账户详情，却被迫先面对一个改余额的表单。现在点行先给一张清单，
+/// 每条动作都写明白要做什么，再决定去哪。
+Future<void> _showAccountActions(
+  BuildContext context,
+  WidgetRef ref,
+  _AccountWithBalance a,
+) async {
+  final s = AppStrings.of(context);
+  final colors = context.colors;
+  final isCredit = a.type == AccountType.credit;
+  final isInvestment = a.type == AccountType.investment;
+
+  final action = await showModalBottomSheet<_AccountAction>(
+    context: context,
+    useRootNavigator: true,
+    builder: (ctx) => SafeArea(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+                Spacing.lg, Spacing.lg, Spacing.lg, Spacing.md),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        a.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 17,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        s.accountActions,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: colors.inkTertiary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                AmountDisplay(cents: a.balance, fontSize: 17),
+              ],
+            ),
+          ),
+          Divider(height: 1, thickness: 1, color: colors.divider),
+          _ActionRow(
+            icon: PlainIconData.receipt,
+            label: s.viewEntries,
+            onTap: () => Navigator.pop(ctx, _AccountAction.entries),
+          ),
+          if (a.pendingReconcile > 0)
+            _ActionRow(
+              icon: PlainIconData.listCheck,
+              label: s.reconcilePerEntry,
+              hint: s.pendingReconcileCount(a.pendingReconcile),
+              onTap: () => Navigator.pop(ctx, _AccountAction.reconcileMode),
+            ),
+          if (isCredit)
+            _ActionRow(
+              icon: PlainIconData.card,
+              label: s.creditBillDetail,
+              onTap: () => Navigator.pop(ctx, _AccountAction.creditBill),
+            )
+          else if (a.isLoan)
+            _ActionRow(
+              icon: PlainIconData.chartLine,
+              label: s.loanPlanDetail,
+              onTap: () => Navigator.pop(ctx, _AccountAction.loanPlan),
+            )
+          else if (isInvestment)
+            _ActionRow(
+              icon: PlainIconData.trendUp,
+              label: s.holdingsDetail,
+              onTap: () => Navigator.pop(ctx, _AccountAction.holdings),
+            )
+          else
+            _ActionRow(
+              icon: PlainIconData.amount,
+              label: s.adjustBalance,
+              onTap: () => Navigator.pop(ctx, _AccountAction.adjust),
+            ),
+          _ActionRow(
+            icon: PlainIconData.edit,
+            label: s.editAccount,
+            onTap: () => Navigator.pop(ctx, _AccountAction.edit),
+          ),
+          const SizedBox(height: Spacing.sm),
+        ],
+      ),
+    ),
+  );
+
+  if (action == null || !context.mounted) return;
+  switch (action) {
+    case _AccountAction.entries:
+      _push(
+        context,
+        AccountEntriesPage(accountId: a.id, accountName: a.name),
+      );
+      break;
+    case _AccountAction.reconcileMode:
+      _push(
+        context,
+        ReconcileModePage(accountId: a.id, accountName: a.name),
+      );
+      break;
+    case _AccountAction.creditBill:
+      _openCreditReconcile(context, a.id);
+      break;
+    case _AccountAction.loanPlan:
+      _push(context, LoanPage(accountId: a.id));
+      break;
+    case _AccountAction.holdings:
+      _push(context, InvestmentPage(accountId: a.id));
+      break;
+    case _AccountAction.adjust:
+      _showReconcileDialog(context, ref, a);
+      break;
+    case _AccountAction.edit:
+      _showAddSheet(context, ref, editing: a.account);
+      break;
   }
 }
 
+/// 操作面板里的一行。
+class _ActionRow extends StatelessWidget {
+  const _ActionRow({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+    this.hint,
+  });
+  final PlainIconData icon;
+  final String label;
+  final String? hint;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    return InkWell(
+      onTap: onTap,
+      child: Container(
+        constraints: const BoxConstraints(minHeight: 52),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        child: Row(
+          children: [
+            PlainIcon(icon, size: 20, color: colors.inkSecondary),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                label,
+                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500),
+              ),
+            ),
+            if (hint != null)
+              Text(
+                hint!,
+                style: TextStyle(fontSize: 12, color: colors.inkTertiary),
+              ),
+            const SizedBox(width: 4),
+            PlainIcon(
+              PlainIconData.chevronRight,
+              size: 20,
+              color: colors.inkFaint,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+void _showAddSheet(BuildContext context, WidgetRef ref, {Account? editing}) {
+  showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    useRootNavigator: true,
+    builder: (ctx) => SafeArea(
+      child: _AddAccountSheet(
+        editing: editing,
+        onSaved: () {
+          ref.invalidateData.bumpAccountsMutated();
+        },
+      ),
+    ),
+  );
+}
+
+void _openCreditReconcile(BuildContext context, String accountId) {
+  _push(context, CreditReconcilePage(accountId: accountId));
+}
+
+/// 现金 / 储蓄卡 / 目标账户的「调整余额」：差额写成一笔对账调整账单。
+void _showReconcileDialog(
+  BuildContext context,
+  WidgetRef ref,
+  _AccountWithBalance account,
+) {
+  final s = AppStrings.of(context);
+  final ctrl = TextEditingController(text: formatAmount(account.balance));
+  showDialog<void>(
+    context: context,
+    useRootNavigator: true,
+    builder: (ctx) => AlertDialog(
+      title: Text(s.reconcile),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(children: [
+            Text('${s.currentBalance}: ',
+                style: TextStyle(color: context.colors.inkSecondary)),
+            AmountWithCurrency(cents: account.balance),
+          ]),
+          const SizedBox(height: Spacing.md),
+          TextField(
+            controller: ctrl,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            decoration: InputDecoration(
+              labelText: s.actualBalance,
+              border: const OutlineInputBorder(),
+              prefixText: '\u00a5',
+            ),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(ctx), child: Text(s.cancel)),
+        FilledButton(
+          onPressed: () async {
+            final text = ctrl.text.trim();
+            if (text.isEmpty) return;
+            final int actualCents;
+            try {
+              actualCents = Money.parseYuan(text).cents;
+            } on FormatException {
+              return;
+            }
+            final diff = actualCents - account.balance;
+
+            if (diff != 0) {
+              // Route through CreateEntryUseCase so change_log / daily_stats /
+              // UUID / revision are all written (raw INSERT used to skip them).
+              final deps = ref.read(appDependenciesProvider);
+              final isExpense = diff < 0;
+              final result = await deps.createEntry(
+                  CreateEntryInput(
+                    amountExpression: formatAmount(diff.abs()),
+                    type: isExpense ? EntryType.expense : EntryType.income,
+                    categoryId:
+                        isExpense ? 'preset_other' : 'preset_income_other',
+                    accountId: account.id,
+                    // i18n-exempt: 写库系统备注，属数据非界面文案
+                    note: '对账调整',
+                    source: EntrySource.reconcile,
+                    bookId: deps.bookId,
+                    deviceId: deps.deviceId,
+                  ),
+                  s: s);
+              if (result.isFailure) {
+                if (ctx.mounted) Navigator.pop(ctx);
+                if (context.mounted) {
+                  showAppToast(
+                      context,
+                      s.reconcileFailed(
+                          result.failureOrNull?.code ?? s.unknownError));
+                }
+                return;
+              }
+            }
+
+            if (ctx.mounted) Navigator.pop(ctx);
+            ref.invalidateData.bumpAccountsMutated();
+            ref.invalidateData.bumpEntryMutated();
+          },
+          child: Text(s.reconcile),
+        ),
+      ],
+    ),
+  );
+}
+
 class _AddAccountSheet extends ConsumerStatefulWidget {
-  // ignore: unused_element_parameter
   const _AddAccountSheet({required this.onSaved, this.editing});
   final VoidCallback onSaved;
   final Account? editing;

@@ -12,6 +12,19 @@ extension AccountsStrings on AppStrings {
   // ───────────────────────────── 账户通用 ─────────────────────────────
   String get netWorth => isZh ? '净值' : 'Net worth';
   String get liabilities => isZh ? '负债' : 'Liabilities';
+
+  /// 账户列表的分组标题：资产账户（3）。
+  String get assetAccounts => isZh ? '资产账户' : 'Asset accounts';
+  String get liabilityAccounts => isZh ? '负债账户' : 'Liability accounts';
+
+  /// 点账户行弹出的操作面板标题。
+  String get accountActions => isZh ? '账户操作' : 'Account actions';
+  String get viewEntries => isZh ? '查看账单' : 'View entries';
+  String get adjustBalance => isZh ? '调整余额' : 'Adjust balance';
+  String get creditBillDetail => isZh ? '信用卡账单' : 'Credit card bill';
+  String get loanPlanDetail => isZh ? '还款计划' : 'Repayment plan';
+  String get holdingsDetail => isZh ? '持仓明细' : 'Holdings';
+  String get reconcilePerEntry => isZh ? '逐笔对账' : 'Reconcile one by one';
   String get editAccount => isZh ? '编辑账户' : 'Edit account';
   String get nameLabel => isZh ? '名称' : 'Name';
   String get nameHintCash => isZh ? '如：现金' : 'e.g. Cash';
@@ -231,6 +244,8 @@ extension AccountsStrings on AppStrings {
   String accountEntriesCount(String name, int n) =>
       isZh ? '$name · $n 笔' : '$name · $n entries';
   String get noAccountEntries => isZh ? '该账户还没有流水' : 'No entries on this account yet';
+  String get entryListEmptyHint =>
+      isZh ? '用这个账户记一笔，账单会出现在这里' : 'Record an entry with this account and it will show up here';
   String get currentNetWorth => isZh ? '当前净值（资产 − 负债）' : 'Current net worth (assets − liabilities)';
   String get totalAssets => isZh ? '资产合计' : 'Total assets';
   String get totalLiabilities => isZh ? '负债合计' : 'Total liabilities';

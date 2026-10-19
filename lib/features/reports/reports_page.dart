@@ -618,7 +618,7 @@ class _AnalysisEntries extends StatelessWidget {
               icon: PlainIconData.chartLine,
               title: s.reportWeeklyProfileTitle,
               subtitle: s.reportWeeklyProfileSubtitle,
-              onTap: () => Navigator.push<void>(context,
+              onTap: () => Navigator.of(context, rootNavigator: true).push<void>(
                   MaterialPageRoute(builder: (_) => const WeeklyReportPage())),
             ),
             Divider(height: 1, thickness: 1, indent: 16, color: context.colors.divider),
@@ -626,7 +626,7 @@ class _AnalysisEntries extends StatelessWidget {
               icon: PlainIconData.chartLine,
               title: s.reportSankeyTitle,
               subtitle: s.reportSankeySubtitle,
-              onTap: () => Navigator.push<void>(context,
+              onTap: () => Navigator.of(context, rootNavigator: true).push<void>(
                   MaterialPageRoute(builder: (_) => const SankeyPage())),
             ),
             Divider(height: 1, thickness: 1, indent: 16, color: context.colors.divider),
@@ -634,7 +634,7 @@ class _AnalysisEntries extends StatelessWidget {
               icon: PlainIconData.filter,
               title: s.reportCrossTitle,
               subtitle: s.reportCrossSubtitle,
-              onTap: () => Navigator.push<void>(context,
+              onTap: () => Navigator.of(context, rootNavigator: true).push<void>(
                   MaterialPageRoute(builder: (_) => const CrossAnalysisPage())),
             ),
             Divider(height: 1, thickness: 1, indent: 16, color: context.colors.divider),
@@ -642,7 +642,7 @@ class _AnalysisEntries extends StatelessWidget {
               icon: PlainIconData.sort,
               title: s.reportMoneyAgeTitle,
               subtitle: s.reportMoneyAgeSubtitle,
-              onTap: () => Navigator.push<void>(context,
+              onTap: () => Navigator.of(context, rootNavigator: true).push<void>(
                   MaterialPageRoute(builder: (_) => const MoneyAgePage())),
             ),
             Divider(height: 1, thickness: 1, indent: 16, color: context.colors.divider),
@@ -650,7 +650,7 @@ class _AnalysisEntries extends StatelessWidget {
               icon: PlainIconData.receipt,
               title: s.reportTaxTitle,
               subtitle: s.reportTaxSubtitle,
-              onTap: () => Navigator.push<void>(context,
+              onTap: () => Navigator.of(context, rootNavigator: true).push<void>(
                   MaterialPageRoute(builder: (_) => const TaxReportPage())),
             ),
           ],

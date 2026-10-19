@@ -1564,8 +1564,7 @@ class _CategoryGrid extends ConsumerWidget {
             selected: false,
             color: context.colors.inkTertiary,
             onTap: () async {
-              final result = await Navigator.push<String>(
-                context,
+              final result = await Navigator.of(context, rootNavigator: true).push<String>(
                 MaterialPageRoute(
                   // 选分类页必须跟着当前页签的 kind 走：收入页签下开一个
                   // 支出分类的列表，用户会选到不属于收入的分类。

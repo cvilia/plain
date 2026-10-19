@@ -61,6 +61,37 @@ void main() {
     expect(find.byType(NavigationRail), findsOneWidget);
   });
 
+  testWidgets('二级页不显示底部导航', (tester) async {
+    // 四个主页面在 StatefulShellRoute 的 branch 里，branch 自带嵌套 Navigator。
+    // 一旦有人把二级页的 `rootNavigator: true` 去掉，页面会盖在 body 上、
+    // 底部导航条留在原地 —— 这条断言就是防这个回归。
+    tester.platformDispatcher.localesTestValue = const [Locale('zh', 'CN')];
+    addTearDown(tester.platformDispatcher.clearLocalesTestValue);
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await tester.pumpWidget(_app(onboarding: false));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+
+    await tester.tap(find.text('资产'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
+    expect(find.text('净值追踪'), findsOneWidget);
+    // 主页面有底部导航
+    expect(find.text('流水'), findsAtLeastNWidgets(1));
+
+    await tester.tap(find.text('净值追踪'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+
+    await tester.pump(const Duration(milliseconds: 200));
+    // 二级页整屏：底部导航（流水/报表）不再可见。
+    // 注意别断言「净值追踪」消失 —— 那是新页标题，与入口按钮同名。
+    expect(find.text('流水'), findsNothing);
+    expect(find.text('报表'), findsNothing);
+  });
+
   testWidgets('PlainApp smoke: onboarding replaces shell chrome', (tester) async {
     await tester.binding.setSurfaceSize(const Size(390, 844));
     addTearDown(() => tester.binding.setSurfaceSize(null));

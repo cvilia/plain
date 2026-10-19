@@ -182,8 +182,7 @@ class _NetWorthPageState extends ConsumerState<NetWorthPage> {
             color: const Color(0x00000000),
             borderRadius: BorderRadius.circular(12),
             child: InkWell(
-              onTap: () => Navigator.push<void>(
-                context,
+              onTap: () => Navigator.of(context, rootNavigator: true).push<void>(
                 MaterialPageRoute(builder: (_) => const DebtOptimizePage()),
               ),
               borderRadius: BorderRadius.circular(12),
@@ -299,18 +298,15 @@ class _NetWorthPageState extends ConsumerState<NetWorthPage> {
 
     switch (account.type) {
       case AccountType.investment:
-        await Navigator.push<void>(
-          context,
+        await Navigator.of(context, rootNavigator: true).push<void>(
           MaterialPageRoute(builder: (_) => InvestmentPage(accountId: accountId)),
         );
       case AccountType.loanIn:
-        await Navigator.push<void>(
-          context,
+        await Navigator.of(context, rootNavigator: true).push<void>(
           MaterialPageRoute(builder: (_) => LoanPage(accountId: accountId)),
         );
       case AccountType.credit:
-        await Navigator.push<void>(
-          context,
+        await Navigator.of(context, rootNavigator: true).push<void>(
           MaterialPageRoute(
               builder: (_) => CreditReconcilePage(accountId: accountId)),
         );

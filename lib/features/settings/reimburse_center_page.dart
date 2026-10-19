@@ -196,8 +196,7 @@ class _EntryRow extends ConsumerWidget {
                 ? '$dateStr $note'
                 : dateStr;
     return InkWell(
-      onTap: () => Navigator.push<void>(
-        context,
+      onTap: () => Navigator.of(context, rootNavigator: true).push<void>(
         MaterialPageRoute(builder: (_) => EntryDetailPage(entryId: entry.id)),
       ),
       child: Padding(

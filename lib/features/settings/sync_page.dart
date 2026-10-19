@@ -424,8 +424,7 @@ class _SyncPageState extends ConsumerState<SyncPage> {
                           : s.conflictsPending(_openConflicts),
                       showChevron: true,
                       onTap: () {
-                        Navigator.push<void>(
-                          context,
+                        Navigator.of(context, rootNavigator: true).push<void>(
                           MaterialPageRoute(
                               builder: (_) => const ConflictCenterPage()),
                         ).then((_) => _refreshConflictCount());

@@ -80,8 +80,7 @@ class FlowListPage extends ConsumerWidget {
             icon: PlainIconData.search,
             iconSize: 20,
             tooltip: s.searchOrFilter,
-            onTap: () => Navigator.push<void>(
-              context,
+            onTap: () => Navigator.of(context, rootNavigator: true).push<void>(
               MaterialPageRoute(builder: (_) => const AdvancedFilterPage()),
             ),
           ),
