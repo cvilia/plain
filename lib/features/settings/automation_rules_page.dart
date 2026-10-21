@@ -101,7 +101,7 @@ class _AutomationRulesPageState extends ConsumerState<AutomationRulesPage> {
     final hasRules = _rules.isNotEmpty;
 
     return Scaffold(
-      backgroundColor: colors.surface,
+      backgroundColor: colors.pageBg,
       appBar: PlainTopBar(
         title: s.automationTitle,
         showBack: true,

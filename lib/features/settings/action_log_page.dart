@@ -34,6 +34,15 @@ class ActionLogPage extends ConsumerWidget {
         'budget' => s.entityBudget,
         'recurring_rule' => s.actionLogEntityRecurring,
         'currency_rate' => s.entityCurrencyRate,
+        'merchant_rule' => s.entityMerchantRule,
+        'rule' => s.entityAutomationRule,
+        'savings_goal' => s.entitySavingsGoal,
+        'holding' => s.entityHolding,
+        'saved_report' => s.entitySavedReport,
+        'tax_filing' => s.entityTaxFiling,
+        'member' => s.entityMember,
+        'entry_participant' => s.entityEntryParticipant,
+        'setting' => s.entitySetting,
         _ => type,
       };
 

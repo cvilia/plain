@@ -37,7 +37,12 @@ class _WeeklyReportPageState extends ConsumerState<WeeklyReportPage> {
   @override
   void initState() {
     super.initState();
-    _load();
+    // ⚠️ `_load()` 里要取 `AppStrings.of(context)`，`initState` 阶段
+    // `Localizations` 还没挂载 → 必须等首帧后再跑（2026-10-20 全页面巡检发现）。
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _load();
+    });
     WeeklyReportService.level().then((v) {
       if (mounted) setState(() => _level = v);
     });
@@ -70,7 +75,7 @@ class _WeeklyReportPageState extends ConsumerState<WeeklyReportPage> {
     ref.listen(ledgerVersionProvider, (_, _) => _load());
 
     return Scaffold(
-      backgroundColor: colors.surface,
+      backgroundColor: colors.pageBg,
       appBar: PlainTopBar(title: s.wrSummaryTitle, showBack: true),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
@@ -114,15 +119,23 @@ class _WeeklyReportPageState extends ConsumerState<WeeklyReportPage> {
                     const Divider(height: 1, thickness: 1, indent: 16),
                     PlainRow(
                       title: s.weeklyLevelTitle,
-                      trailing: PlainSeg(
-                        items: [s.weeklyLevelRing, s.weeklyLevelSilent],
-                        selectedIndex: _level == ReminderLevel.ring ? 0 : 1,
-                        onChanged: (i) {
-                          final next =
-                              i == 0 ? ReminderLevel.ring : ReminderLevel.silent;
-                          WeeklyReportService.setLevel(next);
-                          setState(() => _level = next);
-                        },
+                      // ⚠️ `PlainSeg` 内部是 `Row + Expanded`，塞进 `PlainRow` 的
+                      // `trailing` 会拿到**无界宽度**（Row 给非 flex 子项的约束是
+                      // BoxConstraints(0..infinity)）→ 「non-zero flex but incoming
+                      // width constraints are unbounded」直接红屏。必须给定宽度。
+                      trailing: SizedBox(
+                        width: 164,
+                        child: PlainSeg(
+                          items: [s.weeklyLevelRing, s.weeklyLevelSilent],
+                          selectedIndex: _level == ReminderLevel.ring ? 0 : 1,
+                          onChanged: (i) {
+                            final next = i == 0
+                                ? ReminderLevel.ring
+                                : ReminderLevel.silent;
+                            WeeklyReportService.setLevel(next);
+                            setState(() => _level = next);
+                          },
+                        ),
                       ),
                     ),
                   ]),

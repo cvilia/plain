@@ -143,6 +143,14 @@ class IncrementalSyncService {
         final all = SyncWire.decodeLines(bytes);
         if (all.isEmpty) continue;
         final cursor = _cursorOf(dev);
+        // 缺口检测（2026-10-20 加）：本机位点是 100，对端文件却从 400 开始 ——
+        // 说明中间那段日志已经被 GC（或文件被替换），这段变更是**永久拿不到**的。
+        // 原先这种情况会静默跳过、位点照常推进，用户只看到「同步成功但少了几笔账」。
+        final minRev = all.fold<int>(
+            all.first.localRevision, (m, r) => r.localRevision < m ? r.localRevision : m);
+        if (minRev > cursor + 1) {
+          _recordGap(dev, expected: cursor + 1, received: minRev);
+        }
         final fresh = [
           for (final r in SyncWire.filterSyncable(all))
             if (r.localRevision > cursor) r,
@@ -196,6 +204,39 @@ class IncrementalSyncService {
 
   /// 用完即弃（内部持有 HttpClient）。
   void dispose() => _client.dispose();
+
+  /// 记一条「日志缺口」：写日志 + 落 `app_meta`（`sync.gap.<writer>`），
+  /// 供诊断页/后续「整库补齐」流程读取。不阻断同步——能拿到的还是要应用。
+  void _recordGap(String writerDeviceId, {required int expected, required int received}) {
+    _log?.warn('sync.gap', fields: {
+      'writer': writerDeviceId,
+      'expected': expected,
+      'received': received,
+      'missed': received - expected,
+    });
+    final now = _clock.now().millisecondsSinceEpoch;
+    _db.raw.execute(
+      'INSERT INTO app_meta (key,value,updated_at) VALUES (?,?,?) '
+      'ON CONFLICT(key) DO UPDATE SET value=?,updated_at=?',
+      [
+        'sync.gap.$writerDeviceId',
+        jsonEncode({
+          'expected': expected,
+          'received': received,
+          'missed': received - expected,
+          'at': now,
+        }),
+        now,
+        jsonEncode({
+          'expected': expected,
+          'received': received,
+          'missed': received - expected,
+          'at': now,
+        }),
+        now,
+      ],
+    );
+  }
 
   int _cursorOf(String deviceId) {    final rows = _db.raw.select('SELECT value FROM sync_state WHERE key = ?', ['cursor.$deviceId']);
     if (rows.isEmpty) return 0;

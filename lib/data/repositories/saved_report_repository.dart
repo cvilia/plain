@@ -61,6 +61,8 @@ class SavedReportRepositoryImpl implements SavedReportRepository {
   @override
   Future<Result<SavedReport>> update(SavedReport report) async {
     try {
+      final oldRows = _db.raw.select('SELECT * FROM saved_reports WHERE id = ?', [report.id]);
+      final before = oldRows.isEmpty ? const <String, Object?>{} : _payload(_fromRow(oldRows.first));
       _db.transaction(() {
         _updateRow(report);
         _changeLog.write(
@@ -69,7 +71,7 @@ class SavedReportRepositoryImpl implements SavedReportRepository {
           op: ChangeOp.update,
           deviceId: report.deviceId,
           baseRevision: report.baseRevision,
-          before: const {},
+          before: before,
           after: _payload(report),
         );
       });
@@ -168,5 +170,14 @@ class SavedReportRepositoryImpl implements SavedReportRepository {
         'to_ms': r.toMs,
         'entry_filter': r.entryFilter.wire,
         'heatmap': r.heatmap,
+        // 必填审计列（见 syncMetaOf），漏了会让对端插入该报表直接失败。
+        ...syncMetaOf(
+          createdAt: r.createdAt,
+          updatedAt: r.updatedAt,
+          deletedAt: r.deletedAt,
+          revision: r.revision,
+          deviceId: r.deviceId,
+          baseRevision: r.baseRevision,
+        ),
       };
 }

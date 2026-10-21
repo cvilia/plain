@@ -5,25 +5,48 @@ import 'package:flutter/material.dart';
 import 'package:plain/app/theme/app_colors.dart';
 
 /// 显示一个持久气泡，返回 dismiss 回调。
+///
+/// 气泡挂在 Overlay 上、不属于任何路由：页面被系统返回键 pop 时 OverlayEntry
+/// 不会自动移除，气泡会飘到上一页。因此这里监听宿主路由的状态——路由开始
+/// 退场（reverse）就一并撤掉气泡；手动 dismiss 时也把监听摘掉，避免泄漏。
 VoidCallback showPersistentBubble(
   BuildContext context,
   String text, {
   required Offset targetPosition,
 }) {
   final overlay = Overlay.of(context);
+  final hostRoute = ModalRoute.of(context);
   late OverlayEntry entry;
+  AnimationStatusListener? routeListener;
+
+  void dismiss() {
+    if (routeListener != null) {
+      hostRoute?.animation?.removeStatusListener(routeListener!);
+      routeListener = null;
+    }
+    if (entry.mounted) entry.remove();
+  }
 
   entry = OverlayEntry(
     builder: (_) => _BubbleOverlay(
       text: text,
       targetPosition: targetPosition,
-      onDismiss: () => entry.remove(),
+      onDismiss: dismiss,
     ),
   );
+  final routeAnim = hostRoute?.animation;
+  if (routeAnim != null) {
+    routeListener = (AnimationStatus status) {
+      // forward / completed 是正常浏览；reverse / dismissed 说明宿主页在退场。
+      if (status != AnimationStatus.forward &&
+          status != AnimationStatus.completed) {
+        dismiss();
+      }
+    };
+    routeAnim.addStatusListener(routeListener!);
+  }
   overlay.insert(entry);
-  return () {
-    if (entry.mounted) entry.remove();
-  };
+  return dismiss;
 }
 
 class _BubbleOverlay extends StatelessWidget {

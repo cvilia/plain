@@ -21,7 +21,11 @@ class ColumnWriter {
     return cols;
   }
 
-  static void clearCache() => _cache.clear();
+  static void clearCache() {
+    _cache.clear();
+    _notNullCache.clear();
+    _requiredCache.clear();
+  }
 
   static final Map<String, Set<String>> _notNullCache = {};
 
@@ -42,14 +46,69 @@ class ColumnWriter {
     return cols;
   }
 
+  static final Map<String, Map<String, String>> _requiredCache = {};
+
+  /// 表里「`NOT NULL` 且没有默认值」的列 → 列类型（不含主键）。
+  ///
+  /// 同步 payload 可能来自更早的版本、也可能被某条旁路写成「部分列」形态。
+  /// 插入时缺这些列，SQLite 会直接拒绝整条 `INSERT` —— 后果不是「少一列」，
+  /// 而是这条变更永远应用不上、`applyAll` 整批失败、同步位点停在原地。
+  static Map<String, String> requiredColumnsOf(AppDatabase db, String table) {
+    final cached = _requiredCache[table];
+    if (cached != null) return cached;
+    final rows = db.raw.select(
+      'SELECT name, type, "notnull" AS nn, dflt_value AS dv FROM pragma_table_info(?)',
+      [table],
+    );
+    final map = <String, String>{};
+    for (final r in rows) {
+      final name = r['name']! as String;
+      final notNull = ((r['nn'] as int?) ?? 0) == 1;
+      final hasDefault = r['dv'] != null;
+      if (name != 'id' && notNull && !hasDefault) {
+        map[name] = (r['type'] as String?) ?? 'TEXT';
+      }
+    }
+    _requiredCache[table] = map;
+    return map;
+  }
+
+  /// 缺列时的兜底值。只用来「让这条变更能落库」，正常 payload 不该走到这里。
+  static Object? _defaultFor(String column, String type, int nowMs) {
+    switch (column) {
+      case 'created_at':
+      case 'updated_at':
+        return nowMs;
+      case 'revision':
+        return 1;
+      case 'base_revision':
+        return 0;
+      case 'device_id':
+        return '';
+    }
+    final t = type.toUpperCase();
+    if (t.contains('INT') ||
+        t.contains('REAL') ||
+        t.contains('FLOA') ||
+        t.contains('DOUB') ||
+        t.contains('NUM') ||
+        t.contains('DEC')) {
+      return 0;
+    }
+    return '';
+  }
+
   /// 用 [values] 里**表里真实存在**的列，插入或更新 id 对应的行。
   ///
   /// 不返回结果——异常交给调用方（仓储）包成 Failure。
+  ///
+  /// [nowMs] 仅供测试注入「现在」；省略时取系统时间。
   static void upsert(
     AppDatabase db,
     String table,
-    Map<String, Object?> values,
-  ) {
+    Map<String, Object?> values, {
+    int? nowMs,
+  }) {
     final allowed = columnsOf(db, table);
     final pairs = <MapEntry<String, Object?>>[
       for (final e in values.entries)
@@ -64,10 +123,20 @@ class ColumnWriter {
         .isNotEmpty;
     if (!exists) {
       final cols = ['id', for (final p in pairs) p.key];
+      final vals = <Object?>[id, for (final p in pairs) p.value];
+      // 补齐「NOT NULL 且无默认值」的缺列：漏了它们不是少一列，而是整条插入失败，
+      // 于是这条变更永远应用不上、同步位点不推进（见 [requiredColumnsOf]）。
+      final at = nowMs ?? DateTime.now().millisecondsSinceEpoch;
+      final present = {for (final p in pairs) p.key};
+      requiredColumnsOf(db, table).forEach((name, type) {
+        if (present.contains(name)) return;
+        cols.add(name);
+        vals.add(_defaultFor(name, type, at));
+      });
       final marks = List.filled(cols.length, '?').join(',');
       db.raw.execute(
         'INSERT INTO $table (${cols.join(',')}) VALUES ($marks)',
-        [id, for (final p in pairs) p.value],
+        vals,
       );
     } else {
       final sets = [for (final p in pairs) '${p.key}=?'].join(',');

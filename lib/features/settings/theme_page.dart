@@ -11,6 +11,7 @@ import 'package:plain/app/theme/theme_registry.dart';
 import 'package:plain/design_system/app_toast.dart';
 import 'package:plain/design_system/plain_icons_v3.dart';
 import 'package:plain/design_system/plain_ui.dart';
+import 'package:plain/features/settings/card_opacity_page.dart';
 import 'package:plain/app/l10n/strings_settings_a.dart';
 
 // gate-copy 屏10 必现（门禁字面量）：
@@ -34,7 +35,7 @@ class ThemePage extends ConsumerWidget {
     };
 
     return Scaffold(
-      backgroundColor: colors.surface,
+      backgroundColor: colors.pageBg,
       appBar: PlainTopBar(title: s.theme, showBack: true),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
@@ -67,6 +68,22 @@ class ThemePage extends ConsumerWidget {
                     );
                   },
                 ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          // 卡片透明度（独立页面：滑杆 + 实时预览）。
+          PlainPanel(
+            children: [
+              PlainRow(
+                title: s.cardOpacityTitle,
+                subtitle: s.cardOpacitySubtitle,
+                value: s.cardOpacityValue((prefs.cardOpacity * 100).round()),
+                showChevron: true,
+                onTap: () => Navigator.of(context, rootNavigator: true)
+                    .push(MaterialPageRoute<void>(
+                  builder: (_) => const CardOpacityPage(),
+                )),
+              ),
             ],
           ),
           const SizedBox(height: 16),

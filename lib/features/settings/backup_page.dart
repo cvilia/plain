@@ -87,7 +87,7 @@ class _BackupPageState extends ConsumerState<BackupPage> {
     final s = AppStrings.of(context);
     final colors = context.colors;
     return Scaffold(
-      backgroundColor: colors.surface,
+      backgroundColor: colors.pageBg,
       appBar: PlainTopBar(
         title: s.backupRestore,
         showBack: true,

@@ -90,6 +90,28 @@ extension SettingsAStrings on AppStrings {
   // ══════════════════════════ theme_page ══════════════════════════
 
   String themeSwitched(String name) => isZh ? '已切换主题：$name' : 'Theme switched: $name';
+  // ── 卡片透明度（主题页 → 独立页面：滑杆 + 实时预览）──
+  String get cardOpacityTitle => isZh ? '卡片透明度' : 'Card opacity';
+  String get cardOpacitySubtitle =>
+      isZh ? '方框底色的白所占比例' : 'How white the boxes are';
+  String cardOpacityValue(int pct) => '$pct%';
+  String get cardOpacityHint =>
+      isZh ? '左右拖动，方框底色实时变化；松手才写入本地。' : 'Drag to change; saved on release.';
+  String get cardOpacityPreviewTitle => isZh ? '实时预览' : 'Live preview';
+  String get cardOpacityMinLabel => isZh ? '融入页面' : 'Blend in';
+  String get cardOpacityMaxLabel => isZh ? '纯白' : 'Solid white';
+  String get cardOpacityReset => isZh ? '恢复默认' : 'Reset';
+  String get cardOpacityPresetTitle => isZh ? '逐行说明' : 'What you see';
+  String get cardOpacityNote =>
+      isZh
+          ? '透明度只改「方框」的底色（卡片、胶囊、键帽、弹层），不动文字与描边。'
+          : 'Only box fills change (cards, chips, keys, sheets) — text and borders stay.';
+  String get cardOpacityDemoAmount => isZh ? '午餐 · 食堂' : 'Lunch · canteen';
+  String get cardOpacityDemoCategory => isZh ? '餐' : 'F';
+  String get cardOpacityDemoChip1 => isZh ? '账户' : 'Account';
+  String get cardOpacityDemoChip2 => isZh ? '计入收支' : 'Counts';
+  String get cardOpacityDemoKey => isZh ? '7' : '7';
+
   String get themeCountLabel => isZh ? '10 套主题' : '10 themes';
   String get themeAllFree => isZh ? '全部免费' : 'all free';
   String get themeNote1Suffix => isZh ? '，每套含浅色 / 深色两态，切换即时生效、无需重启。' : ', each with light / dark modes — switch instantly, no restart.';

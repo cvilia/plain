@@ -619,5 +619,15 @@ class AccountRepositoryImpl implements AccountRepository {
         'valuation_rate_bp': a.valuationRateBp,
         'valuation_manual_cents': a.valuationManualCents,
         'valuation_started_at': a.valuationStartedAt?.millisecondsSinceEpoch,
+        // 必填审计列必须一起走：对端插入这一行时 created_at/updated_at/device_id
+        // 是 NOT NULL 无默认值，漏了会整条插入失败、同步卡死。
+        ...syncMetaOf(
+          createdAt: a.createdAt,
+          updatedAt: a.updatedAt,
+          deletedAt: a.deletedAt,
+          revision: a.revision,
+          deviceId: a.deviceId,
+          baseRevision: a.baseRevision,
+        ),
       };
 }

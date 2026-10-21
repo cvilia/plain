@@ -29,7 +29,7 @@ class OnboardingPage extends StatelessWidget {
     final s = AppStrings.of(context);
     final colors = context.colors;
     return Scaffold(
-      backgroundColor: colors.surface,
+      backgroundColor: colors.pageBg,
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(24, 24, 24, 24),

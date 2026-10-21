@@ -60,6 +60,67 @@ int mix(int a, int b, double t) {
 const int _black = 0xFF000000;
 const int _white = 0xFFFFFFFF;
 
+/// HSL → ARGB。[h] 0–360，[s]/[l] 0–1。
+int hsl(double h, double s, double l) {
+  final hh = h % 360;
+  final c = (1 - (2 * l - 1).abs()) * s;
+  final x = c * (1 - ((hh / 60) % 2 - 1).abs());
+  final m = l - c / 2;
+  final (double r, double g, double b) = switch (hh ~/ 60) {
+    0 => (c, x, 0),
+    1 => (x, c, 0),
+    2 => (0, c, x),
+    3 => (0, x, c),
+    4 => (x, 0, c),
+    _ => (c, 0, x),
+  };
+  int q(double v) => ((v + m) * 255).round().clamp(0, 255);
+  return 0xFF000000 | (q(r) << 16) | (q(g) << 8) | q(b);
+}
+
+/// 取 [c] 的色相/饱和度，把亮度换到「相对亮度 ≈ [target]」的那一档。
+///
+/// 用途：暗色页面纸色。直接 `mix(appBg, 品牌色, α)` 会把纸色提亮 —— 品牌色在暗色档
+/// 是一支亮色（`#79BFC8`），叠完页面比卡片还亮，层级直接反过来（实测 20 个组合里
+/// 16 个倒挂）。而「先压暗 N% 再叠」又会把彩度压没（`#72313A` 压 55% 只剩近黑，
+/// 纸色等于没染色，ΔE 0.78）。
+///
+/// 所以改成：色相/饱和度照抄品牌色（彩度保住），亮度通过搜索对齐到目标相对亮度
+/// （层级顺序保住）。两步都能落到纸色上，只影响色温。
+int atLuminance(int c, double target) {
+  final r = ((c >> 16) & 0xFF) / 255.0;
+  final g = ((c >> 8) & 0xFF) / 255.0;
+  final b = (c & 0xFF) / 255.0;
+  final maxC = math.max(r, math.max(g, b));
+  final minC = math.min(r, math.min(g, b));
+  final l = (maxC + minC) / 2;
+  final d = maxC - minC;
+  final s = d == 0 ? 0.0 : d / (1 - (2 * l - 1).abs());
+  double h;
+  if (d == 0) {
+    h = 0;
+  } else if (maxC == r) {
+    h = ((g - b) / d) % 6;
+  } else if (maxC == g) {
+    h = (b - r) / d + 2;
+  } else {
+    h = (r - g) / d + 4;
+  }
+  h *= 60;
+
+  var best = c;
+  var bestDiff = double.infinity;
+  for (var i = 0; i <= 100; i++) {
+    final candidate = hsl(h, s, i / 100);
+    final diff = (lum(candidate) - target).abs();
+    if (diff < bestDiff) {
+      bestDiff = diff;
+      best = candidate;
+    }
+  }
+  return best;
+}
+
 /// ① inkFor: find a color near [fg] that contrasts ≥ [target] against [bg].
 /// Direction is decided by comparing black vs white endpoints (NOT mid-gray probe).
 int inkFor(int fg, int bg, double target) {

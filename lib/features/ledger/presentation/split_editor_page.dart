@@ -93,7 +93,7 @@ class _SplitEditorPageState extends State<SplitEditorPage> {
     final s = AppStrings.of(context);
     final colors = context.colors;
     return Scaffold(
-      backgroundColor: colors.surface,
+      backgroundColor: colors.pageBg,
       appBar: PlainTopBar(
         title: s.splitThisEntry,
         showBack: true,

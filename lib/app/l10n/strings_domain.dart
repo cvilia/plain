@@ -328,6 +328,14 @@ extension DomainStrings on AppStrings {
   String get entitySavingsGoal => isZh ? '储蓄目标' : 'Savings goal';
   String get entityRecurringRule => isZh ? '周期规则' : 'Recurring rule';
   String get entityCurrencyRate => isZh ? '锁定汇率' : 'Locked rate';
+  // 操作日志要覆盖 EntityType 全量 wire 值，漏一个界面就会直接打英文枚举串。
+  String get entityMerchantRule => isZh ? '商家规则' : 'Merchant rule';
+  String get entityAutomationRule => isZh ? '自动化规则' : 'Automation rule';
+  String get entityHolding => isZh ? '持仓' : 'Holding';
+  String get entitySavedReport => isZh ? '报表存档' : 'Saved report';
+  String get entityTaxFiling => isZh ? '税务申报' : 'Tax filing';
+  String get entityEntryParticipant => isZh ? '分摊参与人' : 'Participant';
+  String get entitySetting => isZh ? '设置' : 'Setting';
 
   // ─────────────────────── SavedReport.describe ───────────────────────
   String reportDescribe(String row, String col, String filter) =>

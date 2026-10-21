@@ -233,13 +233,18 @@ class _CrossAnalysisPageState extends ConsumerState<CrossAnalysisPage> {
                   else ...[
                     PlainEyebrow(
                         s.reportMatrixEyebrow(_rowDim.label(s), _colDim.label(s), _entries.length)),
-                    PlainPanel(children: [
-                      _Matrix(
-                        table: _table,
-                        heatmap: _heatmap,
-                        onCellTap: _showCell,
-                      ),
-                    ]),
+                    PlainPanel(
+                      // 与其他页面卡片同一口径：内边距 16（默认是 zero，
+                      // 表格内容会贴着卡片边框）。
+                      padding: const EdgeInsets.all(Spacing.lg),
+                      children: [
+                        _Matrix(
+                          table: _table,
+                          heatmap: _heatmap,
+                          onCellTap: _showCell,
+                        ),
+                      ],
+                    ),
                     const SizedBox(height: Spacing.sm),
                     Text(
                       s.reportGrandTotalHint(formatAmountYuan(_table.grandTotalCents)),

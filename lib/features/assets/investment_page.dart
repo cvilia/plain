@@ -51,7 +51,11 @@ class _InvestmentPageState extends ConsumerState<InvestmentPage> {
   @override
   void initState() {
     super.initState();
-    _reload();
+    // ⚠️ `_reload()` 开头就取 `AppStrings.of(context)`，`initState` 阶段
+    // `Localizations` 还没挂载 → 必须等首帧后再跑（2026-10-20 全页面巡检发现）。
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _reload();
+    });
   }
 
   Future<void> _reload() async {

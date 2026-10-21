@@ -28,6 +28,7 @@ class AppColors extends ThemeExtension<AppColors> {
     required this.inkFaint,
     required this.surface,
     required this.surfaceCard,
+    required this.pageBg,
     required this.surfaceMuted,
     required this.border,
     required this.divider,
@@ -96,8 +97,12 @@ class AppColors extends ThemeExtension<AppColors> {
         inkSecondary: t.ink2,
         inkTertiary: t.muted,
         inkFaint: t.faint,
-        surface: t.appBg,
+        surface: t.surface,
         surfaceCard: t.surface,
+        // 页面底色（纸色）。`surface` 这个名字在 Material 语义里是「卡片底」，
+        // 曾把 `surface` 指到 `t.appBg`，导致 PlainPanel 等卡片被涂成页面色、
+        // 卡片边界消失（与设计预览对不上）—— 见 theme_resolver 的「页面纸色」段。
+        pageBg: t.appBg,
         surfaceMuted: t.surface2,
         border: t.line,
         divider: t.lineSoft,
@@ -122,7 +127,8 @@ class AppColors extends ThemeExtension<AppColors> {
         primaryPressed: t.primaryPressed,
         accentPressed: t.accentPressed,
         frame: t.frame,
-        // fabIc 恒等于 onAccent（设计 gen_tokens.py 的 FAB 段直接复用，不是算的）。
+        // FAB 底色是 `primaryInk`（= 导航选中色），图标是它对 4.5:1 的取反，
+        // 不再复用 accent 的 onAccent（那是另一支色）。见 theme_resolver 的 FAB 段。
         fabIc: t.fabIc,
         toastBg: t.toastBg,
         primaryTint: t.primaryTint,
@@ -166,6 +172,10 @@ class AppColors extends ThemeExtension<AppColors> {
   final Color inkFaint;
   final Color surface;
   final Color surfaceCard;
+
+  /// 页面底色 = `t.appBg`（中性纸 × 品牌色 wash）。Scaffold/顶栏/底栏用它；
+  /// 卡片一律 [surface] / [surfaceCard]，别再混。
+  final Color pageBg;
   final Color surfaceMuted;
   final Color border;
   final Color divider;
@@ -234,6 +244,7 @@ class AppColors extends ThemeExtension<AppColors> {
     Color? inkFaint,
     Color? surface,
     Color? surfaceCard,
+    Color? pageBg,
     Color? surfaceMuted,
     Color? border,
     Color? divider,
@@ -299,6 +310,7 @@ class AppColors extends ThemeExtension<AppColors> {
       inkFaint: inkFaint ?? this.inkFaint,
       surface: surface ?? this.surface,
       surfaceCard: surfaceCard ?? this.surfaceCard,
+      pageBg: pageBg ?? this.pageBg,
       surfaceMuted: surfaceMuted ?? this.surfaceMuted,
       border: border ?? this.border,
       divider: divider ?? this.divider,
@@ -369,6 +381,7 @@ class AppColors extends ThemeExtension<AppColors> {
       inkFaint: Color.lerp(inkFaint, other.inkFaint, t)!,
       surface: Color.lerp(surface, other.surface, t)!,
       surfaceCard: Color.lerp(surfaceCard, other.surfaceCard, t)!,
+      pageBg: Color.lerp(pageBg, other.pageBg, t)!,
       surfaceMuted: Color.lerp(surfaceMuted, other.surfaceMuted, t)!,
       border: Color.lerp(border, other.border, t)!,
       divider: Color.lerp(divider, other.divider, t)!,

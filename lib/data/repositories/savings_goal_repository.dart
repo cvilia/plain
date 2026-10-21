@@ -73,6 +73,10 @@ class SavingsGoalRepositoryImpl implements SavingsGoalRepository {
   @override
   Future<Result<SavingsGoal>> update(SavingsGoal goal) async {
     try {
+      // 共同祖先（`before`）必须是**改动前的整行**：写成空 map 等于「没有祖先」，
+      // 对端每次线性修改都会被判成「两边都改了」→ 一批假冲突。
+      final oldRows = _db.raw.select('SELECT * FROM savings_goals WHERE id = ?', [goal.id]);
+      final before = oldRows.isEmpty ? const <String, Object?>{} : _payload(_fromRow(oldRows.first));
       _db.transaction(() {
         _updateRow(goal);
         _changeLog.write(
@@ -81,7 +85,7 @@ class SavingsGoalRepositoryImpl implements SavingsGoalRepository {
           op: ChangeOp.update,
           deviceId: goal.deviceId,
           baseRevision: goal.baseRevision,
-          before: const {},
+          before: before,
           after: _payload(goal),
         );
       });
@@ -105,7 +109,20 @@ class SavingsGoalRepositoryImpl implements SavingsGoalRepository {
         revision: old.revision + 1,
         baseRevision: old.revision,
       );
-      _db.transaction(() => _updateRow(deleted));
+      // 删除也必须进 change_log：否则「本机删了、对端还留着」，
+      // 而且下轮同步会把对端那条又拉回来。
+      _db.transaction(() {
+        _updateRow(deleted);
+        _changeLog.write(
+          entityType: EntityType.savingsGoal,
+          entityId: id,
+          op: ChangeOp.delete,
+          deviceId: old.deviceId,
+          baseRevision: old.revision,
+          before: _payload(old),
+          after: const {},
+        );
+      });
       return ok(null);
     } on Exception catch (e) {
       return err(StorageFailure('db.delete_failed', e.toString(), isRetryable: true));
@@ -194,5 +211,14 @@ class SavingsGoalRepositoryImpl implements SavingsGoalRepository {
         'due_at': g.dueAt?.millisecondsSinceEpoch,
         'account_id': g.accountId,
         'auto_transfer': g.autoTransfer,
+        // 必填审计列（见 syncMetaOf）：漏了会让对端插入该行直接抛 NOT NULL。
+        ...syncMetaOf(
+          createdAt: g.createdAt,
+          updatedAt: g.updatedAt,
+          deletedAt: g.deletedAt,
+          revision: g.revision,
+          deviceId: g.deviceId,
+          baseRevision: g.baseRevision,
+        ),
       };
 }

@@ -30,6 +30,33 @@ class ChangeLogWriter {
   }
 }
 
+/// 实体**必填**的同步/审计列，供各仓储的 `_payload` 展开。
+///
+/// 为什么必须带：`ColumnWriter.upsert` 的 INSERT 分支只按 payload 里的列建行，
+/// 而 `created_at` / `updated_at` / `device_id` 等列在 DDL 里是 `NOT NULL` 且
+/// **无默认值**。payload 漏它们时，对端「本地没有这条 → 直接插入」必然抛
+/// `NOT NULL constraint failed`，进而让 `applyAll` 整批失败、同步位点不推进
+/// （该设备会永久卡在这一行）。
+///
+/// `revision` / `base_revision` / `created_at` / `device_id` 都在
+/// `MergeEngine.managedFields` 里，不参与字段级仲裁，带上它们不会制造假冲突。
+Map<String, Object?> syncMetaOf({
+  required DateTime createdAt,
+  required DateTime updatedAt,
+  DateTime? deletedAt,
+  required int revision,
+  required String deviceId,
+  required int baseRevision,
+}) =>
+    {
+      'created_at': createdAt.millisecondsSinceEpoch,
+      'updated_at': updatedAt.millisecondsSinceEpoch,
+      'deleted_at': deletedAt?.millisecondsSinceEpoch,
+      'revision': revision,
+      'device_id': deviceId,
+      'base_revision': baseRevision,
+    };
+
 /// 账单的 change_log payload。
 ///
 /// 字段须覆盖 `transactions` 表中所有**参与同步语义**的列：同步端拿到 before/after

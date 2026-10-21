@@ -93,7 +93,13 @@ class _CreditReconcilePageState extends ConsumerState<CreditReconcilePage> {
   @override
   void initState() {
     super.initState();
-    _reload();
+    // ⚠️ 不能直接 `_reload()`：它开头要取 `AppStrings.of(context)`，而
+    // `initState` 阶段 `Localizations` 尚未挂载 → `Localizations.of` 抛
+    // 「dependOnInheritedWidgetOfExactType was called before initState completed」。
+    // 改成首帧后再跑（2026-10-20 全页面巡检发现）。
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _reload();
+    });
   }
 
   @override

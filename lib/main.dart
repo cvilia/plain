@@ -214,8 +214,12 @@ class _PlainAppState extends ConsumerState<PlainApp> with WidgetsBindingObserver
 
 
 
-    final (_, lightTheme) = themeDataFor(prefs.themeId, Brightness.light);
-    final (_, darkTheme) = themeDataFor(prefs.themeId, Brightness.dark);
+    // 卡片透明度是用户可调偏好（主题 → 卡片透明度），必须传进来，
+    // 否则滑杆拖动只改状态不改主题。
+    final (_, lightTheme) = themeDataFor(prefs.themeId, Brightness.light,
+        cardOpacity: prefs.cardOpacity);
+    final (_, darkTheme) = themeDataFor(prefs.themeId, Brightness.dark,
+        cardOpacity: prefs.cardOpacity);
 
     // First launch: full-screen onboarding (SP-0-01), no shell chrome.
     if (_onboarding) {

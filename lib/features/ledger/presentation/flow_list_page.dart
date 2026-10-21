@@ -22,6 +22,7 @@ import 'package:plain/core/time/date_format.dart';
 import 'package:plain/design_system/amount_display.dart';
 import 'package:plain/design_system/app_empty_state.dart';
 import 'package:plain/design_system/app_toast.dart';
+import 'package:plain/design_system/category_avatar.dart';
 import 'package:plain/design_system/plain_icons_v3.dart';
 import 'package:plain/design_system/plain_ui.dart';
 import 'package:plain/domain/entities/category.dart' as domain;
@@ -65,7 +66,7 @@ class FlowListPage extends ConsumerWidget {
     final monthTitle = s.yearMonth(now);
 
     return Scaffold(
-      backgroundColor: colors.surface,
+      backgroundColor: colors.pageBg,
       // 顶栏统一走 PlainTopBar（`.topbar`）：内容盒 56，状态栏高度由它自己的
       // SafeArea 承担。照设计稿：动作图标 20（`ic("ic_search", 20)`），
       // 不是 `.iconbtn` 的默认 22。
@@ -243,7 +244,7 @@ class _FlowList extends ConsumerWidget {
         _FlowRow.dayHeader(g),
         _FlowRow.dayPanel(g),
       ],
-      if (state.hasMore) const _FlowRow.more(),
+      if (state.hasMore) _FlowRow.more(failed: state.loadMoreFailed),
     ];
 
     return ListView.builder(
@@ -272,6 +273,19 @@ class _FlowList extends ConsumerWidget {
               categoryMap: state.categoryMap,
             );
           case _FlowRowKind.more:
+            // 加载失败时**不能**再自动重试：这一段是 postFrame 触发的，
+            // 一旦 DB 持续失败就会变成每帧一次查询（列表有数据时用户只看到永久转圈）。
+            if (row.failed) {
+              return Padding(
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                child: Center(
+                  child: TextButton(
+                    onPressed: controller.retryLoadMore,
+                    child: Text(AppStrings.of(context).retry),
+                  ),
+                ),
+              );
+            }
             WidgetsBinding.instance.addPostFrameCallback((_) {
               controller.loadMore();
             });
@@ -291,18 +305,22 @@ class _FlowRow {
   const _FlowRow.balance()
       : kind = _FlowRowKind.balance,
         group = null,
-        entry = null;
+        entry = null,
+        failed = false;
   const _FlowRow.safeToSpend()
       : kind = _FlowRowKind.safeToSpend,
         group = null,
-        entry = null;
+        entry = null,
+        failed = false;
   const _FlowRow.dayHeader(DayGroup this.group)
       : kind = _FlowRowKind.dayHeader,
-        entry = null;
+        entry = null,
+        failed = false;
   const _FlowRow.dayPanel(DayGroup this.group)
       : kind = _FlowRowKind.dayPanel,
-        entry = null;
-  const _FlowRow.more()
+        entry = null,
+        failed = false;
+  const _FlowRow.more({this.failed = false})
       : kind = _FlowRowKind.more,
         group = null,
         entry = null;
@@ -310,41 +328,47 @@ class _FlowRow {
   final _FlowRowKind kind;
   final DayGroup? group;
   final LedgerEntry? entry;
+
+  /// 只对 [ _FlowRowKind.more ] 有意义：上一页加载失败 → 显示「重试」而不是转圈。
+  final bool failed;
 }
 
-/// Hero：发丝线夹住的结余 + 支出/收入 + 记账月起始。
-/// 金额：结余 ink；支出 ink（无符号）；收入 income 红（带 +）。
-///
-/// 高度账（设计稿 `spec.json` 屏 2，`.hero` 实测 200.09）：
-/// ```
-/// padding-top 14                      .hero{padding:14px 0 0}
-/// hairline 1
-/// label  margin-top 16 + 行盒 16 + margin-bottom 8   .hero-label 12/600
-/// 金额行 45（= 34 × normal 1.3235）+ margin-bottom 16
-/// split  padding-bottom 16 + 内容 39.09（= 16 + gap 3 + 20.09）
-/// hairline 1
-/// month-note  padding-top 12 + 行盒 16
-/// ```
+/// Hero：品牌渐变卡（本月支出 + 比上月 ±%）+ 卡内收入/结余 + 卡下记账月起始。
+/// 2026-10-20 重做：旧版是「发丝线夹住的结余四段式」，用户要求对齐配色预览里的
+/// 渐变方框。渐变端点 `heroStart/heroEnd`（暗色 `heroDark*`）按白字 4.6:1 生成，
+/// 卡上文字一律白系，不取 `context.colors.ink*`。
 /// 记账月收支合计：走 `daily_stats`（monthSummary），与列表分页无关。
 ///
 /// 之前 `_Hero` 累加 `state.groups`（**已加载**的条目），翻页翻到上个月后
 /// 会把上个月的钱算进「本月结余」。这里按 `monthStartDay` 的记账月边界查库。
-final _monthTotalsProvider = FutureProvider<MonthSummary>((ref) async {
+/// 2026-10-20：同时取**上一个记账月**，hero 渐变卡要显示「比上月 ±%」。
+final _monthTotalsProvider =
+    FutureProvider<({MonthSummary cur, MonthSummary prev})>((ref) async {
   ref.watch(ledgerVersionProvider);
   final deps = ref.watch(appDependenciesProvider);
-  final period = ref.watch(calendarProvider).currentPeriod();
-  final res = await deps.ledgerRepository.monthSummary(
-    bookId: deps.bookId,
-    dayFrom: period.dayFrom,
-    dayTo: period.dayTo,
+  final cal = ref.watch(calendarProvider);
+  final cur = cal.currentPeriod();
+  final prev = cal.previousPeriod(cur);
+  const zero = MonthSummary(
+    expenseCents: 0,
+    incomeCents: 0,
+    txCount: 0,
+    byCategory: {},
   );
-  return res.successOrNull ??
-      const MonthSummary(
-        expenseCents: 0,
-        incomeCents: 0,
-        txCount: 0,
-        byCategory: {},
-      );
+  final curRes = await deps.ledgerRepository.monthSummary(
+    bookId: deps.bookId,
+    dayFrom: cur.dayFrom,
+    dayTo: cur.dayTo,
+  );
+  final prevRes = await deps.ledgerRepository.monthSummary(
+    bookId: deps.bookId,
+    dayFrom: prev.dayFrom,
+    dayTo: prev.dayTo,
+  );
+  return (
+    cur: curRes.successOrNull ?? zero,
+    prev: prevRes.successOrNull ?? zero,
+  );
 });
 
 class _Hero extends ConsumerWidget {
@@ -355,9 +379,8 @@ class _Hero extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final s = AppStrings.of(context);
-    final hideAmounts = ref.watch(hideAmountsProvider);
     final totals = ref.watch(_monthTotalsProvider);
-    final summary = totals.value;
+    final summary = totals.value?.cur;
     var income = 0;
     var expense = 0;
     if (summary != null) {
@@ -371,90 +394,141 @@ class _Hero extends ConsumerWidget {
       }
     }
     final balance = income - expense;
+    final prevExpense = totals.value?.prev.expenseCents;
     final colors = context.colors;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    // 「比上月」：本月和上月都有数才算百分比；上月为 0 就直说，不除零。
+    String? vsText;
+    if (expense > 0 && prevExpense != null) {
+      if (prevExpense == 0) {
+        vsText = s.noExpenseLastMonth;
+      } else if (prevExpense == expense) {
+        vsText = s.expenseFlatVsLastMonth;
+      } else {
+        final pct = (expense - prevExpense).abs() / prevExpense * 100;
+        final pctStr = pct >= 99.95
+            ? '100'
+            : (pct % 1 == 0 ? pct.toStringAsFixed(0) : pct.toStringAsFixed(1));
+        vsText = expense < prevExpense
+            ? s.expenseDownVsLastMonth('$pctStr%')
+            : s.expenseUpVsLastMonth('$pctStr%');
+      }
+    }
+
+    final hero0 = isDark ? colors.heroDarkStart : colors.heroStart;
+    final hero1 = isDark ? colors.heroDarkEnd : colors.heroEnd;
+    // 渐变端点由 theme_registry 门禁保证白字 ≥ 4.6:1，文字全用白系。
+    const onHero = Colors.white;
+    final onHeroSub = Colors.white.withValues(alpha: 0.82);
+    final onHeroLabel = Colors.white.withValues(alpha: 0.74);
+    final heroHairline = Colors.white.withValues(alpha: 0.24);
 
     return Padding(
+      // 横向内距归 `ListView.padding`（左右各 16）统一负责 —— 这里**不能再加**，
+      // 否则渐变卡比下面的日卡片窄 32（用户口径：方框要和列表项一样宽）。
       padding: const EdgeInsets.only(top: 14),
       child: Column(
-        // 显式写。`Column` 默认 center，而 hero 的每一块都该满宽（发丝线要通栏）。
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Divider(height: 1, thickness: 1, color: colors.border),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(2, 16, 0, 8),
-            child: Text(
-              s.thisMonthBalance,
-              style: TextStyle(
-                fontSize: 12,
-                // 12 的设计行盒是 16（normal）。不写就继承 body 的 1.5714 → 18.86（+2.86）。
-                height: designLineHeight(12),
-                fontWeight: FontWeight.w600,
-                letterSpacing: 0.08 * 12,
-                color: colors.inkTertiary,
+          Container(
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [hero0, hero1],
               ),
             ),
-          ),
-          // ⚠️ 这层 SizedBox 不是「随便垫一下」：`.hero-amt` 是**块级**元素，
-          // 它的行盒由 CSS `normal` 的 strut 决定 = 34 × 1.3235 ≈ 45；
-          // 内层 `.amt.xl` 自己的行盒只有 39.44（= 34 × 1.16），两者差 5.56。
-          // 直接把 AmountDisplay 放进来会矮 5.56，把下面整块往上带。
-          SizedBox(
-            height: 34 * designLineHeight(34),
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: AmountDisplay(
-                cents: balance,
-                fontSize: 34,
-                integerWeight: FontWeight.w700,
-                // 设计：结余用 ink，不因正负变色
-                color: colors.ink,
-                decorationColor: colors.inkTertiary,
-                // 结余要一眼看出正负：`¥+3,842.00` / `¥-3,842.00`
-                showValueSign: true,
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-          Padding(
-            // `.hero-split{gap:28px;padding:0 0 16px}`
-            padding: const EdgeInsets.only(bottom: 16),
-            child: Row(
-              spacing: 28,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
-                _Split(
-                  label: s.expense,
-                  cents: expense,
-                  hide: hideAmounts,
-                  // 设计：支出 ink；符号跟在货币符之后（`¥-3,842.00`）
-                  color: colors.ink,
-                  showSign: true,
-                  isExpense: true,
+                Text(
+                  s.thisMonthExpense,
+                  style: TextStyle(
+                    fontSize: 12,
+                    height: designLineHeight(12),
+                    fontWeight: FontWeight.w500,
+                    letterSpacing: 0.04 * 12,
+                    color: onHeroSub,
+                  ),
                 ),
-                _Split(
-                  label: s.income,
-                  cents: income,
-                  hide: hideAmounts,
-                  // 设计 `.tone-income` 的 `--income` = #DC2626 红。
-                  // ⚠️ 令牌表历史命名翻转：`AppColors.income` 实际是 `t.dnInk`（绿），
-                  // `AppColors.expense` 才是 `t.income`（红）。取红必须写 `expense`。
-                  color: colors.expense,
-                  showSign: true,
-                  isIncome: true,
+                const SizedBox(height: 4),
+                SizedBox(
+                  height: 28 * designLineHeight(28),
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: AmountDisplay(
+                      cents: expense,
+                      fontSize: 28,
+                      color: onHero,
+                      decorationColor: onHeroSub,
+                    ),
+                  ),
+                ),
+                if (vsText != null) ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    vsText,
+                    style: TextStyle(
+                      fontSize: 12,
+                      height: designLineHeight(12),
+                      fontWeight: FontWeight.w500,
+                      color: onHeroSub,
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 12),
+                Container(height: 1, color: heroHairline),
+                const SizedBox(height: 10),
+                Row(
+                  // 大金额（¥+12,800.00）在窄屏/宽字体下会顶破 Row
+                  // （实测溢出 17px），各占一半 + FittedBox 缩放兜底。
+                  children: [
+                    Expanded(
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerLeft,
+                        child: _HeroStat(
+                          label: s.income,
+                          cents: income,
+                          labelColor: onHeroLabel,
+                          valueColor: onHero,
+                          valueDecoration: onHeroSub,
+                          isIncome: true,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 24),
+                    Expanded(
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerLeft,
+                        child: _HeroStat(
+                          label: s.thisMonthBalance,
+                          cents: balance,
+                          labelColor: onHeroLabel,
+                          valueColor: onHero,
+                          valueDecoration: onHeroSub,
+                          showValueSign: true,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
           ),
-          Divider(height: 1, thickness: 1, color: colors.border),
           Padding(
-            // `.month-note{padding:12px 0 0 2px;gap:6px}`（总高 12 + 16 = 28）
-            padding: const EdgeInsets.fromLTRB(2, 12, 0, 0),
+            padding: const EdgeInsets.only(top: 12, left: 2),
             child: Row(
               spacing: 6,
               children: [
                 PlainIcon(
                   PlainIconData.calendar,
                   size: 13,
-                  // 设计 `.month-note svg{color:var(--faint)}` —— 是 faint，不是 muted。
                   color: colors.inkFaint,
                 ),
                 Text(
@@ -475,24 +549,24 @@ class _Hero extends ConsumerWidget {
   }
 }
 
-/// `.hs`：12/600 标签 + amount-s 值，列间距 3。
-class _Split extends StatelessWidget {
-  const _Split({
+/// 渐变卡内的小统计（收入 / 结余）：标签 + 15 号金额，白系。
+class _HeroStat extends StatelessWidget {
+  const _HeroStat({
     required this.label,
     required this.cents,
-    required this.hide,
-    required this.color,
-    this.showSign = false,
-    this.isExpense = false,
+    required this.labelColor,
+    required this.valueColor,
+    required this.valueDecoration,
+    this.showValueSign = false,
     this.isIncome = false,
   });
 
   final String label;
   final int cents;
-  final bool hide;
-  final Color color;
-  final bool showSign;
-  final bool isExpense;
+  final Color labelColor;
+  final Color valueColor;
+  final Color valueDecoration;
+  final bool showValueSign;
   final bool isIncome;
 
   @override
@@ -500,7 +574,6 @@ class _Split extends StatelessWidget {
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
-      // `.hs{gap:3px}` —— 不是 4。差 1px 会让 hero 的 200.09 变 201.09。
       spacing: 3,
       children: [
         Text(
@@ -510,19 +583,15 @@ class _Split extends StatelessWidget {
             height: designLineHeight(12),
             fontWeight: FontWeight.w600,
             letterSpacing: 0.04 * 12,
-            color: context.colors.inkTertiary,
+            color: labelColor,
           ),
         ),
         AmountDisplay(
           cents: cents,
           fontSize: 15,
-          color: color,
-          // 别传 `decorationColor: inkTertiary`。设计 `.amt.s .dec{color:inherit}` +
-          // `.tone-*` 规则：收入那份四段全取 income 色（cur 压 70%），
-          // 支出那份是墨色 + cur/dec muted —— 两者都由 AmountDisplay 自己判，
-          // 硬塞一个灰色会把收入的小数位也染灰。
-          showSign: showSign,
-          isExpense: isExpense,
+          color: valueColor,
+          decorationColor: valueDecoration,
+          showValueSign: showValueSign,
           isIncome: isIncome,
         ),
       ],
@@ -606,7 +675,14 @@ class _EntryRowState extends ConsumerState<_EntryRow> {
     // `.sub` = 「二级 · 备注」（午餐 · 公司楼下）。
     final title = widget.parent?.name ?? category?.name ?? s.uncategorized;
     final sub = _subtitleOf(entry, category, widget.parent);
-    final dotColor = _catColor(category);
+    // 分类图标：二级有自己的 iconRef 就用它，留空则继承一级（与预置数据口径一致）；
+    // 颜色跟着最终那个 ref 走，保证「图标和点同色」。
+    final catRef = category != null && category.iconRef.isNotEmpty
+        ? category.iconRef
+        : (widget.parent?.iconRef.isNotEmpty ?? false)
+            ? widget.parent!.iconRef
+            : 'other';
+    final dotColor = _catColor(catRef);
 
     return Dismissible(
       key: Key(entry.id),
@@ -639,8 +715,8 @@ class _EntryRowState extends ConsumerState<_EntryRow> {
         });
       },
       child: Material(
-        // ⚠️ 必须与 `_DayPanel` 同色。`Material` 是不透明层，会盖住面板底 ——
-        // 两处都写 `surfaceCard`（白卡片层），改一处就会露出一条异色的行。
+        // ⚠️ 必须与 `_DayPanel` 同色（都是 `surfaceCard`）。透明也行，但实心
+        // 更稳：滑动删除过程中行底不会漏出面板色。颜色本身已由令牌统一。
         color: colors.surfaceCard,
         child: InkWell(
           onTap: () => context.push('/entry/${entry.id}'),
@@ -659,12 +735,9 @@ class _EntryRowState extends ConsumerState<_EntryRow> {
             child: Row(
               spacing: 10,
               children: [
-                Container(
-                  width: 6,
-                  height: 6,
-                  decoration:
-                      BoxDecoration(color: dotColor, shape: BoxShape.circle),
-                ),
+                // 分类图标（v3 描边风，未知 ref 兜底「其他」）。之前这里是
+                // 一个 6×6 色点，是设计稿早期的简化，真机上辨识度太低。
+                CategoryAvatar(iconRef: catRef, color: dotColor, size: 20),
                 Expanded(
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
@@ -720,9 +793,8 @@ class _EntryRowState extends ConsumerState<_EntryRow> {
     );
   }
 
-  Color _catColor(domain.Category? cat) {
-    if (cat == null) return context.colors.inkTertiary;
-    final argb = categoryColorFor(cat.iconRef);
+  Color _catColor(String iconRef) {
+    final argb = categoryColorFor(iconRef);
     return argb != null ? Color(argb) : context.colors.inkTertiary;
   }
 
@@ -730,6 +802,11 @@ class _EntryRowState extends ConsumerState<_EntryRow> {
   ///
   /// 备注选填 → 有二级无备注时就是「午餐」；两者都空（仅一级记账且没写备注）
   /// 才退回时间，避免整行只剩标题。
+  ///
+  /// ⚠️ 退回的是**录入时刻**（`createdAt`），不是 `occurredAt`：天内顺序本身就是
+  /// 「按录入先后」（见 `compareByRecordedOrder`）。显示发生时刻会出现
+  /// 「09:00 排在 20:00 上面」这种看着像 bug 的画面 —— 补记时 occurredAt 的
+  /// 时分是程序补的，用户从没设过。发生时刻在详情页看。
   String _subtitleOf(
     LedgerEntry entry,
     domain.Category? category,
@@ -741,7 +818,7 @@ class _EntryRowState extends ConsumerState<_EntryRow> {
       if (note != null && note.isNotEmpty) note,
     ];
     if (parts.isNotEmpty) return parts.join(' · ');
-    final t = entry.occurredAt.toLocal();
+    final t = entry.createdAt.toLocal();
     return '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
   }
 }
@@ -786,10 +863,13 @@ class _DayPanel extends StatelessWidget {
     }
     return Container(
       decoration: BoxDecoration(
-        // ⚠️ 卡片底必须是 `colors.surfaceCard`（= `t.surface` = #FFFFFF），
-        // **不是** `colors.surface`（= `t.appBg` = 页面底色 #FBFBFC）。
-        // 用后者卡片会和页面融为一体，只剩 1px 的 `--line`，看上去「根本没有框」。
-        // 设计稿屏 2 中心列实测：页面 (251,251,252) / 卡片 (255,255,255) / 边框 (228,228,232)。
+        // ⚠️ 卡片底必须是 `colors.surfaceCard`（= `t.surface`）；页面底色是
+        // `colors.pageBg`（= `t.appBg`，中性纸 × 品牌色 wash）。两者绝不能混：
+        // 用后者卡片会和页面融为一体，只剩 1px 的边框，看上去「根本没有卡片」。
+        //
+        // 2026-10-20：`t.surface` 本身已是「40% 卡白 × 60% 纸色」的预混色
+        // （theme_resolver 的「卡片底预混」段，全 app 卡片统一），这里不要再
+        // 叠 withValues —— 再叠就成了透明色，且行内 Material 会造成叠乘。
         color: colors.surfaceCard,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: colors.border),

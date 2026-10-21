@@ -632,7 +632,9 @@ void main() {
   // ── ⑦ schema v27：提醒历史表进得了还原清单 ──
 
   test('reminders 表与索引已建立（schema v27）', () async {
-    expect(kSchemaVersion, 27);
+    // v28（2026-10-20）只做了数据修复（补记的 00:00 时刻），表结构未变；
+    // 这里只锁「reminders 那一版之后没退化」。
+    expect(kSchemaVersion, greaterThanOrEqualTo(27));
     final tables = db.raw
         .select("SELECT name FROM sqlite_master WHERE type='table'")
         .map((r) => r['name'] as String)

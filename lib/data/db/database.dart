@@ -6,7 +6,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:plain/core/security/db_passphrase.dart';
 import 'package:sqlite3/sqlite3.dart';
 
-const int kSchemaVersion = 27;
+const int kSchemaVersion = 28;
 
 class AppDatabase {
   AppDatabase._(this._db);
@@ -375,6 +375,29 @@ class AppDatabase {
         _db.execute('DELETE FROM categories WHERE id = ?', [id]);
       }
     }
+
+    // v28（2026-10-20）：补记的账曾经被写成「当天 00:00:00」。
+    //
+    // 日期选择器只返回日期（`DateTime(y,m,d).toUtc()`），老版本直接把它当
+    // `occurred_at` 落库 → 流水页按 `occurred_at DESC` 排，这条账永远沉在当天
+    // 分组最下面（「新建昨天的食材消费，排到了昨天交通下面」）。
+    // 写入侧已在 `EntryInputController.onDateSelected` 修好（补此刻的时分秒），
+    // 这里把**历史数据**一次性对齐：保留原来的日期，时刻取「录入那一刻的时分秒」。
+    //
+    // 只在本地时间恰好 00:00:00.000 时改 —— 真实凌晨零点记账几乎不存在，
+    // 而这是唯一能可靠识别「当时只选了日期」的痕迹。归属日不变，所以
+    // `daily_stats` / 报表 / 账户余额全都不受影响，只是当天内的排序位置变化。
+    // 用 app_meta 打标保证只跑一次（`_migrate()` 每次开库都会走）。
+    const backdateFixKey = 'migration.backdated_zero_time';
+    final alreadyFixed =
+        _db.select('SELECT 1 FROM app_meta WHERE key = ?', [backdateFixKey]);
+    if (alreadyFixed.isEmpty) {
+      final fixed = repairBackdatedZeroTime(_db);
+      _db.execute(
+        'INSERT OR REPLACE INTO app_meta (key,value,updated_at) VALUES (?,?,?)',
+        [backdateFixKey, '$fixed', DateTime.now().millisecondsSinceEpoch],
+      );
+    }
   }
 
   /// Runs [action] inside a BEGIN/COMMIT transaction.
@@ -525,6 +548,55 @@ class AppDatabase {
   }
 
   void close() => _db.close();
+}
+
+/// v28 数据修复（2026-10-20）：把「补记只选了日期」的账从当天 `00:00:00` 挪到
+/// 「录入那一刻的时分秒」。**日期不变**，只改当天内的排序位置（见 `_migrate`
+/// 里 v28 的注释）。返回改动的行数。
+///
+/// 抽成顶层函数有两个原因：`_migrate()` 每次开库都跑，需要一个可单独调用的
+/// 幂等实现；测试也要能对「已有历史数据」重跑一遍。
+int repairBackdatedZeroTime(Database db) {
+  // `% 60000 = 0` 只用来把扫描面缩小到「秒为 0」的行（本地午夜的 UTC 秒一定是
+  // 0，因为时区偏移都是整分钟）；精确判断在 Dart 里按本地时间做。
+  final rows = db.select(
+    'SELECT id, occurred_at, created_at FROM transactions '
+    'WHERE occurred_at % 60000 = 0',
+  );
+  final fixes = <(String, int)>[];
+  for (final r in rows) {
+    final at = DateTime.fromMillisecondsSinceEpoch(
+      r['occurred_at']! as int,
+      isUtc: true,
+    ).toLocal();
+    if (at.hour != 0 || at.minute != 0 || at.second != 0 || at.millisecond != 0) {
+      continue;
+    }
+    final created = DateTime.fromMillisecondsSinceEpoch(
+      r['created_at']! as int,
+      isUtc: true,
+    ).toLocal();
+    // 录入时刻本身也在零点 → 没有更可信的时间可用，保持原样。
+    if (created.hour == 0 && created.minute == 0) continue;
+    final merged = DateTime(at.year, at.month, at.day, created.hour,
+        created.minute, created.second, created.millisecond);
+    fixes.add((r['id']! as String, merged.toUtc().millisecondsSinceEpoch));
+  }
+  if (fixes.isEmpty) return 0;
+  db.execute('BEGIN');
+  try {
+    for (final (id, ms) in fixes) {
+      db.execute(
+        'UPDATE transactions SET occurred_at = ? WHERE id = ?',
+        [ms, id],
+      );
+    }
+    db.execute('COMMIT');
+  } catch (_) {
+    db.execute('ROLLBACK');
+    rethrow;
+  }
+  return fixes.length;
 }
 
 /// PRD STORY-4.1 恢复前预览摘要。

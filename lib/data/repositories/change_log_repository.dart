@@ -55,8 +55,14 @@ class ChangeLogRepository {
   }
 
   /// 06-C3 / 08-§12：change_log GC（30 天 / 5 万行上限）。
-  /// V1.0 无同步消费方，裁剪安全；V2.0 增量同步上线后须先确认
-  /// 所有已知设备位点早于被删行（08-§7.4 S6 耦合）。
+  ///
+  /// ⚠️ **开了 WebDAV 同步就不再按时间删**（2026-10-20 修）：
+  /// 按 `changed_at` 删行只看「本机这条日志多久了」，完全不看对端位点。
+  /// 一台设备离线超过 30 天，它要的那段变更已经被删掉，而同步位点照常推进 ——
+  /// 结果是**永久缺一段账、无报错**。删除是不可逆的，所以宁可多占几 MB。
+  /// 行数上限保留（5 万行 ≈ 个人记账好几年的变更量），只作为增长兜底。
+  ///
+  /// 未配置同步（单机使用）时没有消费方，按时间裁剪仍然安全。
   Future<Result<int>> gc({
     required DateTime now,
     int maxRows = 50000,
@@ -69,7 +75,9 @@ class ChangeLogRepository {
         final before = _db.raw.select('SELECT COUNT(*) AS c FROM change_log');
         final countBefore = (before.first['c'] as int?) ?? 0;
 
-        _db.raw.execute('DELETE FROM change_log WHERE changed_at < ?', [cutoff]);
+        if (!_syncConfigured()) {
+          _db.raw.execute('DELETE FROM change_log WHERE changed_at < ?', [cutoff]);
+        }
 
         final mid = _db.raw.select('SELECT COUNT(*) AS c FROM change_log');
         final countMid = (mid.first['c'] as int?) ?? 0;
@@ -88,5 +96,14 @@ class ChangeLogRepository {
     } on Object catch (e) {
       return err(StorageFailure('db.gc_failed', e.toString(), isRetryable: true));
     }
+  }
+
+  /// 这台设备是否配置过 WebDAV 同步（= 有别的设备在消费本机的 change_log）。
+  bool _syncConfigured() {
+    final rows = _db.raw.select(
+      "SELECT value FROM app_meta WHERE key = 'webdav.url'",
+    );
+    if (rows.isEmpty) return false;
+    return ((rows.first['value'] as String?) ?? '').trim().isNotEmpty;
   }
 }

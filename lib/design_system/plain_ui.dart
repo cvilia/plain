@@ -690,10 +690,11 @@ class PlainTopBar extends StatelessWidget implements PreferredSizeWidget {
       ),
     );
     // `color` 必须落在 SafeArea **外层**：否则状态栏那一条会漏出 Scaffold 底色。
+    // 顶栏不是卡片：它和页面同底（pageBg），与 Scaffold 背景连成一体。
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: plainStatusBarStyle(context),
       child: Container(
-        color: colors.surface,
+        color: colors.pageBg,
         child: primary ? SafeArea(bottom: false, child: content) : content,
       ),
     );

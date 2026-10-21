@@ -20,8 +20,10 @@ import 'package:plain/domain/entities/category.dart' as domain;
 import 'package:plain/domain/entities/enums.dart';
 import 'package:plain/domain/entities/ledger_entry.dart';
 import 'package:plain/domain/usecases/split_usecases.dart';
+import 'package:plain/features/ledger/presentation/category_picker_page.dart';
 import 'package:plain/features/ledger/presentation/member_write_guard.dart';
 import 'package:plain/features/ledger/presentation/entry_participants_row.dart';
+import 'package:plain/design_system/picker_sheet.dart';
 import 'package:plain/app/l10n/app_strings.dart';
 import 'package:plain/app/l10n/strings_accounts.dart';
 import 'package:plain/app/l10n/strings_domain.dart';
@@ -273,106 +275,42 @@ class _EntryDetailPageState extends ConsumerState<EntryDetailPage> {
     // STORY-8.2 AC2：拆分会产生子笔（= 写账单），只读成员不得做
     if (!await guardCanWriteLedger(context, ref)) return;
     if (!context.mounted) return;
-    final rows = List.generate(SplitRules.minChildren, (_) {
-      return (amountCtrl: TextEditingController(), catCtrl: TextEditingController());
-    });
+    // 子笔分类走「选择分类」页（与记一笔同一入口），这里需要 id → 名称
+    // 做回显。kind 跟随父笔类型：支出账单只给选支出分类。
+    final deps = ref.read(appDependenciesProvider);
+    final cats = await deps.categoryRepository.listAll();
+    if (!context.mounted) return;
+    final catById = <String, domain.Category>{
+      for (final c in (cats.successOrNull ?? const <domain.Category>[]))
+        if (!c.isDeleted) c.id: c,
+    };
+    final kind = entry.type == EntryType.income
+        ? CategoryKind.income
+        : CategoryKind.expense;
 
-    await showModalBottomSheet<void>(
+    final items = await showModalBottomSheet<List<SplitItem>>(
       context: context,
       isScrollControlled: true,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setSheet) => Padding(
-          padding: EdgeInsets.only(
-            left: Spacing.lg,
-            right: Spacing.lg,
-            top: Spacing.lg,
-            bottom: MediaQuery.viewInsetsOf(ctx).bottom + Spacing.lg,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(
-                s.splitSheetTitle(formatAmount(entry.amount.cents)),
-                style: Theme.of(ctx).textTheme.titleMedium,
-              ),
-              const SizedBox(height: Spacing.md),
-              for (var i = 0; i < rows.length; i++) ...[
-                Row(children: [
-                  Expanded(
-                    child: TextField(
-                      controller: rows[i].amountCtrl,
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                      decoration: InputDecoration(
-                        labelText: s.childAmountFieldLabel(i + 1),
-                        border: const OutlineInputBorder(),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: Spacing.sm),
-                  Expanded(
-                    child: TextField(
-                      controller: rows[i].catCtrl,
-                      decoration: InputDecoration(
-                        labelText: s.categoryIdFieldLabel,
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-                  ),
-                ]),
-                const SizedBox(height: Spacing.sm),
-              ],
-              Row(children: [
-                TextButton.icon(
-                  onPressed: rows.length >= SplitRules.maxChildren
-                      ? null
-                      : () => setSheet(() => rows.add((
-                            amountCtrl: TextEditingController(),
-                            catCtrl: TextEditingController(),
-                          ))),
-                  icon: const PlainIcon(PlainIconData.plus, size: 18),
-                  label: Text(s.addChildAction),
-                ),
-                const Spacer(),
-                FilledButton(
-                  onPressed: () async {
-                    final items = <SplitItem>[];
-                    for (final r in rows) {
-                      final a = r.amountCtrl.text.trim();
-                      if (a.isEmpty) continue;
-                      final cents = (double.tryParse(a) ?? 0) * 100;
-                      items.add(SplitItem(
-                        amountCents: cents.round(),
-                        categoryId: r.catCtrl.text.trim().isEmpty
-                            ? null
-                            : r.catCtrl.text.trim(),
-                      ));
-                    }
-                    if (items.length < SplitRules.minChildren) return;
-                    final deps = ref.read(appDependenciesProvider);
-                    final result = await SplitEntryUseCase(
-                      repository: deps.ledgerRepository,
-                      clock: deps.clock,
-                      idGen: deps.idGen,
-                    )(parent: entry, items: items);
-                    if (ctx.mounted) Navigator.pop(ctx);
-                    if (!mounted) return;
-                    result.when(
-                      success: (_) {
-                        ref.invalidateData.bumpEntryMutated();
-                        showAppToast(context, s.splitDone);
-                        setState(() {});
-                      },
-                      failure: (f) => showAppToast(context, s.splitFailed(f.code)),
-                    );
-                  },
-                  child: Text(s.saveSplitAction),
-                ),
-              ]),
-            ],
-          ),
-        ),
+      builder: (_) => _SplitSheet(
+        originalCents: entry.amount.cents,
+        kind: kind,
+        catById: catById,
       ),
+    );
+    if (items == null || !mounted) return;
+    final result = await SplitEntryUseCase(
+      repository: deps.ledgerRepository,
+      clock: deps.clock,
+      idGen: deps.idGen,
+    )(parent: entry, items: items);
+    if (!mounted) return;
+    result.when(
+      success: (_) {
+        ref.invalidateData.bumpEntryMutated();
+        showAppToast(context, s.splitDone);
+        setState(() {});
+      },
+      failure: (f) => showAppToast(context, s.splitFailed(f.code)),
     );
   }
 
@@ -488,3 +426,187 @@ class _DetailRow extends StatelessWidget {
   }
 }
 
+
+/// 拆分弹层。
+///
+/// 子笔分类不再要求输入「分类 ID」（用户不可能知道 id），改为跳转
+/// [CategoryPickerPage] 现选（与记一笔同一入口，kind 跟随父笔类型）。
+/// 合计不对平不让保存：按钮上方的实时合计行先给提示，点保存再兜一层。
+class _SplitSheet extends StatefulWidget {
+  const _SplitSheet({
+    required this.originalCents,
+    required this.kind,
+    required this.catById,
+  });
+
+  final int originalCents;
+  final CategoryKind kind;
+  final Map<String, domain.Category> catById;
+
+  @override
+  State<_SplitSheet> createState() => _SplitSheetState();
+}
+
+class _SplitRow {
+  final amountCtrl = TextEditingController();
+  String? categoryId;
+}
+
+class _SplitSheetState extends State<_SplitSheet> {
+  late final List<_SplitRow> _rows = [
+    for (var i = 0; i < SplitRules.minChildren; i++) _SplitRow(),
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    for (final r in _rows) {
+      _listen(r);
+    }
+  }
+
+  @override
+  void dispose() {
+    for (final r in _rows) {
+      r.amountCtrl.dispose();
+    }
+    super.dispose();
+  }
+
+  void _listen(_SplitRow r) {
+    r.amountCtrl.addListener(() {
+      if (mounted) setState(() {});
+    });
+  }
+
+  void _addRow() {
+    final r = _SplitRow();
+    _listen(r);
+    setState(() => _rows.add(r));
+  }
+
+  int get _assignedCents {
+    var sum = 0;
+    for (final r in _rows) {
+      final a = r.amountCtrl.text.trim();
+      if (a.isEmpty) continue;
+      sum += ((double.tryParse(a) ?? 0) * 100).round();
+    }
+    return sum;
+  }
+
+  Future<void> _pickCategory(_SplitRow row) async {
+    final id = await Navigator.of(context, rootNavigator: true)
+        .push<String>(MaterialPageRoute(
+      builder: (_) => CategoryPickerPage(kind: widget.kind),
+    ));
+    if (id == null || !mounted) return;
+    setState(() => row.categoryId = id);
+  }
+
+  void _save() {
+    final s = AppStrings.of(context);
+    final items = <SplitItem>[];
+    for (final r in _rows) {
+      final a = r.amountCtrl.text.trim();
+      if (a.isEmpty) continue;
+      final cents = ((double.tryParse(a) ?? 0) * 100).round();
+      if (cents <= 0) continue;
+      items.add(SplitItem(amountCents: cents, categoryId: r.categoryId));
+    }
+    if (items.length < SplitRules.minChildren) return;
+    final sum = items.fold<int>(0, (x, i) => x + i.amountCents);
+    if (sum != widget.originalCents) {
+      showAppToast(
+        context,
+        sum < widget.originalCents
+            ? s.splitShortBy(formatAmount(widget.originalCents - sum))
+            : s.splitOverBy(formatAmount(sum - widget.originalCents)),
+      );
+      return;
+    }
+    Navigator.pop(context, items);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final s = AppStrings.of(context);
+    final colors = context.colors;
+    final sum = _assignedCents;
+    final balanced = sum == widget.originalCents;
+
+    return Padding(
+      padding: EdgeInsets.only(
+        left: Spacing.lg,
+        right: Spacing.lg,
+        top: Spacing.lg,
+        bottom: MediaQuery.viewInsetsOf(context).bottom + Spacing.lg,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            s.splitSheetTitle(formatAmount(widget.originalCents)),
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
+          const SizedBox(height: Spacing.md),
+          for (var i = 0; i < _rows.length; i++) ...[
+            Row(children: [
+              Expanded(
+                child: TextField(
+                  controller: _rows[i].amountCtrl,
+                  keyboardType:
+                      const TextInputType.numberWithOptions(decimal: true),
+                  decoration: InputDecoration(
+                    labelText: s.childAmountFieldLabel(i + 1),
+                    hintText: '0.00',
+                    border: const OutlineInputBorder(),
+                  ),
+                ),
+              ),
+              const SizedBox(width: Spacing.sm),
+              Expanded(
+                child: PickerField(
+                  label: s.category,
+                  value: _rows[i].categoryId == null
+                      ? s.notSelectedValue
+                      : (widget.catById[_rows[i].categoryId]?.name ??
+                          _rows[i].categoryId!),
+                  onTap: () => _pickCategory(_rows[i]),
+                ),
+              ),
+            ]),
+            const SizedBox(height: Spacing.sm),
+          ],
+          // 实时合计：对平前给黄字提示，对平给绿字。
+          Text(
+            balanced
+                ? s.splitBalancedOk
+                : '${s.assignedAmountLabel} ¥${formatAmount(sum)}'
+                    '${sum <= 0 ? '' : sum < widget.originalCents ? ' · ${s.splitShortBy(formatAmount(widget.originalCents - sum))}' : ' · ${s.splitOverBy(formatAmount(sum - widget.originalCents))}'}',
+            style: TextStyle(
+              fontSize: 12,
+              color: balanced ? colors.okInk : colors.warnInk,
+            ),
+          ),
+          const SizedBox(height: Spacing.sm),
+          Row(children: [
+            TextButton.icon(
+              onPressed: _rows.length >= SplitRules.maxChildren
+                  ? null
+                  : _addRow,
+              icon: const PlainIcon(PlainIconData.plus, size: 18),
+              label: Text(s.addChildAction),
+            ),
+            const Spacer(),
+            FilledButton(
+              onPressed: _save,
+              child: Text(s.saveSplitAction),
+            ),
+          ]),
+        ],
+      ),
+    );
+  }
+}

@@ -70,7 +70,11 @@ class _RemindersPageState extends ConsumerState<RemindersPage> {
   @override
   void initState() {
     super.initState();
-    unawaited(_reload());
+    // ⚠️ `_reload()` 里要取 `AppStrings.of(context)`，`initState` 阶段
+    // `Localizations` 还没挂载 → 必须等首帧后再跑（2026-10-20 全页面巡检发现）。
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) unawaited(_reload());
+    });
   }
 
   Future<void> _reload() async {
@@ -180,7 +184,7 @@ class _RemindersPageState extends ConsumerState<RemindersPage> {
     final prefs = ref.watch(reminderPrefsProvider);
     final list = _filtered;
     return Scaffold(
-      backgroundColor: colors.surface,
+      backgroundColor: colors.pageBg,
       appBar: PlainTopBar(
         title: s.remindersTitle,
         showBack: true,

@@ -122,7 +122,8 @@ class _QuietNav extends StatelessWidget {
     // 导航条一体：上边框 + 60 内容高 + 安全区，避免 bottom overflow
     return Container(
       decoration: BoxDecoration(
-        color: colors.surface,
+        // 导航条不是卡片：与页面同底（pageBg），只靠 1px 上边框分层。
+        color: colors.pageBg,
         border: Border(top: BorderSide(color: colors.border, width: 1)),
       ),
       // ⚠️ `maintainBottomViewPadding: true` 不能省。
@@ -260,14 +261,13 @@ class _NavFab extends StatelessWidget {
     // `.navfab{width:44px;height:44px;border-radius:14px;background:var(--accent);
     //          color:var(--fab-ic);box-shadow:0 2px 8px var(--shadow-accent)}`
     //
-    // 底 / 图标一律走 FAB 令牌（`fabBg` = accent、`fabIc` = onAccent），
-    // 与设计 `gen_tokens.py` 的「FAB 3」段一一对应，别再手挑 accent/onPrimary。
+    // 底色 `fabBg` 恒等于**导航选中色** `primaryInk`（右侧 `_NavItem` 选中时用它），
+    // 所以「记一笔」和「当前页签」永远是同一个色 —— 这是产品口径，不是巧合。
+    // 图标 `fabIc` 是 `primaryInk` 对 4.5:1 的取反：亮主题深底白图标、暗主题浅底深图标。
     //
-    // ⚠️ 图标色**不是** `onPrimary`、也**不是**运行时算的对比色：`onAccent` 由设计侧
-    // `pick_on(accent, tone.ink, 4.5)` 定死并进 4.5:1 门禁。主色与强调色是两套色 ——
-    // 素白主题 accent 是蜜桃橙 `#FB923C`，`onPrimary` 配的却是近黑 `#3F3F46` 那支。
-    // 踩过的坑：`inkFor(accent, primary, 3.0)` 在 `subai.light` 上
-    // `contrast = 4.614 ≥ 3.0` → 第一步直接返回 accent 本身 → 橘底画橘，图标整个消失。
+    // ⚠️ 别再写 `inkFor(accent, fabBg, 3.0)` 这类运行时兜底：`inkFor` 在
+    // `contrast(fg,bg) ≥ 阈值` 时**第一步就 return 前景本身**，历史上素白主题
+    // `contrast(#FB923C, #3F3F46) = 4.614 ≥ 3.0` → 橘底画橘 `+`，图标整个消失。
     return Container(
       width: 44,
       height: 44,

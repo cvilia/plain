@@ -35,6 +35,24 @@ bool isSameLocalDay(DateTime at, DateTime now) {
   return a.year == now.year && a.month == now.month && a.day == now.day;
 }
 
+/// 把「只选了哪一天」的日期补上一个时刻：**那一天 + [now] 的时分秒**（返回 UTC）。
+///
+/// 为什么必须补：`showAppDatePicker` 返回的是 `DateTime(y,m,d).toUtc()`，时分秒
+/// 恒为 00:00:00。直接落库会让补记的账落在**当天最早的一刻**，流水页按
+/// `occurred_at DESC` 排序时它永远沉在当天分组最下面（用户 2026-10-20 报的
+/// 「新建昨天的食材消费排到昨天的交通下面」就是这个原因）。
+///
+/// 补「此刻的时分秒」而不是 23:59 —— 列表副标题在无分类/无备注时会**显示时分**，
+/// 编一个 23:59 会被看见；而「此刻」对用户也是可解释的：这条账是你现在补的。
+/// 选「今天」时等价于「就是现在」。
+DateTime mergeDayWithNowTime(DateTime pickedDay, DateTime now) {
+  final d = pickedDay.toLocal();
+  final n = now.toLocal();
+  return DateTime(d.year, d.month, d.day, n.hour, n.minute, n.second,
+          n.millisecond)
+      .toUtc();
+}
+
 /// Group-header label for a `yyyy-MM-dd` day key: 今天 / 昨天 / `M月D日 周X`.
 ///
 /// 日期形态照设计稿屏 2 的 `.eyebrow`：`9月28日 周日`（不补零、不带年）。

@@ -76,10 +76,17 @@ class _SavingsGoalsPageState extends ConsumerState<SavingsGoalsPage> {
   @override
   void initState() {
     super.initState();
-    _reload();
+    // ⚠️ 不能直接 `_reload()`：它开头要取 `AppStrings.of(context)`，而
+    // `initState` 阶段 `Localizations` 尚未挂载 → `Localizations.of` 抛
+    // 「dependOnInheritedWidgetOfExactType was called before initState completed」
+    // （debug 直接红屏；2026-10-20 审计二次页时踩到）。改成首帧后再跑。
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _reload();
+    });
   }
 
   Future<void> _reload() async {
+    // 由 `initState` 的 post-frame 回调 / 重试按钮调用，此时 context 已可用。
     final s = AppStrings.of(context);
     setState(() {
       _loading = true;

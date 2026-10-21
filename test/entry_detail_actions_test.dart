@@ -27,6 +27,7 @@ import 'package:plain/core/time/clock.dart';
 import 'package:plain/data/db/database.dart';
 import 'package:plain/design_system/plain_icons_v3.dart';
 import 'package:plain/design_system/plain_ui.dart';
+import 'package:plain/design_system/picker_sheet.dart';
 import 'package:plain/domain/entities/enums.dart';
 import 'package:plain/domain/usecases/entry_usecases.dart';
 import 'package:plain/features/ledger/presentation/entry_detail_page.dart';
@@ -139,5 +140,26 @@ void main() {
     expect(find.text('删除这笔账单'), findsNothing);
     expect(find.text('删除后不可恢复'), findsNothing);
     expect(find.byType(PlainDangerButton), findsNothing);
+  });
+
+  testWidgets('拆分弹层：子笔分类走选择页，不再要求输入「分类 ID」', (tester) async {
+    _phone(tester, height: 1600);
+    await _openDetail(tester);
+
+    await tester.tap(find.text('拆分这笔账单'));
+    await tester.pumpAndSettle();
+
+    // 旧实现让用户手填分类 ID —— 用户不可能知道 id，属可用性事故。
+    // 这里钉死两件事：① 界面上不出现「分类 ID」字样；② 每行子笔都有一枚
+    // 「分类」选择字段（默认未选择），点击后进「选择分类」页。
+    expect(find.text('分类 ID'), findsNothing);
+    expect(find.byType(PickerField), findsNWidgets(2),
+        reason: 'SplitRules.minChildren 行子笔，每行金额 + 分类');
+    expect(find.text('未选择'), findsNWidgets(2));
+
+    await tester.tap(find.byType(PickerField).first);
+    await tester.pumpAndSettle();
+    expect(find.text('选择分类'), findsOneWidget,
+        reason: '点分类字段应跳「选择分类」页（与记一笔同一入口）');
   });
 }

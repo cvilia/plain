@@ -14,11 +14,13 @@ import 'package:plain/core/money/expression_evaluator.dart';
 import 'package:plain/core/money/money.dart';
 import 'package:plain/core/refresh/data_invalidation.dart';
 import 'package:plain/core/time/clock.dart';
+import 'package:plain/core/time/date_format.dart';
 import 'package:plain/data/platform/platform_bridge.dart';
 import 'package:plain/domain/entities/currency_rate.dart';
 import 'package:plain/domain/entities/enums.dart';
 import 'package:plain/domain/entities/ledger_entry.dart';
 import 'package:plain/domain/repositories/repositories.dart';
+import 'package:plain/domain/services/accounting_calendar.dart';
 import 'package:plain/domain/services/emotion_feedback_service.dart';
 import 'package:plain/domain/services/gamification_service.dart';
 import 'package:plain/domain/services/merchant_learner.dart';
@@ -309,6 +311,24 @@ class EntryInputController extends Notifier<EntryInputState> {
     state = EntryInputState(occurredAt: state.occurredAt);
   }
 
+  /// 打开「记一笔」（新建）时复位上一轮残留。
+  ///
+  /// 这个 provider 是常驻的（不是 autoDispose），编辑过一笔后
+  /// `isEditing` / `editingId` / `_editingEntry` 会一直留着；而编辑页保存后是
+  /// `Navigator.pop` 离开的，没人复位。于是「编辑过一笔 → 再记一笔」按 OK 会走
+  /// **update 分支**：新账不落库，反而把刚才那笔按当前输入再写一遍，界面还提示
+  /// 「已保存」。
+  ///
+  /// 只在确实有编辑残留时清空，避免把用户正在填的内容或刚恢复的草稿冲掉。
+  void startNewEntry() {
+    _editingEntry = null;
+    lastSavedEntryId = null;
+    if (!state.isEditing) return;
+    state = EntryInputState(occurredAt: _clock.now());
+    // 编辑态盖住过草稿：清空后把草稿找回来（否则用户上次没保存的内容丢了）
+    _restoreDraftIfAny();
+  }
+
   void onEquals() {
     final result = _evaluator.eval(state.amountExpression);
     final text = result.money.toYuanString();
@@ -456,14 +476,19 @@ class EntryInputController extends Notifier<EntryInputState> {
   }
 
   void onDateSelected(DateTime date) {
-    state = state.copyWith(occurredAt: date, occurredAtUserSet: true);
+    // 日期选择器只给「哪一天」，时分秒是 00:00:00。补上此刻的时分秒，
+    // 否则补记的账会沉到当天分组最下面（见 `mergeDayWithNowTime` 注释）。
+    final picked = mergeDayWithNowTime(date, _clock.now());
+    state = state.copyWith(occurredAt: picked, occurredAtUserSet: true);
     final calendar = ref.read(calendarProvider);
-    final today = _clock.now();
-    final cur = calendar.periodFor(today.year, today.month);
-    final target = calendar.periodFor(date.year, date.month, day: date.day);
-    if (target.label != cur.label) {
+    // 归属月一律走 `AccountingCalendar.labelFor`（全产品唯一入口）：之前拿选择器
+    // 的 UTC 年月日直接比，月初那天（本地 11-01 00:30 = 10-31 16:30Z）会判成上个月。
+    final targetLabel =
+        AccountingCalendar.labelFor(picked, calendar.monthStartDay);
+    if (targetLabel != calendar.currentLabel()) {
+      final month = int.parse(targetLabel.split('-').last);
       state = state.copyWith(
-        toastMessage: _strings.entryCountsInMonth(target.month),
+        toastMessage: _strings.entryCountsInMonth(month),
       );
     }
   }
@@ -557,7 +582,26 @@ class EntryInputController extends Notifier<EntryInputState> {
       return _blockSave('transfer_accounts_required');
     }
     state = state.copyWith(isSubmitting: true, clearError: true);
+    // isSubmitting 是「保存被永久卡死」的单点：从这里开始任何一步抛出未捕获
+    // 异常（DB 异常、平台通道崩溃等），状态机就会停在 true —— 之后每次点 OK
+    // 都被上面的 `save_ignored` 静默吞掉，表现为「金额不归零 + 流水不增加」，
+    // 且界面没有任何提示（release 真机出现过一次、无法稳定复现的形态）。
+    // 这里整体兜底：任何异常一律复位 isSubmitting 并给出可见错误。
+    try {
+      return await _saveCommit(eval);
+    } catch (e) {
+      _log.debug('entry.save_crashed', fields: {'error': e.toString()});
+      state = state.copyWith(
+        isSubmitting: false,
+        errorMessage: 'save_failed',
+        clearToast: true,
+      );
+      return false;
+    }
+  }
 
+  /// [_save] 的落库段（isSubmitting 已置位，异常由调用方兜底）。
+  Future<bool> _saveCommit(EvalResult eval) async {
     // STORY-9.3：账户（或跨币种转账的任一端）不是本位币时，必须能确定汇率。
     // 拿不到汇率就拦截——不用 0 或 1 悄悄记错金额。
     final resolvedAccountId = await _resolveAccountId(state.selectedAccountId);

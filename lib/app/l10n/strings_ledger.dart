@@ -33,6 +33,7 @@ extension LedgerStrings on AppStrings {
   String get fxRateRequired => isZh ? '请先设定该币种的汇率' : 'Set the exchange rate for this currency first';
   String get readOnlyNoPermission => isZh ? '你是「只读」成员，没有记账权限' : 'You are a read-only member and cannot edit the ledger';
   String get invalidInput => isZh ? '输入有误' : 'Invalid input';
+  String get saveFailedRetry => isZh ? '保存失败，请重试' : 'Save failed, try again';
   String get undone => isZh ? '已撤销' : 'Undone';
   String get categoryLoadFailed => isZh ? '分类加载失败' : 'Failed to load categories';
 
@@ -88,6 +89,14 @@ extension LedgerStrings on AppStrings {
   String flowLoadFailedSubtitle(String code) =>
       isZh ? '数据还在本机，重试一下就好（$code）' : 'Data is still on this device — just retry ($code)';
   String get thisMonthBalance => isZh ? '本月结余' : 'This month balance';
+  // 流水页 hero 渐变卡（2026-10-20）：标题是「本月支出」，附「比上月」变化。
+  String get thisMonthExpense => isZh ? '本月支出' : 'This month expense';
+  String expenseDownVsLastMonth(String pct) =>
+      isZh ? '比上月少 $pct' : 'Down $pct vs last month';
+  String expenseUpVsLastMonth(String pct) =>
+      isZh ? '比上月多 $pct' : 'Up $pct vs last month';
+  String get expenseFlatVsLastMonth => isZh ? '与上月持平' : 'Flat vs last month';
+  String get noExpenseLastMonth => isZh ? '上月无支出' : 'No expense last month';
   String monthStartNote(int day) => isZh ? '记账月起始：$day 日' : 'Month starts on day $day';
   String get deleteFailed => isZh ? '删除失败' : 'Delete failed';
 

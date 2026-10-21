@@ -438,5 +438,33 @@ void main() {
           .select("SELECT value FROM app_meta WHERE key='pref.month_start_day'");
       expect(rows.first['value'], '10');
     });
+
+    test('对端日志被裁掉一段 → 记缺口，不静默少账', () async {
+      const cfg = WebDavConfig(baseUrl: 'x', username: '', password: '');
+      await a.addExpense(1000, note: '第一次');
+      await a.sync.push(cfg);
+      await b.sync.pull(cfg);
+      expect(
+        b.db.raw.select("SELECT value FROM app_meta WHERE key = 'sync.gap.dev-a'"),
+        isEmpty,
+        reason: '正常增量不该报缺口',
+      );
+
+      // A 的旧日志被 GC 掉（或整库还原换了一套日志），后面的变更从 3 开始
+      a.db.raw.execute('DELETE FROM change_log WHERE local_revision <= 2');
+      await a.addExpense(2000, note: '第二次');
+      await a.sync.push(cfg);
+
+      // B 的位点回到 0（模拟「离线太久 / 位点被重置」）
+      b.db.raw.execute("UPDATE sync_state SET value = '0' WHERE key = 'cursor.dev-a'");
+      await b.sync.pull(cfg);
+
+      final gap = b.db.raw
+          .select("SELECT value FROM app_meta WHERE key = 'sync.gap.dev-a'");
+      expect(gap, hasLength(1), reason: '缺口必须留痕，否则用户只看到「同步成功」');
+      final decoded = jsonDecode(gap.first['value']! as String) as Map<String, Object?>;
+      expect(decoded['expected'], 1);
+      expect(decoded['received'], greaterThan(1));
+    });
   });
 }

@@ -72,9 +72,13 @@ class _EntryInputPageState extends ConsumerState<EntryInputPage> {
     if (widget.editEntryId != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _loadForEdit());
     } else {
-      // STORY-9.3：进来就把默认/草稿账户的币种语境取回来（外币时要当场提示）
+      // 新建页：先清掉上一轮的编辑态（编辑页保存是 pop 走的，没人复位 ——
+      // 残留会让「记一笔」按 OK 时走 update 分支、新账不落库），
+      // 再取默认/草稿账户的币种语境（外币时要当场提示）。
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        ref.read(entryInputControllerProvider.notifier).refreshCurrencyContext();
+        final ctl = ref.read(entryInputControllerProvider.notifier);
+        ctl.startNewEntry();
+        ctl.refreshCurrencyContext();
       });
     }
   }
@@ -126,7 +130,7 @@ class _EntryInputPageState extends ConsumerState<EntryInputPage> {
     // （导航栏 / 手势条算 padding，不算 insets）。
     final sysKeyboardUp = MediaQuery.viewInsetsOf(context).bottom > 100;
     return Scaffold(
-      backgroundColor: context.colors.surface,
+      backgroundColor: context.colors.pageBg,
       // ⚠️ 必须 false，别改回默认值。
       // 默认 true 时系统键盘一弹，整个 body 会被 viewInsets 顶掉一截
       // （iPhone 约 336dp、Android 约 260–320dp）→ 下面 _buildFormA 拿到的
@@ -697,6 +701,8 @@ class _AmountDisplayState extends State<_AmountDisplay>
     'fx_rate_required' => s.fxRateRequired,
     // STORY-8.2 AC2：只读成员不能记账
     'member_read_only' => s.readOnlyNoPermission,
+    // 落库段抛了未捕获异常（_save 的整体兜底），不再静默
+    'save_failed' => s.saveFailedRetry,
     _ => s.invalidInput,
   };
 }
@@ -1961,7 +1967,10 @@ class _AttrChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.colors;
     return Material(
-      color: colors.surface,
+      // ⚠️ 这里必须透明：白底如果画在 Material 上，它占的是外层 44 命中区，
+      // 而虚线/实线描边画在内层 40 的盒子上 → 底比框高 4（用户截图实锤）。
+      // 底改画到下面 40 的 DecoratedBox 上，和描边同一个盒子，严格等高。
+      color: Colors.transparent,
       borderRadius: BorderRadius.circular(Radii.pill),
       child: InkWell(
         onTap: onTap,
@@ -1985,32 +1994,41 @@ class _AttrChip extends StatelessWidget {
                   color: colors.border,
                   dashed: placeholder,
                 ),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: Spacing.md),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    // 转账表单里 chip 被 Expanded 拉满宽，此时内容居中；
-                    // Wrap 里 Row 是收缩的，这一行不产生任何影响。
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      // spec：.chip svg{color:muted}
-                      PlainIcon(icon, size: 16, color: colors.inkTertiary),
-                      const SizedBox(width: 6),
-                      Text(
-                        label,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: placeholder
-                              ? FontWeight.w500
-                              : FontWeight.w600,
-                          color: placeholder
-                              ? colors.inkTertiary
-                              : colors.inkSecondary,
+                child: DecoratedBox(
+                  // 胶囊底：与描边同一个 40 高的盒子（CustomPaint 的 child
+                  // 被强制成它的尺寸），虚线框和白色底严格等高。
+                  decoration: BoxDecoration(
+                    color: colors.surface,
+                    borderRadius: BorderRadius.circular(Radii.pill),
+                  ),
+                  child: Padding(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: Spacing.md),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      // 转账表单里 chip 被 Expanded 拉满宽，此时内容居中；
+                      // Wrap 里 Row 是收缩的，这一行不产生任何影响。
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        // spec：.chip svg{color:muted}
+                        PlainIcon(icon, size: 16, color: colors.inkTertiary),
+                        const SizedBox(width: 6),
+                        Text(
+                          label,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: placeholder
+                                ? FontWeight.w500
+                                : FontWeight.w600,
+                            color: placeholder
+                                ? colors.inkTertiary
+                                : colors.inkSecondary,
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               ),

@@ -27,6 +27,7 @@ class FlowListState {
     this.groups = const [],
     this.isLoading = false,
     this.hasMore = true,
+    this.loadMoreFailed = false,
     this.errorMessage,
     this.categoryMap = const {},
   });
@@ -34,6 +35,13 @@ class FlowListState {
   final List<DayGroup> groups;
   final bool isLoading;
   final bool hasMore;
+
+  /// 上一页**加载失败**（DB 报错等）。
+  ///
+  /// 必须单独记：列表尾部那个「更多」行是 `postFrameCallback` 触发的，
+  /// 只要 `hasMore` 还是 true、`isLoading` 回到 false，每帧重建都会再发一次查询
+  /// → DB 持续失败时变成「每帧一次 SQL」的死循环（发热、掉电、永远转圈）。
+  final bool loadMoreFailed;
   final String? errorMessage;
   final Map<String, Category> categoryMap;
 
@@ -41,6 +49,7 @@ class FlowListState {
     List<DayGroup>? groups,
     bool? isLoading,
     bool? hasMore,
+    bool? loadMoreFailed,
     String? errorMessage,
     Map<String, Category>? categoryMap,
     bool clearError = false,
@@ -49,6 +58,7 @@ class FlowListState {
       groups: groups ?? this.groups,
       isLoading: isLoading ?? this.isLoading,
       hasMore: hasMore ?? this.hasMore,
+      loadMoreFailed: loadMoreFailed ?? this.loadMoreFailed,
       errorMessage: clearError ? null : (errorMessage ?? this.errorMessage),
       categoryMap: categoryMap ?? this.categoryMap,
     );
@@ -104,7 +114,11 @@ class FlowListController extends Notifier<FlowListState> {
 
   Future<void> loadInitial() async {
     if (state.isLoading) return;
-    state = state.copyWith(isLoading: true, clearError: true);
+    state = state.copyWith(
+      isLoading: true,
+      clearError: true,
+      loadMoreFailed: false,
+    );
     _cursor = null;
 
     final catResult = await _categoryRepository.listAll();
@@ -146,7 +160,9 @@ class FlowListController extends Notifier<FlowListState> {
   }
 
   Future<void> loadMore() async {
-    if (state.isLoading || !state.hasMore || _cursor == null) return;
+    if (state.isLoading || !state.hasMore || state.loadMoreFailed || _cursor == null) {
+      return;
+    }
     state = state.copyWith(isLoading: true);
 
     final result = await _repository.listPage(
@@ -169,9 +185,22 @@ class FlowListController extends Notifier<FlowListState> {
         );
       },
       failure: (f) {
-        state = state.copyWith(isLoading: false, errorMessage: f.code);
+        // 失败后**不能**继续保持「可以自动加载」的状态：尾部那一行是
+        // postFrame 触发的，会每帧重试。置 loadMoreFailed 停下来，等用户点重试。
+        state = state.copyWith(
+          isLoading: false,
+          loadMoreFailed: true,
+          errorMessage: f.code,
+        );
       },
     );
+  }
+
+  /// 用户点「重试」：先清掉失败标记，再加载一次。
+  Future<void> retryLoadMore() async {
+    if (!state.loadMoreFailed) return;
+    state = state.copyWith(loadMoreFailed: false, clearError: true);
+    await loadMore();
   }
 
   /// 把新一页**增量**追加到已有分组尾部，而不是整表重排。
@@ -185,9 +214,11 @@ class FlowListController extends Notifier<FlowListState> {
   ///   · 新页首组与已有最后一组**同一天** → 并入那一组（同一天不能被切成两块）；
   ///   · 否则 → 追加为新组。
   ///
-  /// ⚠️ 代价：本方法**不重排**已有分组。所以只有在「后续页日期不早于已有」
+  /// ⚠️ 代价：跨天层面**不重排**已有分组。所以只有在「后续页日期不早于已有」
   /// 这个前提成立时结果才正确。该前提由 `listPage` 的 keyset 游标保证
   /// （`occurred_at` 降序 + id 兜底），若将来排序口径变了，这里必须同步改。
+  /// 同一天被翻页切开时，那一组会就地重排（组内按录入先后，见
+  /// `compareByRecordedOrder`）—— 这个重排只涉及一组、开销可忽略。
   List<DayGroup> _appendGroups(
     List<DayGroup> current,
     List<LedgerEntry> incoming,
@@ -199,7 +230,12 @@ class FlowListController extends Notifier<FlowListState> {
     for (final g in incomingGroups) {
       if (merged.isNotEmpty && merged.last.dayKey == g.dayKey) {
         final last = merged.removeLast();
-        merged.add(DayGroup(dayKey: last.dayKey, entries: [...last.entries, ...g.entries]));
+        // 同一天被翻页切开时必须整体重排：两页各自的顺序都是「录入先后」，
+        // 直接拼接会让第二页的行永远沉在底部（那正是用户看到的怪顺序）。
+        merged.add(DayGroup(
+          dayKey: last.dayKey,
+          entries: sortByRecordedOrder([...last.entries, ...g.entries]),
+        ));
       } else {
         merged.add(g);
       }
@@ -262,7 +298,11 @@ class FlowListController extends Notifier<FlowListState> {
       map.putIfAbsent(key, () => []).add(e);
     }
     final keys = map.keys.toList()..sort((a, b) => b.compareTo(a));
-    return keys.map((k) => DayGroup(dayKey: k, entries: map[k]!)).toList();
+    // 组内顺序 = 录入先后（见 `compareByRecordedOrder` 的注释）。SQL 的
+    // `occurred_at DESC` 只负责「哪一天在前」；天内按钟点排会让补记的账沉底。
+    return keys
+        .map((k) => DayGroup(dayKey: k, entries: sortByRecordedOrder(map[k]!)))
+        .toList();
   }
 }
 

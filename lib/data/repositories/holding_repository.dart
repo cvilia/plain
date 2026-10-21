@@ -84,6 +84,10 @@ class HoldingRepositoryImpl implements HoldingRepository {
   @override
   Future<Result<Holding>> update(Holding holding) async {
     try {
+      // `before` = 改动前的整行；空 map 会被同步端当成「没有共同祖先」，
+      // 每次普通修改都凭空产生一批字段冲突。
+      final oldRows = _db.raw.select('SELECT * FROM holdings WHERE id = ?', [holding.id]);
+      final before = oldRows.isEmpty ? const <String, Object?>{} : _payload(_fromRow(oldRows.first));
       _db.transaction(() {
         _updateRow(holding);
         _changeLog.write(
@@ -92,7 +96,7 @@ class HoldingRepositoryImpl implements HoldingRepository {
           op: ChangeOp.update,
           deviceId: holding.deviceId,
           baseRevision: holding.baseRevision,
-          before: const {},
+          before: before,
           after: _payload(holding),
         );
       });
@@ -199,5 +203,14 @@ class HoldingRepositoryImpl implements HoldingRepository {
         'last_price_cents': h.lastPriceCents,
         'price_updated_at': h.priceUpdatedAt?.millisecondsSinceEpoch,
         'realized_pnl_cents': h.realizedPnlCents,
+        // 必填审计列（见 syncMetaOf），漏了会让对端插入该持仓直接失败。
+        ...syncMetaOf(
+          createdAt: h.createdAt,
+          updatedAt: h.updatedAt,
+          deletedAt: h.deletedAt,
+          revision: h.revision,
+          deviceId: h.deviceId,
+          baseRevision: h.baseRevision,
+        ),
       };
 }

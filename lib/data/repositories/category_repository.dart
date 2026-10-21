@@ -439,9 +439,12 @@ class CategoryRepositoryImpl implements CategoryRepository {
   }
 
   void _update(Category c) {
+    // ⚠️ `parent_id` 必须在 SET 里：change_log 的 payload 一直带着新 parent
+    // （「二级分类挂到别的一级下」），SET 漏了它就会「对端生效、本机没动」——
+    // 两端分类树分叉，而且 revision 已经 +1，肉眼看不出来。
     _db.raw.execute(
-      'UPDATE categories SET name=?,icon_ref=?,note=?,sort_order=?,is_hidden=?,is_rigid=?,is_deductible=?,updated_at=?,deleted_at=?,revision=?,base_revision=? WHERE id=?',
-      [c.name, c.iconRef, c.note, c.sortOrder, c.isHidden ? 1 : 0, c.isRigid ? 1 : 0, c.isDeductible ? 1 : 0, c.updatedAt.millisecondsSinceEpoch, c.deletedAt?.millisecondsSinceEpoch, c.revision, c.baseRevision, c.id]);
+      'UPDATE categories SET parent_id=?,kind=?,name=?,icon_ref=?,note=?,sort_order=?,is_hidden=?,is_rigid=?,is_deductible=?,updated_at=?,deleted_at=?,revision=?,base_revision=? WHERE id=?',
+      [c.parentId, c.kind.wire, c.name, c.iconRef, c.note, c.sortOrder, c.isHidden ? 1 : 0, c.isRigid ? 1 : 0, c.isDeductible ? 1 : 0, c.updatedAt.millisecondsSinceEpoch, c.deletedAt?.millisecondsSinceEpoch, c.revision, c.baseRevision, c.id]);
   }
 
   Category _fromRow(Map<String, Object?> row) => Category(
@@ -466,5 +469,15 @@ class CategoryRepositoryImpl implements CategoryRepository {
     // 漏列会让对端静默丢掉税务报表的「可抵扣」标记（audit 2026-10-15）。
     // 原 `icon_asset` 随自定义图标功能下线一并移除。
     'is_deductible': c.isDeductible,
+    // 必填审计列（见 syncMetaOf）：categories.created_at/updated_at/device_id
+    // 都是 NOT NULL 无默认值，漏了会让对端插入该分类直接失败。
+    ...syncMetaOf(
+      createdAt: c.createdAt,
+      updatedAt: c.updatedAt,
+      deletedAt: c.deletedAt,
+      revision: c.revision,
+      deviceId: c.deviceId,
+      baseRevision: c.baseRevision,
+    ),
   };
 }

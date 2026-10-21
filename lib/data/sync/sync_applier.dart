@@ -354,7 +354,12 @@ class SyncApplier {
       }
       return;
     }
-    ColumnWriter.upsert(_db, table, columns);
+    ColumnWriter.upsert(
+      _db,
+      table,
+      columns,
+      nowMs: _clock.now().millisecondsSinceEpoch,
+    );
   }
 
   Future<int> _recordConflict(

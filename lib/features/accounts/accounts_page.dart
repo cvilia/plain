@@ -802,9 +802,10 @@ class _AddAccountSheetState extends ConsumerState<_AddAccountSheet> {
     if (e != null) {
       _nameCtrl.text = e.name;
       // 信用卡的权威数字是「欠款余额」（存储值），期初余额对它无意义。
+      // 值为 0 时留空让 hint「0.00」显示：用户直接输入即可，不用先删占位文本。
       _openingCtrl.text = e.type == AccountType.credit
-          ? (e.creditDebtCents / 100).toStringAsFixed(2)
-          : (e.openingBalance / 100).toStringAsFixed(2);
+          ? (e.creditDebtCents == 0 ? '' : (e.creditDebtCents / 100).toStringAsFixed(2))
+          : (e.openingBalance == 0 ? '' : (e.openingBalance / 100).toStringAsFixed(2));
       _noteCtrl.text = e.note ?? '';
       _type = e.type;
       _currency = e.currency;

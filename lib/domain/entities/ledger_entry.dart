@@ -161,3 +161,22 @@ class LedgerEntry {
   @override
   int get hashCode => Object.hash(id, revision);
 }
+
+/// 同一天内的展示顺序：按**录入先后**（`createdAt` 降序），后录的在上面。
+///
+/// 为什么不按 [LedgerEntry.occurredAt]：`occurred_at` 表达的是「这笔钱发生在哪天」，
+/// 补记时那个「几点」用户既没设也不关心。按它排会出现两种怪象（真实反馈）：
+/// 补记的账沉到当天最下面；同一天里有的在上面、有的在下面（取决于当时钟点）。
+/// 按录入先后排则永远符合直觉：**刚补的这一笔就在当天最上面**。
+///
+/// 跨天顺序仍由 `occurred_at` 决定（哪一天归哪一组），两者互不干扰。
+int compareByRecordedOrder(LedgerEntry a, LedgerEntry b) {
+  final byCreated = b.createdAt.compareTo(a.createdAt);
+  if (byCreated != 0) return byCreated;
+  // 同一毫秒（批量写入/周期记账）用 id 兜底，保证顺序稳定、不会每帧跳。
+  return b.id.compareTo(a.id);
+}
+
+/// 见 [compareByRecordedOrder]。返回新列表，不改入参。
+List<LedgerEntry> sortByRecordedOrder(Iterable<LedgerEntry> entries) =>
+    List<LedgerEntry>.of(entries)..sort(compareByRecordedOrder);
