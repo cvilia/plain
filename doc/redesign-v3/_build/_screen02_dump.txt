@@ -1,0 +1,102 @@
+SCREEN 2 SP-0-02 首页流水 [393, 852]
+  1 p0   d0  box       screen                 x=0      y=0      w=393    h=852    bg=rgb(251, 251, 252) 
+  2 p1   d1  container statusbar              x=0      y=0      w=393    h=47      
+  3 p2   d2  text      sb-time                x=22     y=21     w=42.8   h=20      TXT[14:55|15|600|rgb(16, 16, 18)]
+  4 p2   d2  group     sb-marks               x=329    y=29     w=42     h=12      
+  5 p4   d3  icon                             x=329    y=29     w=18     h=12     ic=rgb(16, 16, 18) 
+  6 p4   d3  icon                             x=353    y=29     w=18     h=12     ic=rgb(16, 16, 18) 
+  7 p1   d1  box       topbar                 x=0      y=47     w=393    h=56     bg=rgb(251, 251, 252) 
+  8 p7   d2  group     iconbtn                x=8      y=53     w=44     h=44     rad=12px 
+  9 p8   d3  icon                             x=20     y=65     w=20     h=20     ic=rgb(56, 56, 61) 
+ 10 p7   d2  text                             x=56     y=61.5   w=235    h=27      TXT[2026年9月|20|600|rgb(16, 16, 18)]
+ 11 p7   d2  group     tb-right               x=295    y=53     w=90     h=44      
+ 12 p11  d3  group     iconbtn                x=295    y=53     w=44     h=44     rad=12px 
+ 13 p12  d4  icon                             x=307    y=65     w=20     h=20     ic=rgb(56, 56, 61) 
+ 14 p11  d3  group     iconbtn                x=341    y=53     w=44     h=44     rad=12px 
+ 15 p14  d4  icon                             x=353    y=65     w=20     h=20     ic=rgb(56, 56, 61) 
+ 16 p1   d1  container scroll                 x=0      y=103    w=393    h=689     
+ 17 p16  d2  container hero                   x=16     y=103    w=361    h=200.1   
+ 18 p17  d3  divider   hairline               x=16     y=117    w=361    h=1      bg=rgb(228, 228, 232) 
+ 19 p17  d3  text      hero-label             x=18     y=134    w=359    h=16      TXT[本月结余|12|600|rgb(94, 94, 101)]
+ 20 p17  d3  group     hero-amt               x=16     y=158    w=361    h=45      
+ 21 p20  d4  group     amt xl tone-ink        x=16     y=161    w=143.8  h=39.4    
+ 22 p21  d5  text      cur                    x=16     y=173    w=12.2   h=24.4    TXT[¥|21.08|600|rgb(94, 94, 101)]
+ 23 p21  d5  text      int                    x=29.4   y=161    w=95.8   h=39.4    TXT[3,420|34|700|rgb(16, 16, 18)]
+ 24 p21  d5  text      pnt                    x=125.2  y=161    w=9.4    h=39.4    TXT[.|34|700|rgb(16, 16, 18)]
+ 25 p21  d5  text      dec                    x=134.6  y=173    w=25.2   h=24.4    TXT[50|21.08|600|rgb(94, 94, 101)]
+ 26 p17  d3  container hero-split             x=16     y=219    w=361    h=55.1    
+ 27 p26  d4  group     hs                     x=16     y=219    w=70.2   h=39.1    
+ 28 p27  d5  text      hs-l                   x=16     y=219    w=70.2   h=16      TXT[支出|12|600|rgb(94, 94, 101)]
+ 29 p27  d5  group     hs-v                   x=16     y=238    w=70.2   h=20.1    
+ 30 p29  d6  group     amt s tone-ink         x=16     y=238    w=70.2   h=20.1    
+ 31 p30  d7  text      cur                    x=16     y=245    w=5.5    h=12.4    TXT[¥|9.3|600|rgb(94, 94, 101)]
+ 32 p30  d7  text      int                    x=22.1   y=238    w=41.4   h=20.1    TXT[5,879|15|600|rgb(16, 16, 18)]
+ 33 p30  d7  text      pnt                    x=63.5   y=238    w=4.0    h=20.1    TXT[.|15|600|rgb(16, 16, 18)]
+ 34 p30  d7  text      dec                    x=67.5   y=238    w=18.6   h=20.1    TXT[50|15|600|rgb(16, 16, 18)]
+ 35 p26  d4  group     hs                     x=114.2  y=219    w=79.6   h=39.1    
+ 36 p35  d5  text      hs-l                   x=114.2  y=219    w=79.6   h=16      TXT[收入|12|600|rgb(94, 94, 101)]
+ 37 p35  d5  group     hs-v                   x=114.2  y=238    w=79.6   h=20.1    
+ 38 p37  d6  text      amt s tone-income      x=114.2  y=238    w=79.6   h=20.1    TXT[+|15|600|rgb(220, 38, 38)]
+ 39 p38  d7  text      cur                    x=114.2  y=245    w=5.5    h=12.4    TXT[¥|9.3|600|rgb(220, 38, 38)]
+ 40 p38  d7  text      int                    x=129.7  y=238    w=41.4   h=20.1    TXT[9,300|15|600|rgb(220, 38, 38)]
+ 41 p38  d7  text      pnt                    x=171.1  y=238    w=4.0    h=20.1    TXT[.|15|600|rgb(220, 38, 38)]
+ 42 p38  d7  text      dec                    x=175.1  y=238    w=18.6   h=20.1    TXT[00|15|600|rgb(220, 38, 38)]
+ 43 p17  d3  divider   hairline               x=16     y=274.1  w=361    h=1      bg=rgb(228, 228, 232) 
+ 44 p17  d3  container month-note             x=16     y=275.1  w=361    h=28      
+ 45 p44  d4  icon                             x=18     y=288.6  w=13     h=13     ic=rgb(131, 131, 137) 
+ 46 p44  d4  text                             x=37     y=287.1  w=102    h=16      TXT[记账月起始：10 日|12|500|rgb(94, 94, 101)]
+ 47 p16  d2  group     grp                    x=16     y=335.1  w=361    h=146     
+ 48 p47  d3  text      eyebrow                x=18     y=335.1  w=359    h=16      TXT[9月28日 周日|12|600|rgb(94, 94, 101)]
+ 49 p47  d3  box       panel                  x=16     y=359.1  w=361    h=122    bg=rgb(255, 255, 255) bd=1px solid rgb(228, 228, 232) rad=16px 
+ 50 p49  d4  container row                    x=17     y=360.1  w=359    h=60      
+ 51 p50  d5  box       dot6                   x=33     y=387.1  w=6      h=6      bg=rgb(255, 107, 107) rad=50% 
+ 52 p50  d5  group     rcol                   x=49     y=371.1  w=259.7  h=38      
+ 53 p52  d6  text      rt                     x=49     y=371.1  w=30     h=20      TXT[餐饮|15|500|rgb(16, 16, 18)]
+ 54 p52  d6  text      sub                    x=49     y=393.1  w=85.0   h=16      TXT[午餐 · 公司楼下|12|500|rgb(94, 94, 101)]
+ 55 p50  d5  text      rw-amt tone-ink        x=318.7  y=380.1  w=41.3   h=20      TXT[32.00|15|600|rgb(16, 16, 18)]
+ 56 p49  d4  box       row                    x=17     y=420.1  w=359    h=60     bd=1px solid rgb(239, 239, 242) 
+ 57 p56  d5  box       dot6                   x=33     y=447.6  w=6      h=6      bg=rgb(56, 189, 248) rad=50% 
+ 58 p56  d5  group     rcol                   x=49     y=431.6  w=269.1  h=38      
+ 59 p58  d6  text      rt                     x=49     y=431.6  w=30     h=20      TXT[交通|15|500|rgb(16, 16, 18)]
+ 60 p58  d6  text      sub                    x=49     y=453.6  w=61.0   h=16      TXT[地铁 · 通勤|12|500|rgb(94, 94, 101)]
+ 61 p56  d5  text      rw-amt tone-ink        x=328.1  y=440.6  w=31.9   h=20      TXT[4.00|15|600|rgb(16, 16, 18)]
+ 62 p16  d2  group     grp                    x=16     y=513.1  w=361    h=146     
+ 63 p62  d3  text      eyebrow                x=18     y=513.1  w=359    h=16      TXT[9月27日 周六|12|600|rgb(94, 94, 101)]
+ 64 p62  d3  box       panel                  x=16     y=537.1  w=361    h=122    bg=rgb(255, 255, 255) bd=1px solid rgb(228, 228, 232) rad=16px 
+ 65 p64  d4  container row                    x=17     y=538.1  w=359    h=60      
+ 66 p65  d5  box       dot6                   x=33     y=565.1  w=6      h=6      bg=rgb(244, 114, 182) rad=50% 
+ 67 p65  d5  group     rcol                   x=49     y=549.1  w=250.4  h=38      
+ 68 p67  d6  text      rt                     x=49     y=549.1  w=30     h=20      TXT[购物|15|500|rgb(16, 16, 18)]
+ 69 p67  d6  text      sub                    x=49     y=571.1  w=73.0   h=16      TXT[日用品 · 超市|12|500|rgb(94, 94, 101)]
+ 70 p65  d5  text      rw-amt tone-ink        x=309.4  y=558.1  w=50.6   h=20      TXT[128.60|15|600|rgb(16, 16, 18)]
+ 71 p64  d4  box       row                    x=17     y=598.1  w=359    h=60     bd=1px solid rgb(239, 239, 242) 
+ 72 p71  d5  box       dot6                   x=33     y=625.6  w=6      h=6      bg=rgb(192, 132, 252) rad=50% 
+ 73 p71  d5  group     rcol                   x=49     y=609.6  w=250.4  h=38      
+ 74 p73  d6  text      rt                     x=49     y=609.6  w=30     h=20      TXT[人情|15|500|rgb(16, 16, 18)]
+ 75 p73  d6  text      sub                    x=49     y=631.6  w=48     h=16      TXT[生日礼物|12|500|rgb(94, 94, 101)]
+ 76 p71  d5  text      rw-amt tone-ink        x=309.4  y=618.6  w=50.6   h=20      TXT[300.00|15|600|rgb(16, 16, 18)]
+ 77 p16  d2  group     grp                    x=16     y=691.1  w=361    h=86      
+ 78 p77  d3  text      eyebrow                x=18     y=691.1  w=359    h=16      TXT[9月26日 周五|12|600|rgb(94, 94, 101)]
+ 79 p77  d3  box       panel                  x=16     y=715.1  w=361    h=62     bg=rgb(255, 255, 255) bd=1px solid rgb(228, 228, 232) rad=16px 
+ 80 p79  d4  container row                    x=17     y=716.1  w=359    h=60      
+ 81 p80  d5  box       dot6                   x=33     y=743.1  w=6      h=6      bg=rgb(45, 212, 191) rad=50% 
+ 82 p80  d5  group     rcol                   x=49     y=727.1  w=259.7  h=38      
+ 83 p82  d6  text      rt                     x=49     y=727.1  w=30     h=20      TXT[通讯|15|500|rgb(16, 16, 18)]
+ 84 p82  d6  text      sub                    x=49     y=749.1  w=48     h=16      TXT[话费充值|12|500|rgb(94, 94, 101)]
+ 85 p80  d5  text      rw-amt tone-ink        x=318.7  y=736.1  w=41.3   h=20      TXT[50.00|15|600|rgb(16, 16, 18)]
+ 86 p1   d1  box       nav                    x=0      y=792    w=393    h=60     bg=rgb(251, 251, 252) bd=1px solid rgb(228, 228, 232) 
+ 87 p86  d2  group     navitem on             x=0      y=793    w=78.6   h=59      
+ 88 p87  d3  icon                             x=28.3   y=802    w=22     h=22     ic=rgb(63, 63, 70) 
+ 89 p87  d3  text      navlab                 x=27.3   y=827    w=24     h=16      TXT[流水|12|500|rgb(63, 63, 70)]
+ 90 p86  d2  group     navitem                x=78.6   y=793    w=78.6   h=59      
+ 91 p90  d3  icon                             x=106.9  y=802    w=22     h=22     ic=rgb(94, 94, 101) 
+ 92 p90  d3  text      navlab                 x=105.9  y=827    w=24     h=16      TXT[报表|12|500|rgb(94, 94, 101)]
+ 93 p86  d2  group     navitem navcenter      x=157.2  y=793    w=78.6   h=59      
+ 94 p93  d3  box       navfab                 x=174.5  y=800.5  w=44     h=44     bg=rgb(251, 146, 60) rad=12px 
+ 95 p94  d4  icon                             x=185.5  y=811.5  w=22     h=22     ic=rgb(16, 16, 18) 
+ 96 p86  d2  group     navitem                x=235.8  y=793    w=78.6   h=59      
+ 97 p96  d3  icon                             x=264.1  y=802    w=22     h=22     ic=rgb(94, 94, 101) 
+ 98 p96  d3  text      navlab                 x=263.1  y=827    w=24     h=16      TXT[资产|12|500|rgb(94, 94, 101)]
+ 99 p86  d2  group     navitem                x=314.4  y=793    w=78.6   h=59      
+100 p99  d3  icon                             x=342.7  y=802    w=22     h=22     ic=rgb(94, 94, 101) 
+101 p99  d3  text      navlab                 x=341.7  y=827    w=24     h=16      TXT[我的|12|500|rgb(94, 94, 101)]

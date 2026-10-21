@@ -1,0 +1,1672 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>素记 Plain · redesign-v3 · 8 屏高保真</title>
+<style>
+
+/* ── 字体：交付自带优先（12-FONTS/），仓库路径兜底 ──
+   本机与仓库均无 Inter；MiSans 是仓库内唯一真实存在、免费可商用、且带 tnum 的字体。
+   双 src 列表：第一个 404 时浏览器自动降级到第二个（已实测 Chrome 行为）。        */
+@font-face{font-family:"MiSans";font-style:normal;font-weight:400;font-display:swap;
+  src:url("12-FONTS/MiSans-Regular.ttf") format("truetype"),
+      url("../plain/assets/fonts/misans/MiSans-Regular.ttf") format("truetype")}
+@font-face{font-family:"MiSans";font-style:normal;font-weight:500;font-display:swap;
+  src:url("12-FONTS/MiSans-Medium.ttf") format("truetype"),
+      url("../plain/assets/fonts/misans/MiSans-Medium.ttf") format("truetype")}
+@font-face{font-family:"MiSans";font-style:normal;font-weight:600;font-display:swap;
+  src:url("12-FONTS/MiSans-Semibold.ttf") format("truetype"),
+      url("../plain/assets/fonts/misans/MiSans-Semibold.ttf") format("truetype")}
+@font-face{font-family:"MiSans";font-style:normal;font-weight:700;font-display:swap;
+  src:url("12-FONTS/MiSans-Bold.ttf") format("truetype"),
+      url("../plain/assets/fonts/misans/MiSans-Bold.ttf") format("truetype")}
+
+*{box-sizing:border-box;margin:0;padding:0;-webkit-font-smoothing:antialiased}
+html,body{background:#E9E9EC;color:#121214;
+  font-family:"MiSans",Inter,"Segoe UI",system-ui,-apple-system,"HarmonyOS Sans SC","PingFang SC","Microsoft YaHei",sans-serif;
+  /* 账本类应用：全站数字走等宽数字。tnum 只作用于 0-9 与相关标点，不影响中文。
+     MiSans 的 tnum 已实测存在（GSUB: pnum + tnum，开后数字统一 594/1000）。 */
+  font-variant-numeric:tabular-nums;font-feature-settings:"tnum" 1}
+body{padding:0 0 72px}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+a{text-decoration:none;color:inherit;cursor:pointer}
+svg{display:block}
+
+/* ── 顶部工具条（不参与设计系统，纯脚手架） ── */
+.toolbar{position:sticky;top:0;z-index:50;display:flex;flex-wrap:wrap;gap:18px;align-items:center;
+  padding:14px 22px;background:#FFFFFF;border-bottom:1px solid #D8D8DE;box-shadow:0 1px 3px rgba(0,0,0,.05)}
+.tb-brand{font-weight:700;font-size:15px;letter-spacing:.01em}
+.tb-brand small{font-weight:500;color:#5E5E65;margin-left:8px;font-size:12px}
+.tb-group{display:flex;align-items:center;gap:6px}
+.tb-lab{font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#7A7A82}
+.seg2{display:inline-flex;background:#F0F0F3;border-radius:9px;padding:2px}
+.seg2 button{padding:5px 11px;border-radius:7px;font-size:12.5px;font-weight:600;color:#5E5E65}
+.seg2 button.on{background:#FFFFFF;color:#121214;box-shadow:0 1px 2px rgba(0,0,0,.10)}
+.screenpicker{display:flex;flex-wrap:wrap;gap:6px}
+.screenpicker button{padding:5px 10px;border-radius:7px;font-size:12.5px;font-weight:600;
+  background:#F0F0F3;color:#5E5E65}
+.screenpicker button.on{background:#121214;color:#fff}
+
+/* ── 舞台 ── */
+.stage{display:flex;flex-wrap:wrap;gap:34px;justify-content:center;padding:34px 22px;
+  --tscale:1}
+body[data-view="single"] .frame:not(.active){display:none}
+body[data-view="single"] .stage{justify-content:center}
+
+/* ── 手机壳 ── */
+.frame{position:relative;width:390px;height:844px;flex:0 0 auto}
+.frame .bezel{position:absolute;inset:0;border-radius:46px;background:var(--surface);
+  border:1px solid var(--line);box-shadow:0 18px 44px var(--shadow-3);overflow:hidden}
+.frame .flabel{position:absolute;top:-24px;left:2px;font-size:11.5px;font-weight:700;
+  letter-spacing:.05em;color:#5E5E65;text-transform:uppercase}
+.screen{position:absolute;inset:0;display:flex;flex-direction:column;overflow:hidden;
+  background:var(--app-bg);color:var(--ink)}
+
+/* ── 状态栏 ── */
+.statusbar{height:47px;flex:0 0 47px;display:flex;align-items:flex-end;justify-content:space-between;
+  padding:0 22px 6px;color:var(--ink);font-size:14.5px;font-weight:600;letter-spacing:.01em}
+.sb-marks{display:flex;gap:6px;align-items:center;color:var(--ink)}
+
+/* ── 顶栏 ── */
+.topbar{height:56px;flex:0 0 56px;display:flex;align-items:center;gap:4px;padding:0 8px;
+  background:var(--app-bg)}
+.topbar h1{flex:1;text-align:center;font-size:calc(20px * var(--tscale));font-weight:600;
+  letter-spacing:0;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  padding:0 4px}
+.tb-right{display:flex;align-items:center;gap:2px;min-width:40px;justify-content:flex-end}
+.iconbtn{width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;
+  color:var(--ink-2);flex:0 0 auto;background:none}
+.iconbtn:active{background:var(--surface-inset);transform:scale(.93)}
+.iconbtn.ghost{color:var(--ink-2)}
+.textbtn{height:34px;padding:0 10px;border-radius:12px;font-size:calc(15px * var(--tscale));
+  font-weight:500;color:var(--primary-ink);display:flex;align-items:center}
+.textbtn:active{background:var(--primary-tint)}
+
+/* ── 滚动区 ── */
+.scroll{flex:1;overflow-y:auto;overflow-x:hidden;padding:0 16px}
+.scroll::-webkit-scrollbar{width:0}
+.scroll-pad{height:24px}
+.hairline{height:1px;background:var(--line);margin:0}
+.eyebrow{font-size:calc(12px * var(--tscale));font-weight:600;letter-spacing:.08em;
+  text-transform:uppercase;color:var(--muted);margin:0 0 8px 2px}
+
+/* ── 金额（四段式） ── */
+.amt{display:inline-flex;align-items:baseline;font-variant-numeric:tabular-nums;
+  font-feature-settings:"tnum" 1;letter-spacing:-.02em;color:var(--ink)}
+.amt .cur{font-size:.62em;color:var(--muted);margin-right:.06em;font-weight:600}
+.amt .pnt,.amt .int{font-size:1em}
+.amt .dec{font-size:.62em;color:var(--muted);font-weight:600}
+.amt.xl{font-size:calc(34px * var(--tscale));font-weight:700;line-height:1.16}
+.amt.l{font-size:calc(22px * var(--tscale));font-weight:600;line-height:1.24}
+.amt.s{font-size:calc(15px * var(--tscale));font-weight:600;line-height:1.34;letter-spacing:-.01em}
+.amt.input{font-size:calc(44px * var(--tscale));font-weight:600;line-height:1.12;letter-spacing:-.03em}
+.amt.s .dec{font-size:1em;color:inherit}
+.tone-income{color:var(--income)}
+.tone-income .int,.tone-income .pnt{color:var(--income)}
+.tone-income .cur,.tone-income .dec{color:var(--income);opacity:.7}
+/* 涨红跌绿：中国股市/记账惯例，涨=红、跌=绿。方向另由箭头图标承担。 */
+.tone-up{color:var(--income-ink)}
+.tone-dn{color:var(--dn-ink)}
+.tone-muted{color:var(--muted)}
+
+/* ── Hero 区（无卡片、无渐变、无光晕） ── */
+.hero{padding:14px 0 0}
+.hero .hairline{margin:0}
+.hero-label{font-size:calc(12px * var(--tscale));font-weight:600;letter-spacing:.08em;
+  text-transform:uppercase;color:var(--muted);margin:16px 0 8px 2px}
+.hero-amt{font-size:calc(34px * var(--tscale));margin:0 0 16px 0}
+.hero-split{display:flex;gap:28px;padding:0 0 16px}
+.hs{display:flex;flex-direction:column;gap:3px}
+.hs-l{font-size:calc(12px * var(--tscale));font-weight:600;letter-spacing:.04em;color:var(--muted)}
+.month-note{display:flex;align-items:center;gap:6px;padding:12px 0 0 2px;
+  font-size:calc(12px * var(--tscale));font-weight:500;color:var(--muted)}
+.month-note.tight{padding:14px 2px 12px}
+.month-note svg{color:var(--faint)}
+.dot-sep{color:var(--faint);margin:0 2px}
+
+/* ── 分组面板 ── */
+.grp{margin-top:32px}
+.panel{border-radius:16px;background:var(--surface);border:1px solid var(--line);overflow:hidden}
+
+/* ── 列表行 ── */
+.row{display:flex;align-items:center;gap:10px;min-height:60px;padding:9px 16px;color:inherit}
+.row + .row{border-top:1px solid var(--line-soft);margin-top:0}
+.row:active{background:var(--surface-inset)}
+/* ⚠️ 这里必须是独立类，不能写成 `.row .rcol`。
+   早先写成 `.row .rcol` 时，分类管理页（用 .crow2 而不是 .row）拿不到
+   flex-direction:column，结果「餐饮」和它的别名挤成一行
+   「餐饮三餐、外卖、堂食」——看起来像忘了加分隔符，其实是作用域没命中。 */
+.rcol{flex:1;display:flex;flex-direction:column;align-items:flex-start;gap:2px;min-width:0}
+.rcol .rt{font-size:calc(15px * var(--tscale));font-weight:500;color:var(--ink);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.rcol .sub{font-size:calc(12px * var(--tscale));font-weight:500;color:var(--muted);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.rw-amt{font-variant-numeric:tabular-nums;font-size:calc(15px * var(--tscale));font-weight:600;
+  letter-spacing:-.01em;flex:0 0 auto}
+.dot6{width:6px;height:6px;border-radius:50%;flex:0 0 6px}
+.dot6-none{background:transparent}
+.dot8{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+.chev{color:var(--faint);flex:0 0 auto}
+.ricos{width:26px;height:22px;display:flex;align-items:center;color:var(--ink-2);flex:0 0 auto}
+.sicon{color:var(--ink-2);flex:0 0 auto;width:20px}
+.srow .rcol{margin-left:2px}
+.sval{font-size:calc(14px * var(--tscale));font-weight:500;color:var(--muted);margin-right:2px}
+.crow2{display:flex;align-items:center;gap:12px;min-height:72px;padding:12px 16px}
+.crow2 + .crow2{border-top:1px solid var(--line-soft)}
+.cicon{flex:0 0 24px;display:flex;align-items:center;justify-content:center}
+.cnt{font-size:calc(12px * var(--tscale));font-weight:500;color:var(--muted);flex:0 0 auto}
+.drag{color:var(--faint);flex:0 0 auto}
+
+/* ── 底部导航 ── */
+.nav{height:60px;flex:0 0 60px;display:flex;border-top:1px solid var(--line);background:var(--app-bg);
+  padding-bottom:env(safe-area-inset-bottom)}
+.navitem{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;
+  color:var(--muted)}
+.navitem.on{color:var(--primary-ink)}
+.navitem:active svg{transform:scale(.93)}
+.navlab{font-size:calc(12px * var(--tscale));font-weight:500;white-space:nowrap}
+.navcenter{justify-content:center}
+.navfab{width:44px;height:44px;border-radius:14px;background:var(--accent);color:var(--fab-ic);
+  display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px var(--shadow-accent)}
+.navcenter:active .navfab{background:var(--accent-pressed);transform:scale(.94)}
+
+/* ── 按钮 ── */
+.btn{height:52px;border-radius:12px;display:flex;align-items:center;justify-content:center;gap:8px;
+  font-size:calc(15px * var(--tscale));font-weight:600;padding:0 20px;min-width:88px}
+.btn.primary{background:var(--primary);color:var(--on-primary);box-shadow:0 1px 2px var(--shadow-1)}
+.btn.primary:active{background:var(--primary-pressed);transform:scale(.97)}
+.btn2{height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;gap:8px;
+  font-size:calc(15px * var(--tscale));font-weight:500;padding:0 16px;
+  border:1px solid var(--line-strong);color:var(--ink);background:none}
+.btn2:active{background:var(--surface-inset);transform:scale(.97)}
+/* 危险按钮：整颗走危险色，不能只是图标红、文字黑。
+   删除是不可逆操作，按钮本身必须读起来「危险」。 */
+.btn2.danger{border-color:var(--income-line);color:var(--income-ink)}
+.btn2.danger svg{color:var(--income-ink)}
+.btn2.wide{width:100%}
+.foot-note{font-size:calc(12px * var(--tscale));color:var(--muted);text-align:center;line-height:1.5}
+
+/* ── 引导页 ── */
+.page-guide{padding:0 24px;background:var(--app-bg)}
+.guide-top{padding:22px 0 0}
+.wordmark{font-size:calc(15px * var(--tscale));font-weight:700;letter-spacing:.06em;color:var(--ink)}
+.guide-hero{margin:26px 0 0}
+.guide-hero .hairline{margin:0}
+.guide-hero .hero-amt{margin:18px 0 18px}
+.guide-h{font-size:calc(20px * var(--tscale));font-weight:600;line-height:1.4;margin:30px 0 8px 2px;
+  color:var(--ink)}
+.guide-p{font-size:calc(14px * var(--tscale));line-height:1.65;color:var(--muted);margin:0 0 4px 2px}
+.featlist{margin:28px 0 0}
+.feat{display:flex;gap:14px;align-items:flex-start;padding:14px 0;border-top:1px solid var(--line-soft)}
+.feat svg{color:var(--ink-2);margin-top:1px;flex:0 0 auto}
+.fcol{display:flex;flex-direction:column;gap:3px}
+.ft{font-size:calc(15px * var(--tscale));font-weight:500;color:var(--ink)}
+.fs{font-size:calc(12px * var(--tscale));font-weight:500;color:var(--muted)}
+.guide-foot{margin:auto 0 0;padding:0 0 34px;display:flex;flex-direction:column;gap:14px}
+
+/* ── 记一笔 ── */
+.ttabs{display:flex;gap:4px;padding:0 12px 6px;overflow-x:auto;flex:0 0 auto}
+.ttabs::-webkit-scrollbar{display:none}
+/* 右缘渐隐：英文 5 个 Tab 放不下时必须能滚（已实测）。
+   没有这个提示，被切一半的 "Borrow" 看起来像渲染错误而不是「还有内容」。
+   中文场景下右侧本来就是空的，遮罩作用在空白上，无副作用。 */
+.ttabs{-webkit-mask-image:linear-gradient(90deg,#000 calc(100% - 28px),transparent);
+  mask-image:linear-gradient(90deg,#000 calc(100% - 28px),transparent)}
+.ttab{height:44px;padding:0 14px;border-radius:12px;font-size:calc(14px * var(--tscale));
+  font-weight:500;color:var(--muted);white-space:nowrap;flex:0 0 auto;
+  display:inline-flex;align-items:center}
+.ttab.on{color:var(--ink);font-weight:600;background:var(--primary-tint);
+  box-shadow:inset 0 0 0 1px var(--primary-ink)}
+.amount-block{padding:2px 16px 10px;display:flex;flex-direction:column;align-items:flex-end;
+  flex:0 0 auto}
+/* 记一笔的中段（分类格 + 属性行）——唯一可滚区，键盘永远贴底。
+   这样在「特大字号 × 英文」下也只是这一区滚动，不会把键盘顶出屏幕。 */
+.addbody{flex:1 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden}
+.chip{position:relative;height:40px;padding:0 12px;border-radius:999px;
+  border:1px solid var(--line);background:var(--surface);display:inline-flex;align-items:center;
+  gap:6px;font-size:calc(12px * var(--tscale));font-weight:600;color:var(--ink-2);
+  white-space:nowrap;flex:0 0 auto}
+.chip svg{color:var(--muted);flex:0 0 auto}
+.chip.ph{border-style:dashed;color:var(--muted);font-weight:500}
+.chip::after{content:"";position:absolute;left:0;top:50%;transform:translateY(-50%);
+  width:100%;height:44px}
+.attrchips{display:flex;flex-wrap:wrap;gap:8px;padding:2px 16px 10px}
+.expr{font-size:calc(14px * var(--tscale));font-weight:500;color:var(--muted);
+  font-variant-numeric:tabular-nums;display:flex;align-items:center;height:20px}
+.caret{display:inline-block;width:2px;height:15px;background:var(--primary);margin-left:3px;
+  vertical-align:-2px}
+.amt-line{margin-top:4px}
+.catgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;padding:10px 16px;flex:0 0 auto}
+.tile{height:62px;border-radius:12px;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;gap:6px;background:none;border:1.5px solid transparent;padding:0 2px}
+.tile-n{font-size:calc(12px * var(--tscale));font-weight:500;color:var(--ink-2);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.tile.on{background:var(--primary-tint);border-color:var(--primary-ink)}
+.tile.on .tile-n{color:var(--primary-ink);font-weight:600}
+.tile:active{background:var(--surface-inset);transform:scale(.96)}
+.tile.more svg{color:var(--muted)}
+.keypad{flex:0 0 auto;display:grid;grid-template-columns:repeat(4,1fr);gap:6px;padding:8px 12px 10px}
+.key{height:62px;border-radius:12px;background:var(--surface-2);border:1px solid var(--line);
+  box-shadow:0 1px 2px var(--shadow-1);font-size:calc(22px * var(--tscale));font-weight:500;
+  color:var(--ink);display:flex;align-items:center;justify-content:center;
+  font-variant-numeric:tabular-nums}
+.key:active{background:var(--primary-tint);transform:scale(.96)}
+.key.op{color:var(--ink-2)}
+.key.blank{background:none;border:0;box-shadow:none}
+.key.ok{grid-column:span 2;background:var(--accent);border-color:var(--accent);
+  color:var(--on-accent);font-size:calc(15px * var(--tscale));font-weight:600;
+  box-shadow:0 2px 8px var(--shadow-accent)}
+.key.ok:active{background:var(--accent-pressed)}
+.safearea{height:34px;flex:0 0 34px}
+
+/* ── 详情 ── */
+.detail-hero{padding:22px 0 26px;text-align:center}
+.detail-hero .hero-label{margin:0 0 10px}
+.dh-amt{display:flex;justify-content:center}
+.dh-meta{display:flex;align-items:center;justify-content:center;gap:8px;margin-top:14px;
+  font-size:calc(12px * var(--tscale));font-weight:500;color:var(--muted)}
+.dh-meta .sep{color:var(--faint)}
+.detail-panel{margin:0}
+.drow{display:flex;align-items:center;gap:16px;min-height:56px;padding:10px 16px}
+.drow + .drow{border-top:1px solid var(--line-soft)}
+.dk{font-size:calc(14px * var(--tscale));font-weight:400;color:var(--muted);flex:0 0 76px}
+.dv{flex:1;display:flex;align-items:center;gap:8px;justify-content:flex-end;text-align:right;
+  font-size:calc(15px * var(--tscale));font-weight:500;color:var(--ink)}
+.dv.note{font-size:calc(14px * var(--tscale));font-weight:400;color:var(--ink-2);line-height:1.5}
+.danger-zone{margin:32px 0 0;display:flex;flex-direction:column;gap:10px}
+.danger-zone .btn2{width:100%}
+
+/* ── 报表 ── */
+.cmppanel{margin-top:4px;padding:18px 16px 10px}
+.cmppanel .eyebrow{margin-left:0}
+.crow{display:flex;align-items:center;height:44px;gap:12px}
+.crow + .crow{border-top:1px solid var(--line-soft)}
+.ck{flex:1;font-size:calc(15px * var(--tscale));font-weight:500;color:var(--ink)}
+.cv{flex:0 0 auto}
+.cd{display:flex;align-items:center;gap:3px;flex:0 0 76px;justify-content:flex-end;
+  font-size:calc(12px * var(--tscale));font-weight:600}
+.chartpanel{margin-top:12px;padding:18px 16px 16px}
+.chartpanel .eyebrow{margin-left:0}
+.donut-wrap{display:flex;justify-content:center;padding:4px 0 14px}
+.dn-c1{font-size:18px;font-weight:600;fill:var(--ink);font-variant-numeric:tabular-nums}
+.dn-c1 .dn-cur,.dn-c1 .dn-dec{font-size:.62em;fill:var(--muted)}
+.dn-c2{font-size:8.5px;font-weight:600;letter-spacing:.1em;fill:var(--muted)}
+.legend{display:flex;flex-direction:column}
+.lrow{display:flex;align-items:center;height:40px;gap:0}
+.lname{flex:1;font-size:calc(14px * var(--tscale));color:var(--ink);margin-left:12px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-right:8px}
+.lpct{flex:0 0 48px;text-align:right;font-size:calc(15px * var(--tscale));font-weight:600;
+  color:var(--ink-2);font-variant-numeric:tabular-nums}
+.lamt{flex:0 0 92px;text-align:right;font-size:calc(15px * var(--tscale));font-weight:600;
+  color:var(--ink);font-variant-numeric:tabular-nums}
+.bars{display:block;margin-top:6px}
+
+/* ── 分类管理 ── */
+.segwrap{padding:0 16px 12px;flex:0 0 auto}
+.seg{display:flex;background:var(--surface-inset);border-radius:12px;padding:3px;height:36px}
+.segi{flex:1;border-radius:9px;font-size:calc(14px * var(--tscale));font-weight:500;
+  color:var(--muted)}
+.segi.on{background:var(--surface);color:var(--ink);font-weight:600;
+  box-shadow:0 1px 2px var(--shadow-1)}
+.catpanel{margin-top:0}
+.footbar{padding:10px 16px 0;flex:0 0 auto;background:var(--app-bg);
+  border-top:1px solid var(--line)}
+
+/* ── 设置 ── */
+.privacy-strip{display:flex;gap:12px;align-items:center;margin-top:4px;padding:14px 16px;
+  border-radius:16px;background:var(--ok-soft);color:var(--ok-ink)}
+.privacy-strip svg{color:var(--ok-ink);flex:0 0 auto}
+.pcol{display:flex;flex-direction:column;gap:2px}
+.pt{font-size:calc(14px * var(--tscale));font-weight:600}
+.ps{font-size:calc(12px * var(--tscale));font-weight:500;opacity:.9}
+
+/* ── 开关 ── */
+.switch{width:48px;height:28px;border-radius:999px;background:var(--line);border:1px solid var(--line);
+  position:relative;flex:0 0 48px;display:inline-block}
+.switch .knob{position:absolute;top:2px;left:2px;width:22px;height:22px;border-radius:50%;
+  background:var(--surface);box-shadow:0 1px 2px var(--shadow-1);transition:transform .15s cubic-bezier(.4,0,.2,1)}
+.switch.on{background:var(--primary);border-color:var(--primary)}
+.switch.on .knob{transform:translateX(20px)}
+
+/* ── 触控命中区补足 ──────────────────────────────────────────────
+   规则：视觉尺寸允许小于 44，但「命中区」必须 ≥ 44×44。
+   做法：用 ::after 撑一层透明覆盖层，不改变视觉与布局。
+   仅对视觉尺寸 < 44 的可点元素使用；≥44 的元素（.key 62 / .navitem 60 /
+   .row 60 / .drow 56 / .attrrow 44 / .crow 44 / .navfab 44 / .tile 68）
+   本身已合规，不加。                                                */
+.textbtn,.segi,.switch{position:relative}
+.textbtn::after,.segi::after,.switch::after{
+  content:"";position:absolute;left:0;top:50%;transform:translateY(-50%);
+  width:100%;height:44px;pointer-events:auto}
+.switch::after{left:50%;transform:translate(-50%,-50%);width:44px}
+
+/* ── 响应式：窄屏时缩放整个舞台 ── */
+@media (max-width:520px){
+  .frame{transform:scale(.82);transform-origin:top center;margin-bottom:-152px}
+}
+
+/* ── 主题 × 亮度 → 变量（值全部来自 01-tokens.json，页面里没有裸色号） ── */
+body{}
+body[data-theme="subai"][data-mode="light"] .stage{
+  --bg: #F5F5F6FF;
+  --app-bg: #FBFBFCFF;
+  --surface: #FFFFFFFF;
+  --surface-2: #F6F6F8FF;
+  --ink: #101012FF;
+  --ink-2: #38383DFF;
+  --muted: #5E5E65FF;
+  --faint: #838389FF;
+  --line: #E4E4E8FF;
+  --line-soft: #EFEFF2FF;
+  --primary: #3F3F46FF;
+  --primary-deep: #27272AFF;
+  --primary-soft: #3F3F461F;
+  --primary-tint: #3F3F4612;
+  --on-primary: #FFFFFFFF;
+  --accent: #FB923CFF;
+  --accent-deep: #F97316FF;
+  --accent-soft: #FB923C1F;
+  --on-accent: #101012FF;
+  --income: #DC2626FF;
+  --income-soft: #FFF1F2FF;
+  --income-line: #FECDD3FF;
+  --income-ink: #D12424FF;
+  --ok-soft: #ECFDF5FF;
+  --ok-ink: #048059FF;
+  --warn-soft: #FDF3E3FF;
+  --warn-ink: #7A4E14FF;
+  --dn-bg: #ECFDF5FF;
+  --dn-ink: #048059FF;
+  --primary-ink: #3F3F46FF;
+  --accent-ink: #975824FF;
+  --fab-bg: #FB923CFF;
+  --fab-fg: #101012FF;
+  --fab-ic: #101012FF;
+  --toast-bg: #101012FF;
+  --chart-track: #C2C2C6FF;
+  --bar-fill: #3F3F46FF;
+  --dash: #ACACB1FF;
+  --shadow-1: #0000000F;
+  --shadow-2: #0000001A;
+  --shadow-3: #00000029;
+  --shadow-accent: #FB923C1A;
+  --glow-primary: #3F3F460F;
+  --line-strong: #89898BFF;
+  --line-strong-soft: #A8A8ACFF;
+  --focus-ring: #3F3F46FF;
+  --surface-inset: #FAFAFAFF;
+  --disabled-fg: #BBBBBEFF;
+  --disabled-bg: #F8F8F9FF;
+  --overlay: #00000052;
+  --skeleton: #F6F6F7FF;
+  --primary-pressed: #39393FFF;
+  --accent-pressed: #FB9D50FF;
+  --cat-food: #FF6B6BFF;
+  --cat-fruit: #4ADE80FF;
+  --cat-shopping: #F472B6FF;
+  --cat-daily: #A78BFAFF;
+  --cat-transport: #38BDF8FF;
+  --cat-housing: #FDBA74FF;
+  --cat-telecom: #2DD4BFFF;
+  --cat-entertainment: #E879F9FF;
+  --cat-medical: #F87171FF;
+  --cat-study: #60A5FAFF;
+  --cat-social: #C084FCFF;
+  --cat-other: #94A3B8FF;
+  --cat-ink-food: #B24B4BFF;
+  --cat-ink-fruit: #297A46FF;
+  --cat-ink-shopping: #9F4A76FF;
+  --cat-ink-daily: #7561AFFF;
+  --cat-ink-transport: #227195FF;
+  --cat-ink-housing: #8B6640FF;
+  --cat-ink-telecom: #197569FF;
+  --cat-ink-entertainment: #974FA2FF;
+  --cat-ink-medical: #AE4F4FFF;
+  --cat-ink-study: #3E6BA2FF;
+  --cat-ink-social: #865CB0FF;
+  --cat-ink-other: #606A78FF;
+}
+body[data-theme="subai"][data-mode="dark"] .stage{
+  --bg: #121214FF;
+  --app-bg: #1A1A1DFF;
+  --surface: #222225FF;
+  --surface-2: #2B2B2FFF;
+  --ink: #ECECEEFF;
+  --ink-2: #C2C2C7FF;
+  --muted: #93939BFF;
+  --faint: #74747CFF;
+  --line: #33333AFF;
+  --line-soft: #2B2B32FF;
+  --primary: #D4D4D8FF;
+  --primary-deep: #A1A1AAFF;
+  --primary-soft: #D4D4D833;
+  --primary-tint: #D4D4D821;
+  --on-primary: #595959FF;
+  --accent: #FDBA74FF;
+  --accent-deep: #FB923CFF;
+  --accent-soft: #FDBA7438;
+  --on-accent: #4C4C4CFF;
+  --income: #FDA4AFFF;
+  --income-soft: #3A0B16FF;
+  --income-line: #7F1D2DFF;
+  --income-ink: #FDA4AFFF;
+  --ok-soft: #052E22FF;
+  --ok-ink: #6EE7B7FF;
+  --warn-soft: #3A2E1AFF;
+  --warn-ink: #E8B96AFF;
+  --dn-bg: #052E22FF;
+  --dn-ink: #6EE7B7FF;
+  --primary-ink: #D4D4D8FF;
+  --accent-ink: #FDBA74FF;
+  --fab-bg: #FDBA74FF;
+  --fab-fg: #4C4C4CFF;
+  --fab-ic: #4C4C4CFF;
+  --toast-bg: #38383BFF;
+  --chart-track: #4C4C52FF;
+  --bar-fill: #D4D4D8FF;
+  --dash: #5B5B63FF;
+  --shadow-1: #00000042;
+  --shadow-2: #00000057;
+  --shadow-3: #00000075;
+  --shadow-accent: #FDBA7429;
+  --glow-primary: #D4D4D814;
+  --line-strong: #707075FF;
+  --line-strong-soft: #828288FF;
+  --focus-ring: #D4D4D8FF;
+  --surface-inset: #1B1B1DFF;
+  --disabled-fg: #5B5B62FF;
+  --disabled-bg: #1C1C1FFF;
+  --overlay: #0000008F;
+  --skeleton: #1A1A1CFF;
+  --primary-pressed: #D8D8DCFF;
+  --accent-pressed: #FDC182FF;
+  --cat-food: #FF6B6BFF;
+  --cat-fruit: #4ADE80FF;
+  --cat-shopping: #F472B6FF;
+  --cat-daily: #A78BFAFF;
+  --cat-transport: #38BDF8FF;
+  --cat-housing: #FDBA74FF;
+  --cat-telecom: #2DD4BFFF;
+  --cat-entertainment: #E879F9FF;
+  --cat-medical: #F87171FF;
+  --cat-study: #60A5FAFF;
+  --cat-social: #C084FCFF;
+  --cat-other: #94A3B8FF;
+  --cat-ink-food: #FF7A7AFF;
+  --cat-ink-fruit: #4ADE80FF;
+  --cat-ink-shopping: #F579BAFF;
+  --cat-ink-daily: #B097FAFF;
+  --cat-ink-transport: #38BDF8FF;
+  --cat-ink-housing: #FDBA74FF;
+  --cat-ink-telecom: #2DD4BFFF;
+  --cat-ink-entertainment: #E879F9FF;
+  --cat-ink-medical: #F97F7FFF;
+  --cat-ink-study: #68AAFAFF;
+  --cat-ink-social: #C690FCFF;
+  --cat-ink-other: #99A8BCFF;
+}
+body[data-theme="qingci"][data-mode="light"] .stage{
+  --bg: #F4F6F6FF;
+  --app-bg: #FAFBFBFF;
+  --surface: #FFFFFFFF;
+  --surface-2: #F5F7F7FF;
+  --ink: #0E1413FF;
+  --ink-2: #36403EFF;
+  --muted: #5B6765FF;
+  --faint: #808C8AFF;
+  --line: #E3E8E7FF;
+  --line-soft: #EDF1F0FF;
+  --primary: #14B8A6FF;
+  --primary-deep: #0D9488FF;
+  --primary-soft: #14B8A61F;
+  --primary-tint: #14B8A612;
+  --on-primary: #0E1413FF;
+  --accent: #FF6B6BFF;
+  --accent-deep: #F43F5EFF;
+  --accent-soft: #FF6B6B1F;
+  --on-accent: #0E1413FF;
+  --income: #DC2626FF;
+  --income-soft: #FFF1F2FF;
+  --income-line: #FECDD3FF;
+  --income-ink: #D12424FF;
+  --ok-soft: #ECFDF5FF;
+  --ok-ink: #048059FF;
+  --warn-soft: #FDF3E3FF;
+  --warn-ink: #7A4E14FF;
+  --dn-bg: #ECFDF5FF;
+  --dn-ink: #048059FF;
+  --primary-ink: #0C6E64FF;
+  --accent-ink: #A64646FF;
+  --fab-bg: #FF6B6BFF;
+  --fab-fg: #0E1413FF;
+  --fab-ic: #0E1413FF;
+  --toast-bg: #0E1413FF;
+  --chart-track: #C0C7C6FF;
+  --bar-fill: #119C8DFF;
+  --dash: #AAB2B0FF;
+  --shadow-1: #0000000F;
+  --shadow-2: #0000001A;
+  --shadow-3: #00000029;
+  --shadow-accent: #FF6B6B1A;
+  --glow-primary: #14B8A60F;
+  --line-strong: #888B8BFF;
+  --line-strong-soft: #A6ADACFF;
+  --focus-ring: #0C6E64FF;
+  --surface-inset: #F9FAFAFF;
+  --disabled-fg: #B9C0BFFF;
+  --disabled-bg: #F7F9F9FF;
+  --overlay: #00000052;
+  --skeleton: #F6F7F7FF;
+  --primary-pressed: #2CBFAFFF;
+  --accent-pressed: #FF7A7AFF;
+  --cat-food: #FF6B6BFF;
+  --cat-fruit: #4ADE80FF;
+  --cat-shopping: #F472B6FF;
+  --cat-daily: #A78BFAFF;
+  --cat-transport: #38BDF8FF;
+  --cat-housing: #FDBA74FF;
+  --cat-telecom: #2DD4BFFF;
+  --cat-entertainment: #E879F9FF;
+  --cat-medical: #F87171FF;
+  --cat-study: #60A5FAFF;
+  --cat-social: #C084FCFF;
+  --cat-other: #94A3B8FF;
+  --cat-ink-food: #B24B4BFF;
+  --cat-ink-fruit: #297A46FF;
+  --cat-ink-shopping: #9F4A76FF;
+  --cat-ink-daily: #7561AFFF;
+  --cat-ink-transport: #227195FF;
+  --cat-ink-housing: #8B6640FF;
+  --cat-ink-telecom: #197569FF;
+  --cat-ink-entertainment: #974FA2FF;
+  --cat-ink-medical: #AE4F4FFF;
+  --cat-ink-study: #3E6BA2FF;
+  --cat-ink-social: #865CB0FF;
+  --cat-ink-other: #606A78FF;
+}
+body[data-theme="qingci"][data-mode="dark"] .stage{
+  --bg: #101413FF;
+  --app-bg: #181D1CFF;
+  --surface: #202625FF;
+  --surface-2: #293130FF;
+  --ink: #E8EDEAFF;
+  --ink-2: #BEC8C4FF;
+  --muted: #8E9895FF;
+  --faint: #6F7975FF;
+  --line: #2F3634FF;
+  --line-soft: #272E2CFF;
+  --primary: #5EEAD4FF;
+  --primary-deep: #2DD4BFFF;
+  --primary-soft: #5EEAD433;
+  --primary-tint: #5EEAD421;
+  --on-primary: #595959FF;
+  --accent: #FB7185FF;
+  --accent-deep: #F43F5EFF;
+  --accent-soft: #FB718538;
+  --on-accent: #333333FF;
+  --income: #FDA4AFFF;
+  --income-soft: #3A0B16FF;
+  --income-line: #7F1D2DFF;
+  --income-ink: #FDA4AFFF;
+  --ok-soft: #052E22FF;
+  --ok-ink: #6EE7B7FF;
+  --warn-soft: #3A2E1AFF;
+  --warn-ink: #E8B96AFF;
+  --dn-bg: #052E22FF;
+  --dn-ink: #6EE7B7FF;
+  --primary-ink: #5EEAD4FF;
+  --accent-ink: #FC94A4FF;
+  --fab-bg: #FB7185FF;
+  --fab-fg: #333333FF;
+  --fab-ic: #333333FF;
+  --toast-bg: #363C3BFF;
+  --chart-track: #48514FFF;
+  --bar-fill: #5EEAD4FF;
+  --dash: #575F5DFF;
+  --shadow-1: #00000042;
+  --shadow-2: #00000057;
+  --shadow-3: #00000075;
+  --shadow-accent: #FB718529;
+  --glow-primary: #5EEAD414;
+  --line-strong: #6D7271FF;
+  --line-strong-soft: #7E8683FF;
+  --focus-ring: #5EEAD4FF;
+  --surface-inset: #191E1DFF;
+  --disabled-fg: #57605DFF;
+  --disabled-bg: #1A201FFF;
+  --overlay: #0000008F;
+  --skeleton: #181D1CFF;
+  --primary-pressed: #6EECD8FF;
+  --accent-pressed: #FB7F91FF;
+  --cat-food: #FF6B6BFF;
+  --cat-fruit: #4ADE80FF;
+  --cat-shopping: #F472B6FF;
+  --cat-daily: #A78BFAFF;
+  --cat-transport: #38BDF8FF;
+  --cat-housing: #FDBA74FF;
+  --cat-telecom: #2DD4BFFF;
+  --cat-entertainment: #E879F9FF;
+  --cat-medical: #F87171FF;
+  --cat-study: #60A5FAFF;
+  --cat-social: #C084FCFF;
+  --cat-other: #94A3B8FF;
+  --cat-ink-food: #FF7A7AFF;
+  --cat-ink-fruit: #4ADE80FF;
+  --cat-ink-shopping: #F579BAFF;
+  --cat-ink-daily: #B097FAFF;
+  --cat-ink-transport: #38BDF8FF;
+  --cat-ink-housing: #FDBA74FF;
+  --cat-ink-telecom: #2DD4BFFF;
+  --cat-ink-entertainment: #E879F9FF;
+  --cat-ink-medical: #F97F7FFF;
+  --cat-ink-study: #68AAFAFF;
+  --cat-ink-social: #C690FCFF;
+  --cat-ink-other: #99A8BCFF;
+}
+/* 语言切换：先全隐藏，再只显示与 body[data-lang] 匹配的那一半。
+   ⚠️ 早先写成「默认隐藏 zh 帧」是错的 —— 那样 en 帧永远不会被隐藏，
+      网格模式下中英会同时出现（16 帧而不是 8 帧）。 */
+.frame[data-lang]{display:none}
+body[data-lang="zh"] .frame[data-lang="zh"]{display:block}
+body[data-lang="en"] .frame[data-lang="en"]{display:block}
+body[data-view="single"] .frame{display:none !important}
+body[data-view="single"] .frame.active{display:block !important}
+</style></head>
+<body data-theme="subai" data-mode="light" data-lang="zh" data-size="standard" data-view="grid">
+<svg xmlns="http://www.w3.org/2000/svg" style="display:none" aria-hidden="true"><symbol id="ic_nav_ledger" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M8.75 6.5h10.75"/>
+  <path d="M8.75 12h10.75"/>
+  <path d="M8.75 17.5h10.75"/>
+  <circle cx="5.25" cy="6.5" r="1.4" fill="currentColor" stroke="none"/>
+  <circle cx="5.25" cy="12" r="1.4" fill="currentColor" stroke="none"/>
+  <circle cx="5.25" cy="17.5" r="1.4" fill="currentColor" stroke="none"/>
+  </g>
+</symbol><symbol id="ic_nav_report" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M12 3.5A8.5 8.5 0 0 1 20.5 12A8.5 8.5 0 0 1 12 20.5A8.5 8.5 0 0 1 3.5 12"/>
+  <path d="M12 12 12 3.5"/>
+  <path d="M12 12 20.5 12"/>
+  </g>
+</symbol><symbol id="ic_nav_add" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M12 5.25v13.5"/>
+  <path d="M5.25 12h13.5"/>
+  </g>
+</symbol><symbol id="ic_nav_assets" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <rect x="3.75" y="7.25" width="16.5" height="11.5" rx="3"/>
+  <path d="M6.75 7.25V6.4a1.75 1.75 0 0 1 1.75-1.75h7a1.75 1.75 0 0 1 1.75 1.75v.85"/>
+  <circle cx="16.5" cy="13" r="1.35" fill="currentColor" stroke="none"/>
+  </g>
+</symbol><symbol id="ic_nav_profile" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <circle cx="12" cy="8.25" r="3.5"/>
+  <path d="M5.5 19.5a6.5 6.5 0 0 1 13 0"/>
+  </g>
+</symbol><symbol id="ic_cat_food" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M3.5 11.75A8.5 8.5 0 0 0 20.5 11.75Z"/>
+  <path d="M9.6 9V6.25"/>
+  <path d="M14.4 9V6.25"/>
+  </g>
+</symbol><symbol id="ic_cat_grocery" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M12 8.75c1.5-1.3 3.95-1.6 5.55-.2 1.9 1.7 1.9 5-.1 8.1-1.2 1.85-2.85 3.25-4.35 3.25-.5 0-.8-.15-1.1-.3-.35-.15-.65-.3-1-.3s-.65.15-1 .3c-.3.15-.6.3-1.1.3-1.5 0-3.15-1.4-4.35-3.25-2-3.1-2-6.4-.1-8.1 1.6-1.4 4.05-1.1 5.55.2z"/>
+  <path d="M12 8.75V6.1"/>
+  <path d="M12 6.1c1.55-.4 2.55-1.45 2.85-2.85-1.55.1-2.6 1.05-2.85 2.85z"/>
+  </g>
+</symbol><symbol id="ic_cat_shopping" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M5.5 8.25h13l-1.05 10.5a2.25 2.25 0 0 1-2.24 2.05H8.79a2.25 2.25 0 0 1-2.24-2.05z"/>
+  <path d="M9.25 8.25V6.5a2.75 2.75 0 0 1 5.5 0v1.75"/>
+  </g>
+</symbol><symbol id="ic_cat_daily" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <rect x="10.25" y="3.25" width="3.5" height="2.25" rx="0.9"/>
+  <path d="M10.25 5.5 8.5 8.25"/>
+  <path d="M13.75 5.5 15.5 8.25"/>
+  <rect x="7.5" y="8.25" width="9" height="12" rx="2.5"/>
+  </g>
+</symbol><symbol id="ic_cat_transport" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <rect x="5" y="4" width="14" height="13" rx="3"/>
+  <path d="M5 10.5h14"/>
+  <circle cx="8.5" cy="19.25" r="1.35" fill="currentColor" stroke="none"/>
+  <circle cx="15.5" cy="19.25" r="1.35" fill="currentColor" stroke="none"/>
+  </g>
+</symbol><symbol id="ic_cat_housing" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M3.5 11.25 12 4l8.5 7.25"/>
+  <path d="M5.75 10.75V18.5a1.75 1.75 0 0 0 1.75 1.75h9a1.75 1.75 0 0 0 1.75-1.75v-7.75"/>
+  <path d="M10.25 20.25v-4a1.75 1.75 0 0 1 3.5 0v4"/>
+  </g>
+</symbol><symbol id="ic_cat_telecom" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M6.75 20.25V15.5"/>
+  <path d="M12 20.25V10.75"/>
+  <path d="M17.25 20.25V6"/>
+  </g>
+</symbol><symbol id="ic_cat_entertainment" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M5 15.25V12a7 7 0 0 1 14 0v3.25"/>
+  <rect x="3.25" y="13.75" width="3.5" height="6.25" rx="1.75"/>
+  <rect x="17.25" y="13.75" width="3.5" height="6.25" rx="1.75"/>
+  </g>
+</symbol><symbol id="ic_cat_medical" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <circle cx="12" cy="12" r="8.5"/>
+  <path d="M12 8.25v7.5"/>
+  <path d="M8.25 12h7.5"/>
+  </g>
+</symbol><symbol id="ic_cat_study" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M12 7.25v11.5"/>
+  <path d="M12 7.25C10.4 5.9 8.4 5.25 5.75 5.25a1.5 1.5 0 0 0-1.5 1.5v9.5a1.5 1.5 0 0 0 1.5 1.5c2.65 0 4.65.65 6.25 2"/>
+  <path d="M12 7.25c1.6-1.35 3.6-2 6.25-2a1.5 1.5 0 0 1 1.5 1.5v9.5a1.5 1.5 0 0 1-1.5 1.5c-2.65 0-4.65.65-6.25 2"/>
+  </g>
+</symbol><symbol id="ic_cat_social" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <rect x="3" y="6.25" width="18" height="3.75" rx="1.75"/>
+  <rect x="4.5" y="10" width="15" height="10.25" rx="2"/>
+  <path d="M12 6.25v14"/>
+  </g>
+</symbol><symbol id="ic_cat_other" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <rect x="4.25" y="4.25" width="6" height="6" rx="1.75"/>
+  <rect x="13.75" y="4.25" width="6" height="6" rx="1.75"/>
+  <rect x="4.25" y="13.75" width="6" height="6" rx="1.75"/>
+  <rect x="13.75" y="13.75" width="6" height="6" rx="1.75"/>
+  </g>
+</symbol><symbol id="ic_back" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M19 12H5.5"/>
+  <path d="M11.25 5.75 5 12l6.25 6.25"/>
+  </g>
+</symbol><symbol id="ic_chevron_right" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M9.5 5.75 15.75 12 9.5 18.25"/>
+  </g>
+</symbol><symbol id="ic_chevron_left" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M14.5 5.75 8.25 12 14.5 18.25"/>
+  </g>
+</symbol><symbol id="ic_chevron_down" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M5.75 9.5 12 15.75 18.25 9.5"/>
+  </g>
+</symbol><symbol id="ic_close" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M6 6 18 18"/>
+  <path d="M18 6 6 18"/>
+  </g>
+</symbol><symbol id="ic_search" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <circle cx="10.75" cy="10.75" r="6.25"/>
+  <path d="M15.4 15.4 20 20"/>
+  </g>
+</symbol><symbol id="ic_filter" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M4.25 5.75h15.5l-6 7.25v5.25l-3.5 2.25v-7.5z"/>
+  </g>
+</symbol><symbol id="ic_edit" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M16.5 3.75 20.25 7.5 8.25 19.5l-4.5 1 1-4.5z"/>
+  <path d="M14.25 6 18 9.75"/>
+  </g>
+</symbol><symbol id="ic_delete" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M3.75 6.5h16.5"/>
+  <path d="M9.25 6.5V4.75a1.5 1.5 0 0 1 1.5-1.5h2.5a1.5 1.5 0 0 1 1.5 1.5V6.5"/>
+  <path d="M6 6.5 6.95 19.4a1.75 1.75 0 0 0 1.75 1.6h6.6a1.75 1.75 0 0 0 1.75-1.6L18 6.5"/>
+  <path d="M10.25 10.25v6.75"/>
+  <path d="M13.75 10.25v6.75"/>
+  </g>
+</symbol><symbol id="ic_check" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M4.75 12.5 9.5 17.25 19.25 6.75"/>
+  </g>
+</symbol><symbol id="ic_plus" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M12 5.5v13"/>
+  <path d="M5.5 12h13"/>
+  </g>
+</symbol><symbol id="ic_minus" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M5.5 12h13"/>
+  </g>
+</symbol><symbol id="ic_more" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <circle cx="6.25" cy="12" r="1.6" fill="currentColor" stroke="none"/>
+  <circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"/>
+  <circle cx="17.75" cy="12" r="1.6" fill="currentColor" stroke="none"/>
+  </g>
+</symbol><symbol id="ic_more_vertical" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <circle cx="12" cy="6.25" r="1.6" fill="currentColor" stroke="none"/>
+  <circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"/>
+  <circle cx="12" cy="17.75" r="1.6" fill="currentColor" stroke="none"/>
+  </g>
+</symbol><symbol id="ic_share" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <circle cx="6" cy="6.75" r="2.25"/>
+  <circle cx="6" cy="17.25" r="2.25"/>
+  <circle cx="17.75" cy="12" r="2.25"/>
+  <path d="M7.9 7.8 15.7 11.1"/>
+  <path d="M7.9 16.2 15.7 12.9"/>
+  </g>
+</symbol><symbol id="ic_undo" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M20.25 17.75v-2.5a5.25 5.25 0 0 0-5.25-5.25H5.75"/>
+  <path d="M9.5 5.75 5.5 10l4 4.25"/>
+  </g>
+</symbol><symbol id="ic_sort" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M7.5 4.75v14.5"/>
+  <path d="M4.25 16 7.5 19.25 10.75 16"/>
+  <path d="M16.5 19.25V4.75"/>
+  <path d="M13.25 8 16.5 4.75 19.75 8"/>
+  </g>
+</symbol><symbol id="ic_drag_handle" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M6.5 9.5h11"/>
+  <path d="M6.5 14.5h11"/>
+  </g>
+</symbol><symbol id="ic_scan" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M3.75 8.75V5.5a1.75 1.75 0 0 1 1.75-1.75h3.25"/>
+  <path d="M20.25 8.75V5.5a1.75 1.75 0 0 0-1.75-1.75h-3.25"/>
+  <path d="M3.75 15.25v3.25a1.75 1.75 0 0 0 1.75 1.75h3.25"/>
+  <path d="M20.25 15.25v3.25a1.75 1.75 0 0 1-1.75 1.75h-3.25"/>
+  <path d="M3.75 12h16.5"/>
+  </g>
+</symbol><symbol id="ic_status_success" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <circle cx="12" cy="12" r="8.5"/>
+  <path d="M8.25 12.25 10.75 14.75 15.75 9.5"/>
+  </g>
+</symbol><symbol id="ic_status_error" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <circle cx="12" cy="12" r="8.5"/>
+  <path d="M9.5 9.5 14.5 14.5"/>
+  <path d="M14.5 9.5 9.5 14.5"/>
+  </g>
+</symbol><symbol id="ic_status_warning" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M10.6 4.4 2.9 17.75a1.6 1.6 0 0 0 1.4 2.4h15.4a1.6 1.6 0 0 0 1.4-2.4L13.4 4.4a1.6 1.6 0 0 0-2.8 0z"/>
+  <path d="M12 9.75v3.75"/>
+  <circle cx="12" cy="17" r="1.05" fill="currentColor" stroke="none"/>
+  </g>
+</symbol><symbol id="ic_status_info" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <circle cx="12" cy="12" r="8.5"/>
+  <path d="M12 11.25v5"/>
+  <circle cx="12" cy="8.25" r="1.05" fill="currentColor" stroke="none"/>
+  </g>
+</symbol><symbol id="ic_lock" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <rect x="4.75" y="10.25" width="14.5" height="10" rx="2.5"/>
+  <path d="M8.25 10.25V7.75a3.75 3.75 0 0 1 7.5 0v2.5"/>
+  </g>
+</symbol><symbol id="ic_offline" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M6.75 17.5h10.5a3.75 3.75 0 0 0 .4-7.5 5.5 5.5 0 0 0-10.6-1.2 4.4 4.4 0 0 0-.3 8.7z"/>
+  <path d="M4.5 4.5 19.5 19.5"/>
+  </g>
+</symbol><symbol id="ic_empty" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <rect x="3" y="6.5" width="18" height="11" rx="2.75"/>
+  <path d="M3 12.5h4.75l1.25 2.25h6l1.25-2.25H21"/>
+  </g>
+</symbol><symbol id="ic_loading" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M12 3.75a8.25 8.25 0 1 0 8.25 8.25"/>
+  </g>
+</symbol><symbol id="ic_calendar" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <rect x="3.75" y="5.25" width="16.5" height="15" rx="2.75"/>
+  <path d="M3.75 10h16.5"/>
+  <path d="M8.25 3.5v3.5"/>
+  <path d="M15.75 3.5v3.5"/>
+  <circle cx="8.5" cy="14.25" r="1.35" fill="currentColor" stroke="none"/>
+  </g>
+</symbol><symbol id="ic_account" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <rect x="3.25" y="5.75" width="17.5" height="12.5" rx="2.75"/>
+  <path d="M3.25 10.25h17.5"/>
+  <path d="M6.75 14.75h3.5"/>
+  </g>
+</symbol><symbol id="ic_note" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <rect x="4.75" y="3.75" width="14.5" height="16.5" rx="2.5"/>
+  <path d="M8.25 8.75h7.5"/>
+  <path d="M8.25 12.5h7.5"/>
+  <path d="M8.25 16.25h4.25"/>
+  </g>
+</symbol><symbol id="ic_amount" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M8.25 5.5 12 11.25 15.75 5.5"/>
+  <path d="M12 11.25v7.25"/>
+  <path d="M8.75 13.5h6.5"/>
+  <path d="M8.75 16.25h6.5"/>
+  </g>
+</symbol><symbol id="ic_transfer" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M4.25 8.75h13.5"/>
+  <path d="M14.25 5.25 17.75 8.75l-3.5 3.5"/>
+  <path d="M19.75 15.25H6.25"/>
+  <path d="M9.75 11.75 6.25 15.25l3.5 3.5"/>
+  </g>
+</symbol><symbol id="ic_budget" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <circle cx="12" cy="12" r="8.25"/>
+  <circle cx="12" cy="12" r="3.5"/>
+  </g>
+</symbol><symbol id="ic_recurring" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M4.75 12a7.25 7.25 0 0 1 12.15-5.35"/>
+  <path d="M17.25 3.5v3.75h-3.75"/>
+  <path d="M19.25 12a7.25 7.25 0 0 1-12.15 5.35"/>
+  <path d="M6.75 20.5v-3.75h3.75"/>
+  </g>
+</symbol><symbol id="ic_export" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M12 15.25V4"/>
+  <path d="M8.25 7.5 12 3.75l3.75 3.75"/>
+  <path d="M4.5 13.5v4.5a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-4.5"/>
+  </g>
+</symbol><symbol id="ic_import" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M12 3.75V15"/>
+  <path d="M8.25 11.5 12 15.25l3.75-3.75"/>
+  <path d="M4.5 13.5v4.5a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-4.5"/>
+  </g>
+</symbol><symbol id="ic_attachment" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M19.75 10.5 10.9 19.35a5 5 0 0 1-7.07-7.07l8.6-8.6a3.35 3.35 0 0 1 4.74 4.74l-8.6 8.6a1.7 1.7 0 0 1-2.4-2.4l7.6-7.6"/>
+  </g>
+</symbol><symbol id="ic_goal" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M6 20.5V4.25"/>
+  <path d="M6 4.75h11.5l-2.25 3.75 2.25 3.75H6"/>
+  </g>
+</symbol><symbol id="ic_receipt" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M5.75 3.75h12.5v16.5l-2.5-1.75-2.5 1.75-2.5-1.75-2.5 1.75-2.5-1.75z"/>
+  <path d="M9.25 8.5h5.5"/>
+  <path d="M9.25 12.25h5.5"/>
+  </g>
+</symbol><symbol id="ic_chart_pie" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M12 3.5a8.5 8.5 0 1 0 8.5 8.5h-8.5z"/>
+  </g>
+</symbol><symbol id="ic_chart_bars" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M6.75 20.25V12"/>
+  <path d="M12 20.25V5.75"/>
+  <path d="M17.25 20.25V15.5"/>
+  </g>
+</symbol><symbol id="ic_chart_line" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M3.75 18.5 9 12l4 3.5 7.25-8.25"/>
+  </g>
+</symbol><symbol id="ic_trend_up" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M4 16.5 9.5 11l3.5 3.5L20 8"/>
+  <path d="M14.75 8H20v5.25"/>
+  </g>
+</symbol><symbol id="ic_trend_down" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M4 8 9.5 13.5l3.5-3.5L20 16.5"/>
+  <path d="M14.75 16.5H20V11.25"/>
+  </g>
+</symbol><symbol id="ic_settings" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M3.75 8.5h16.5"/>
+  <path d="M3.75 15.5h16.5"/>
+  <circle cx="9" cy="8.5" r="2.25"/>
+  <circle cx="15.5" cy="15.5" r="2.25"/>
+  </g>
+</symbol><symbol id="ic_bell" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M5.75 16.75 7 14.25V10.5a5 5 0 0 1 10 0v3.75l1.25 2.5z"/>
+  <path d="M10.25 19.75a2.25 2.25 0 0 0 3.5 0"/>
+  </g>
+</symbol><symbol id="ic_moon" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M20.25 14.75A8.75 8.75 0 0 1 9.25 3.75a8.75 8.75 0 1 0 11 11z"/>
+  </g>
+</symbol><symbol id="ic_sun" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <circle cx="12" cy="12" r="4.25"/>
+  <path d="M12 2.75v2.5"/>
+  <path d="M12 18.75v2.5"/>
+  <path d="M2.75 12h2.5"/>
+  <path d="M18.75 12h2.5"/>
+  <path d="M5.45 5.45 7.2 7.2"/>
+  <path d="M16.8 16.8l1.75 1.75"/>
+  <path d="M18.55 5.45 16.8 7.2"/>
+  <path d="M7.2 16.8 5.45 18.55"/>
+  </g>
+</symbol><symbol id="ic_palette" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <circle cx="12" cy="12" r="8.5"/>
+  <path d="M3.5 12h17"/>
+  <path d="M12 3.5v17"/>
+  </g>
+</symbol><symbol id="ic_font" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M3.5 19.25 8 5.25l4.5 14"/>
+  <path d="M5.1 15h5.8"/>
+  <path d="M16.25 19.25v-6.5a2.75 2.75 0 0 1 5.5 0v6.5"/>
+  <path d="M16.25 15.5h5.5"/>
+  </g>
+</symbol><symbol id="ic_volume" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M11 5.25 6.75 8.75H3.5v6.5h3.25L11 18.75z"/>
+  <path d="M14.75 9.25a4 4 0 0 1 0 5.5"/>
+  <path d="M17.5 6.5a8 8 0 0 1 0 11"/>
+  </g>
+</symbol><symbol id="ic_qr" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M3.75 8.25V5.5a1.75 1.75 0 0 1 1.75-1.75h2.75"/>
+  <path d="M20.25 8.25V5.5a1.75 1.75 0 0 0-1.75-1.75h-2.75"/>
+  <path d="M3.75 15.75v2.75a1.75 1.75 0 0 0 1.75 1.75h2.75"/>
+  <rect x="6.75" y="6.75" width="3.5" height="3.5" rx="1"/>
+  <rect x="13.75" y="6.75" width="3.5" height="3.5" rx="1"/>
+  <rect x="6.75" y="13.75" width="3.5" height="3.5" rx="1"/>
+  <path d="M13.75 17.5h4"/>
+  <path d="M17.5 13.75v4"/>
+  </g>
+</symbol><symbol id="ic_copy" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <rect x="8.25" y="8.25" width="12" height="12" rx="2.5"/>
+  <path d="M15.75 8.25V6.25a2.5 2.5 0 0 0-2.5-2.5H6.25a2.5 2.5 0 0 0-2.5 2.5v7a2.5 2.5 0 0 0 2.5 2.5h2"/>
+  </g>
+</symbol><symbol id="ic_star" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M12 3.75 14.6 9.05 20.5 9.9l-4.25 4.15 1 5.85L12 17.15l-5.25 2.75 1-5.85L3.5 9.9l5.9-.85z"/>
+  </g>
+</symbol><symbol id="ic_tag" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M11.75 3.75H5.5A1.75 1.75 0 0 0 3.75 5.5v6.25L13.5 21.5l7.25-7.25z"/>
+  <circle cx="7.75" cy="7.75" r="1.4" fill="currentColor" stroke="none"/>
+  </g>
+</symbol><symbol id="ic_shield" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M12 3.5 4.75 6.5v5.25c0 4.4 2.9 7.45 7.25 8.75 4.35-1.3 7.25-4.35 7.25-8.75V6.5z"/>
+  </g>
+</symbol><symbol id="ic_fingerprint" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M12 3.75a8.25 8.25 0 0 1 8.25 8.25"/>
+  <path d="M3.75 12A8.25 8.25 0 0 1 12 3.75"/>
+  <path d="M6.75 14.5a5.25 5.25 0 0 1 10.5-2.5"/>
+  <path d="M12 20.25c-2.6 0-4.85-1.6-5.75-3.9"/>
+  <path d="M14.25 20.1a8.25 8.25 0 0 0 2.9-2.35"/>
+  </g>
+</symbol><symbol id="ic_storage" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M4.25 6.5c0-1.5 3.5-2.75 7.75-2.75s7.75 1.25 7.75 2.75"/>
+  <path d="M4.25 6.5v11c0 1.5 3.5 2.75 7.75 2.75s7.75-1.25 7.75-2.75v-11"/>
+  <path d="M4.25 12c0 1.5 3.5 2.75 7.75 2.75s7.75-1.25 7.75-2.75"/>
+  </g>
+</symbol><symbol id="ic_image" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <rect x="3.75" y="4.75" width="16.5" height="14.5" rx="2.5"/>
+  <path d="M3.75 15.75 8.5 11l4.25 4.25 2.5-2.5 5.25 5.25"/>
+  <circle cx="8.75" cy="9.25" r="1.4" fill="currentColor" stroke="none"/>
+  </g>
+</symbol><symbol id="ic_camera" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M4 8.75h3l1.5-2.5h7l1.5 2.5h3a1.75 1.75 0 0 1 1.75 1.75v7A1.75 1.75 0 0 1 20 19.25H4a1.75 1.75 0 0 1-1.75-1.75v-7A1.75 1.75 0 0 1 4 8.75z"/>
+  <circle cx="12" cy="13.5" r="3.25"/>
+  </g>
+</symbol><symbol id="ic_eye" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M2.75 12S6.25 6.25 12 6.25 21.25 12 21.25 12 17.75 17.75 12 17.75 2.75 12 2.75 12z"/>
+  <circle cx="12" cy="12" r="3.25"/>
+  </g>
+</symbol><symbol id="ic_eye_off" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M9.75 6.6A8.6 8.6 0 0 1 12 6.25c5.75 0 9.25 5.75 9.25 5.75a17 17 0 0 1-3.1 3.6"/>
+  <path d="M6.35 8.4A17 17 0 0 0 2.75 12s3.5 5.75 9.25 5.75c1.15 0 2.2-.2 3.15-.55"/>
+  <path d="M10.1 10.1a2.7 2.7 0 0 0 3.8 3.8"/>
+  <path d="M4.5 4.5 19.5 19.5"/>
+  </g>
+</symbol><symbol id="ic_cloud" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M6.75 17.75h10.5a3.75 3.75 0 0 0 .4-7.5 5.5 5.5 0 0 0-10.6-1.2 4.4 4.4 0 0 0-.3 8.7z"/>
+  </g>
+</symbol><symbol id="ic_wallet" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <rect x="3.75" y="7.25" width="16.5" height="11.5" rx="3"/>
+  <path d="M3.75 11.25h16.5"/>
+  <circle cx="16.5" cy="14.75" r="1.35" fill="currentColor" stroke="none"/>
+  </g>
+</symbol><symbol id="ic_card" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <rect x="3.25" y="6.25" width="17.5" height="11.5" rx="2.5"/>
+  <path d="M3.25 10.25h17.5"/>
+  <path d="M6.5 14.25h4"/>
+  </g>
+</symbol><symbol id="ic_arrow_up_right" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M6.75 17.25 17.25 6.75"/>
+  <path d="M8.75 6.75h8.5v8.5"/>
+  </g>
+</symbol><symbol id="ic_arrow_down_left" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M17.25 6.75 6.75 17.25"/>
+  <path d="M15.25 17.25h-8.5v-8.5"/>
+  </g>
+</symbol><symbol id="ic_chevron_up" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M5.75 14.5 12 8.25 18.25 14.5"/>
+  </g>
+</symbol><symbol id="ic_circle_plus" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <circle cx="12" cy="12" r="8.5"/>
+  <path d="M12 8.25v7.5"/>
+  <path d="M8.25 12h7.5"/>
+  </g>
+</symbol><symbol id="ic_circle_minus" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <circle cx="12" cy="12" r="8.5"/>
+  <path d="M8.25 12h7.5"/>
+  </g>
+</symbol><symbol id="ic_play" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M8.25 5.25 18.75 12 8.25 18.75z"/>
+  </g>
+</symbol><symbol id="ic_list_check" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M3.75 7.25 5.75 9.25 9.75 5.25"/>
+  <path d="M13 7.25h7.75"/>
+  <path d="M13 12.25h7.75"/>
+  <path d="M3.75 17.25 5.75 19.25 9.75 15.25"/>
+  <path d="M13 17.25h7.75"/>
+  </g>
+</symbol><symbol id="ic_merge" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M6.75 4.5 12 9.75"/>
+  <path d="M17.25 4.5 12 9.75"/>
+  <path d="M12 9.75v9.75"/>
+  <path d="M9.75 17.25 12 19.5 14.25 17.25"/>
+  </g>
+</symbol><symbol id="ic_folder_plus" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M3.25 19.25V6.75a2 2 0 0 1 2-2h2.85a2 2 0 0 1 1.66.89l.48.72a2 2 0 0 0 1.66.89h6.85a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5.25a2 2 0 0 1-2-2z"/>
+  <path d="M12 10v4.5"/>
+  <path d="M9.75 12.25h4.5"/>
+  </g>
+</symbol><symbol id="ic_folder_move" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M3.25 19.25V6.75a2 2 0 0 1 2-2h2.85a2 2 0 0 1 1.66.89l.48.72a2 2 0 0 0 1.66.89h6.85a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5.25a2 2 0 0 1-2-2z"/>
+  <path d="M9.25 12.5h6.5"/>
+  <path d="M12.75 9.75 15.5 12.5l-2.75 2.75"/>
+  </g>
+</symbol><symbol id="ic_history" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+  <path d="M3 3v5h5"/>
+  <path d="M12 7v5l4 2"/>
+  </g>
+</symbol><symbol id="ic_mood" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <circle cx="12" cy="12" r="8.5"/>
+  <path d="M7.75 13.75a6 6 0 0 0 8.5 0"/>
+  <circle cx="9" cy="9.25" r="1.05" fill="currentColor" stroke="none"/>
+  <circle cx="15" cy="9.25" r="1.05" fill="currentColor" stroke="none"/>
+  </g>
+</symbol><symbol id="ic_gift" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <rect x="3" y="8" width="18" height="4" rx="1"/>
+  <path d="M12 8v13"/>
+  <path d="M19 12v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7"/>
+  <path d="M7.5 8a2.5 2.5 0 0 1 0-5A4.8 8 0 0 1 12 8a4.8 8 0 0 1 4.5-5 2.5 2.5 0 0 1 0 5"/>
+  </g>
+</symbol><symbol id="ic_trophy" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M7.5 3.75h9v5.5a4.5 4.5 0 0 1-9 0z"/>
+  <path d="M7.5 5.25H6a2.25 2.25 0 0 0 0 4.5h1.5"/>
+  <path d="M16.5 5.25H18a2.25 2.25 0 0 1 0 4.5h-1.5"/>
+  <path d="M12 13.75v5"/>
+  <path d="M8.75 18.75h6.5"/>
+  </g>
+</symbol><symbol id="ic_flame" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/>
+  </g>
+</symbol><symbol id="ic_celebration" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M4.25 19.75 10.25 8.25 15.75 13.75z"/>
+  <path d="M14.5 6.75 16.25 5"/>
+  <circle cx="18.25" cy="4.75" r="1.05" fill="currentColor" stroke="none"/>
+  <circle cx="19.75" cy="9" r="1.05" fill="currentColor" stroke="none"/>
+  </g>
+</symbol><symbol id="ic_cloud_upload" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M6.75 17.75h10.5a3.75 3.75 0 0 0 .4-7.5 5.5 5.5 0 0 0-10.6-1.2 4.4 4.4 0 0 0-.3 8.7z"/>
+  <path d="M12 15.5v-4.5"/>
+  <path d="M9.75 13.25 12 11l2.25 2.25"/>
+  </g>
+</symbol><symbol id="ic_cloud_download" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M6.75 17.75h10.5a3.75 3.75 0 0 0 .4-7.5 5.5 5.5 0 0 0-10.6-1.2 4.4 4.4 0 0 0-.3 8.7z"/>
+  <path d="M12 10.5v4.5"/>
+  <path d="M9.75 12.75 12 15l2.25-2.25"/>
+  </g>
+</symbol></svg>
+<div class="toolbar"><div class="tb-brand">素记 Plain · redesign-v3<small>Quiet Ledger</small></div><div class="tb-group"><span class="tb-lab">主题</span><div class="seg2"><button data-set="theme" data-val="subai" class="on">素白</button><button data-set="theme" data-val="qingci">青瓷</button></div></div><div class="tb-group"><span class="tb-lab">亮度</span><div class="seg2"><button data-set="mode" data-val="light" class="on">亮</button><button data-set="mode" data-val="dark">暗</button></div></div><div class="tb-group"><span class="tb-lab">语言</span><div class="seg2"><button data-set="lang" data-val="zh" class="on">中文</button><button data-set="lang" data-val="en">EN</button></div></div><div class="tb-group"><span class="tb-lab">字号</span><div class="seg2"><button data-set="size" data-val="standard" class="on">标准</button><button data-set="size" data-val="large">大</button><button data-set="size" data-val="xlarge">特大</button></div></div><div class="tb-group"><span class="tb-lab">视图</span><div class="seg2"><button data-set="view" data-val="grid" class="on">全部 8 屏</button><button data-set="view" data-val="single">单屏</button></div></div><div class="tb-group"><span class="tb-lab">跳屏</span><div class="screenpicker"><button data-screen="guide">引导</button><button data-screen="ledger">首页流水</button><button data-screen="add">记一笔</button><button data-screen="detail">账单详情</button><button data-screen="reports">报表</button><button data-screen="assets">资产</button><button data-screen="categories">分类管理</button><button data-screen="settings">我的/设置</button></div></div></div>
+<div class="stage">
+<section class="frame" data-screen="guide" data-lang="zh"><div class="flabel">引导 / Onboarding</div><div class="bezelless"><div class="screen page-guide"><div class="statusbar"><span class="sb-time">14:55</span><span class="sb-marks"><svg width="18" height="12" aria-hidden="true"><rect x="0" y="5" width="3" height="4" rx="1" fill="currentColor"/><rect x="5" y="3" width="3" height="6" rx="1" fill="currentColor"/><rect x="10" y="0" width="3" height="9" rx="1" fill="currentColor"/><rect x="15" y="-3" width="3" height="12" rx="1" fill="currentColor"/></svg><svg width="18" height="12" aria-hidden="true"><rect x="0.5" y="1.5" width="14" height="9" rx="3" fill="none" stroke="currentColor" opacity=".45"/><rect x="2.5" y="3.5" width="9" height="5" rx="1.5" fill="currentColor"/></svg></span></div>
+<div class="guide-top"><span class="wordmark">素记 Plain</span></div>
+<h2 class="guide-h">记账，三秒钟的事</h2>
+<p class="guide-p">本地存储 · 无广告 · 无理财</p>
+<div class="guide-hero">
+  <div class="hairline"></div>
+  <div class="hero-label">本月结余</div>
+  <div class="hero-amt"><span class="amt xl tone-ink"><span class="cur">¥</span><span class="int">12,480</span><span class="pnt">.</span><span class="dec">00</span></span></div>
+  <div class="hairline"></div>
+</div>
+<div class="featlist"><div class="feat"><svg width="22" height="22" aria-hidden="true"><use href="#ic_nav_add"/></svg><span class="fcol"><span class="ft">三秒记一笔</span><span class="fs">只记数字，不填表格</span></span></div><div class="feat"><svg width="22" height="22" aria-hidden="true"><use href="#ic_lock"/></svg><span class="fcol"><span class="ft">数据只在你手机里</span><span class="fs">没有账号，没有服务器</span></span></div><div class="feat"><svg width="22" height="22" aria-hidden="true"><use href="#ic_palette"/></svg><span class="fcol"><span class="ft">十套配色，昼夜两态</span><span class="fs">冷底暖点，久看不累</span></span></div></div>
+<div class="guide-foot">
+  <button class="btn primary" data-goto="ledger">开始记账</button>
+  <p class="foot-note">数据全部本地存储 · 卸载前请先备份</p>
+</div></div></div></section><section class="frame" data-screen="ledger" data-lang="zh"><div class="flabel">首页流水 / Home</div><div class="bezelless"><div class="screen"><div class="statusbar"><span class="sb-time">14:55</span><span class="sb-marks"><svg width="18" height="12" aria-hidden="true"><rect x="0" y="5" width="3" height="4" rx="1" fill="currentColor"/><rect x="5" y="3" width="3" height="6" rx="1" fill="currentColor"/><rect x="10" y="0" width="3" height="9" rx="1" fill="currentColor"/><rect x="15" y="-3" width="3" height="12" rx="1" fill="currentColor"/></svg><svg width="18" height="12" aria-hidden="true"><rect x="0.5" y="1.5" width="14" height="9" rx="3" fill="none" stroke="currentColor" opacity=".45"/><rect x="2.5" y="3.5" width="9" height="5" rx="1.5" fill="currentColor"/></svg></span></div>
+<header class="topbar">
+  <button class="iconbtn" data-goto="reports"><svg width="20" height="20" aria-hidden="true"><use href="#ic_calendar"/></svg></button>
+  <h1>2026年9月</h1>
+  <div class="tb-right">
+    <button class="iconbtn"><svg width="20" height="20" aria-hidden="true"><use href="#ic_search"/></svg></button>
+    <button class="iconbtn"><svg width="20" height="20" aria-hidden="true"><use href="#ic_more"/></svg></button>
+  </div>
+</header>
+<div class="scroll">
+  <section class="hero">
+    <div class="hairline"></div>
+    <div class="hero-label">本月结余</div>
+    <div class="hero-amt"><span class="amt xl tone-ink"><span class="cur">¥</span><span class="int">3,420</span><span class="pnt">.</span><span class="dec">50</span></span></div>
+    <div class="hero-split">
+      <div class="hs"><span class="hs-l">支出</span>
+        <span class="hs-v"><span class="amt s tone-ink"><span class="cur">¥</span><span class="int">5,879</span><span class="pnt">.</span><span class="dec">50</span></span></span></div>
+      <div class="hs"><span class="hs-l">收入</span>
+        <span class="hs-v"><span class="amt s tone-income"><span class="cur">¥</span>+<span class="int">9,300</span><span class="pnt">.</span><span class="dec">00</span></span></span></div>
+    </div>
+    <div class="hairline"></div>
+    <div class="month-note"><svg width="13" height="13" aria-hidden="true"><use href="#ic_calendar"/></svg><span>记账月起始：10 日</span></div>
+  </section>
+  <section class="grp"><div class="eyebrow">9月28日 周日</div><div class="panel"><a class="row" data-goto="detail"><span class="dot6" style="background:var(--cat-food)"></span><span class="rcol"><span class="rt">餐饮</span><span class="sub">午餐 · 公司楼下</span></span><span class="rw-amt tone-ink">32.00</span></a><a class="row" data-goto="detail"><span class="dot6" style="background:var(--cat-transport)"></span><span class="rcol"><span class="rt">交通</span><span class="sub">地铁 · 通勤</span></span><span class="rw-amt tone-ink">4.00</span></a></div></section>
+  <section class="grp"><div class="eyebrow">9月27日 周六</div><div class="panel"><a class="row" data-goto="detail"><span class="dot6" style="background:var(--cat-shopping)"></span><span class="rcol"><span class="rt">购物</span><span class="sub">日用品 · 超市</span></span><span class="rw-amt tone-ink">128.60</span></a><a class="row" data-goto="detail"><span class="dot6" style="background:var(--cat-social)"></span><span class="rcol"><span class="rt">人情</span><span class="sub">生日礼物</span></span><span class="rw-amt tone-ink">300.00</span></a></div></section>
+  <section class="grp"><div class="eyebrow">9月26日 周五</div><div class="panel"><a class="row" data-goto="detail"><span class="dot6" style="background:var(--cat-telecom)"></span><span class="rcol"><span class="rt">通讯</span><span class="sub">话费充值</span></span><span class="rw-amt tone-ink">50.00</span></a></div></section>
+  <div class="scroll-pad"></div>
+</div>
+<nav class="nav"><a class="navitem on" data-goto="ledger"><svg width="22" height="22" aria-hidden="true"><use href="#ic_nav_ledger"/></svg><span class="navlab">流水</span></a><a class="navitem" data-goto="reports"><svg width="22" height="22" aria-hidden="true"><use href="#ic_nav_report"/></svg><span class="navlab">报表</span></a><a class="navitem navcenter" data-goto="add"><span class="navfab"><svg width="22" height="22" aria-hidden="true"><use href="#ic_nav_add"/></svg></span></a><a class="navitem" data-goto="assets"><svg width="22" height="22" aria-hidden="true"><use href="#ic_nav_assets"/></svg><span class="navlab">资产</span></a><a class="navitem" data-goto="settings"><svg width="22" height="22" aria-hidden="true"><use href="#ic_nav_profile"/></svg><span class="navlab">我的</span></a></nav>
+</div></div></section><section class="frame" data-screen="add" data-lang="zh"><div class="flabel">记一笔 / Add</div><div class="bezelless"><div class="screen"><div class="statusbar"><span class="sb-time">14:55</span><span class="sb-marks"><svg width="18" height="12" aria-hidden="true"><rect x="0" y="5" width="3" height="4" rx="1" fill="currentColor"/><rect x="5" y="3" width="3" height="6" rx="1" fill="currentColor"/><rect x="10" y="0" width="3" height="9" rx="1" fill="currentColor"/><rect x="15" y="-3" width="3" height="12" rx="1" fill="currentColor"/></svg><svg width="18" height="12" aria-hidden="true"><rect x="0.5" y="1.5" width="14" height="9" rx="3" fill="none" stroke="currentColor" opacity=".45"/><rect x="2.5" y="3.5" width="9" height="5" rx="1.5" fill="currentColor"/></svg></span></div>
+<header class="topbar"><button class="iconbtn" data-back><svg width="22" height="22" aria-hidden="true"><use href="#ic_close"/></svg></button><h1 class="">记一笔</h1><div class="tb-right"></div></header>
+<div class="ttabs"><button class="ttab on">支出</button><button class="ttab">收入</button><button class="ttab">转账</button><button class="ttab">借出</button><button class="ttab">借入</button></div>
+<div class="amount-block">
+  <div class="expr">25<span class="caret"></span></div>
+  <div class="amt-line"><span class="amt input tone-ink"><span class="cur">¥</span><span class="int">25</span><span class="pnt">.</span><span class="dec">00</span></span></div>
+</div>
+<div class="addbody">
+  <div class="catgrid"><button class="tile on"><span style="color:var(--cat-ink-food);display:flex"><svg width="23" height="23" aria-hidden="true"><use href="#ic_cat_food"/></svg></span><span class="tile-n">餐饮</span></button><button class="tile"><span style="color:var(--cat-ink-fruit);display:flex"><svg width="23" height="23" aria-hidden="true"><use href="#ic_cat_grocery"/></svg></span><span class="tile-n">食材</span></button><button class="tile"><span style="color:var(--cat-ink-transport);display:flex"><svg width="23" height="23" aria-hidden="true"><use href="#ic_cat_transport"/></svg></span><span class="tile-n">交通</span></button><button class="tile"><span style="color:var(--cat-ink-shopping);display:flex"><svg width="23" height="23" aria-hidden="true"><use href="#ic_cat_shopping"/></svg></span><span class="tile-n">购物</span></button><button class="tile"><span style="color:var(--cat-ink-daily);display:flex"><svg width="23" height="23" aria-hidden="true"><use href="#ic_cat_daily"/></svg></span><span class="tile-n">日用</span></button><button class="tile"><span style="color:var(--cat-ink-housing);display:flex"><svg width="23" height="23" aria-hidden="true"><use href="#ic_cat_housing"/></svg></span><span class="tile-n">居住</span></button><button class="tile"><span style="color:var(--cat-ink-telecom);display:flex"><svg width="23" height="23" aria-hidden="true"><use href="#ic_cat_telecom"/></svg></span><span class="tile-n">通讯</span></button><button class="tile"><span style="color:var(--cat-ink-entertainment);display:flex"><svg width="23" height="23" aria-hidden="true"><use href="#ic_cat_entertainment"/></svg></span><span class="tile-n">娱乐</span></button><button class="tile"><span style="color:var(--cat-ink-medical);display:flex"><svg width="23" height="23" aria-hidden="true"><use href="#ic_cat_medical"/></svg></span><span class="tile-n">医疗</span></button><button class="tile"><span style="color:var(--cat-ink-study);display:flex"><svg width="23" height="23" aria-hidden="true"><use href="#ic_cat_study"/></svg></span><span class="tile-n">学习</span></button><button class="tile"><span style="color:var(--cat-ink-social);display:flex"><svg width="23" height="23" aria-hidden="true"><use href="#ic_cat_social"/></svg></span><span class="tile-n">人情</span></button><button class="tile"><span style="color:var(--cat-ink-other);display:flex"><svg width="23" height="23" aria-hidden="true"><use href="#ic_cat_other"/></svg></span><span class="tile-n">其他</span></button></div>
+  <div class="attrchips">
+    <button class="chip"><svg width="16" height="16" aria-hidden="true"><use href="#ic_account"/></svg>招行储蓄卡</button>
+    <button class="chip"><svg width="16" height="16" aria-hidden="true"><use href="#ic_calendar"/></svg>今天</button>
+    <button class="chip ph"><svg width="16" height="16" aria-hidden="true"><use href="#ic_note"/></svg>添加备注</button>
+  </div>
+</div>
+<div class="keypad"><button class="key">1</button><button class="key">2</button><button class="key">3</button><button class="key op"><svg width="22" height="22" aria-hidden="true"><use href="#ic_back"/></svg></button><button class="key">4</button><button class="key">5</button><button class="key">6</button><button class="key op"><svg width="19" height="19" aria-hidden="true"><use href="#ic_close"/></svg></button><button class="key">7</button><button class="key">8</button><button class="key">9</button><span class="key blank"></span><button class="key">.</button><button class="key">0</button><button class="key ok">保存</button></div>
+<div class="safearea"></div>
+</div></div></section><section class="frame" data-screen="detail" data-lang="zh"><div class="flabel">账单详情 / Detail</div><div class="bezelless"><div class="screen"><div class="statusbar"><span class="sb-time">14:55</span><span class="sb-marks"><svg width="18" height="12" aria-hidden="true"><rect x="0" y="5" width="3" height="4" rx="1" fill="currentColor"/><rect x="5" y="3" width="3" height="6" rx="1" fill="currentColor"/><rect x="10" y="0" width="3" height="9" rx="1" fill="currentColor"/><rect x="15" y="-3" width="3" height="12" rx="1" fill="currentColor"/></svg><svg width="18" height="12" aria-hidden="true"><rect x="0.5" y="1.5" width="14" height="9" rx="3" fill="none" stroke="currentColor" opacity=".45"/><rect x="2.5" y="3.5" width="9" height="5" rx="1.5" fill="currentColor"/></svg></span></div>
+<header class="topbar"><button class="iconbtn" data-back><svg width="22" height="22" aria-hidden="true"><use href="#ic_back"/></svg></button><h1 class="">账单详情</h1><div class="tb-right"><button class="textbtn">编辑</button></div></header>
+<div class="scroll">
+  <section class="detail-hero">
+    <div class="hero-label">金额</div>
+    <div class="hero-amt"><span class="amt xl tone-ink"><span class="cur">¥</span><span class="int">32</span><span class="pnt">.</span><span class="dec">00</span></span></div>
+    <div class="dh-meta"><span class="dot6" style="background:var(--cat-food)"></span>
+      <span>餐饮</span><span class="sep">·</span>
+      <span>招行储蓄卡</span></div>
+  </section>
+  <div class="panel detail-panel"><div class="drow"><span class="dk">分类</span><span class="dv"><span class="dot6" style="background:var(--cat-food)"></span>餐饮</span></div><div class="drow"><span class="dk">账户</span><span class="dv">招行储蓄卡</span></div><div class="drow"><span class="dk">日期</span><span class="dv">2026年9月28日 12:34</span></div><div class="drow"><span class="dk">备注</span><span class="dv note">公司楼下 · 工作日午餐</span></div><div class="drow"><span class="dk">来源</span><span class="dv">手动录入</span></div></div>
+  <div class="danger-zone">
+    <button class="btn2 danger"><svg width="18" height="18" aria-hidden="true"><use href="#ic_delete"/></svg><span>删除这笔账单</span></button>
+    <p class="foot-note">删除后可在回收站恢复（保留 30 天）</p>
+  </div>
+</div></div></div></section><section class="frame" data-screen="reports" data-lang="zh"><div class="flabel">报表 / Reports</div><div class="bezelless"><div class="screen"><div class="statusbar"><span class="sb-time">14:55</span><span class="sb-marks"><svg width="18" height="12" aria-hidden="true"><rect x="0" y="5" width="3" height="4" rx="1" fill="currentColor"/><rect x="5" y="3" width="3" height="6" rx="1" fill="currentColor"/><rect x="10" y="0" width="3" height="9" rx="1" fill="currentColor"/><rect x="15" y="-3" width="3" height="12" rx="1" fill="currentColor"/></svg><svg width="18" height="12" aria-hidden="true"><rect x="0.5" y="1.5" width="14" height="9" rx="3" fill="none" stroke="currentColor" opacity=".45"/><rect x="2.5" y="3.5" width="9" height="5" rx="1.5" fill="currentColor"/></svg></span></div>
+<header class="topbar">
+  <button class="iconbtn" data-goto="ledger"><svg width="20" height="20" aria-hidden="true"><use href="#ic_calendar"/></svg></button>
+  <h1>报表</h1>
+  <div class="tb-right">
+    <button class="iconbtn"><svg width="20" height="20" aria-hidden="true"><use href="#ic_filter"/></svg></button>
+    <button class="iconbtn"><svg width="20" height="20" aria-hidden="true"><use href="#ic_more"/></svg></button>
+  </div>
+</header>
+<div class="scroll">
+  <div class="month-note tight"><svg width="13" height="13" aria-hidden="true"><use href="#ic_calendar"/></svg><span>记账月起始：10 日</span>
+    <span class="dot-sep">·</span><span>共 45 笔</span></div>
+  <div class="panel cmppanel">
+    <div class="eyebrow">与上月对比</div>
+    <div class="crow"><span class="ck">支出</span><span class="cv"><span class="amt s tone-ink"><span class="cur">¥</span><span class="int">5,879</span><span class="pnt">.</span><span class="dec">50</span></span></span><span class="cd tone-up"><svg width="14" height="14" aria-hidden="true"><use href="#ic_trend_up"/></svg>12.4%</span></div><div class="crow"><span class="ck">收入</span><span class="cv tone-income"><span class="amt s tone-income"><span class="cur">¥</span>+<span class="int">9,300</span><span class="pnt">.</span><span class="dec">00</span></span></span><span class="cd tone-up"><svg width="14" height="14" aria-hidden="true"><use href="#ic_trend_up"/></svg>8.1%</span></div><div class="crow"><span class="ck">结余</span><span class="cv"><span class="amt s tone-ink"><span class="cur">¥</span><span class="int">3,420</span><span class="pnt">.</span><span class="dec">50</span></span></span><span class="cd tone-dn"><svg width="14" height="14" aria-hidden="true"><use href="#ic_trend_down"/></svg>6.2%</span></div>
+  </div>
+  <div class="panel chartpanel">
+    <div class="eyebrow">分类占比</div>
+    <div class="donut-wrap"><svg class="donut" width="136" height="136" viewBox="0 0 136 136"><g fill="none" stroke-width="13" stroke-linecap="butt"><circle class="dn-seg" cx="68.0" cy="68.0" r="52.0" style="stroke:var(--cat-food);stroke-dasharray:104.55 326.73;stroke-dashoffset:-0.00"/><circle class="dn-seg" cx="68.0" cy="68.0" r="52.0" style="stroke:var(--cat-shopping);stroke-dasharray:78.41 326.73;stroke-dashoffset:-104.55"/><circle class="dn-seg" cx="68.0" cy="68.0" r="52.0" style="stroke:var(--cat-other);stroke-dasharray:58.81 326.73;stroke-dashoffset:-182.97"/><circle class="dn-seg" cx="68.0" cy="68.0" r="52.0" style="stroke:var(--cat-transport);stroke-dasharray:45.74 326.73;stroke-dashoffset:-241.78"/><circle class="dn-seg" cx="68.0" cy="68.0" r="52.0" style="stroke:var(--cat-housing);stroke-dasharray:39.21 326.73;stroke-dashoffset:-287.52"/></g><text class="dn-c1" x="68.0" y="64.0" text-anchor="middle" style="font-size:18px"><tspan class="dn-cur">¥</tspan>5,879<tspan class="dn-pnt">.</tspan><tspan class="dn-dec">50</tspan></text><text class="dn-c2" x="68.0" y="84.0" text-anchor="middle">TOTAL</text></svg></div>
+    <div class="legend"><div class="lrow"><span class="dot8" style="background:var(--cat-food)"></span><span class="lname">餐饮</span><span class="lpct">32%</span><span class="lamt"><span class="amt s tone-ink"><span class="cur">¥</span><span class="int">1,881</span><span class="pnt">.</span><span class="dec">44</span></span></span></div><div class="lrow"><span class="dot8" style="background:var(--cat-shopping)"></span><span class="lname">购物</span><span class="lpct">24%</span><span class="lamt"><span class="amt s tone-ink"><span class="cur">¥</span><span class="int">1,411</span><span class="pnt">.</span><span class="dec">08</span></span></span></div><div class="lrow"><span class="dot8" style="background:var(--cat-other)"></span><span class="lname">其他</span><span class="lpct">18%</span><span class="lamt"><span class="amt s tone-ink"><span class="cur">¥</span><span class="int">1,058</span><span class="pnt">.</span><span class="dec">31</span></span></span></div><div class="lrow"><span class="dot8" style="background:var(--cat-transport)"></span><span class="lname">交通</span><span class="lpct">14%</span><span class="lamt"><span class="amt s tone-ink"><span class="cur">¥</span><span class="int">823</span><span class="pnt">.</span><span class="dec">13</span></span></span></div><div class="lrow"><span class="dot8" style="background:var(--cat-housing)"></span><span class="lname">居住</span><span class="lpct">12%</span><span class="lamt"><span class="amt s tone-ink"><span class="cur">¥</span><span class="int">705</span><span class="pnt">.</span><span class="dec">54</span></span></span></div></div>
+  </div>
+  <div class="panel chartpanel">
+    <div class="eyebrow">每日支出</div>
+    <svg class="bars" viewBox="0 0 274 72" preserveAspectRatio="none" width="100%" height="72"><line x1="0" y1="66.5" x2="274" y2="66.5" style="stroke:var(--line)"/><rect x="0" y="36.2" width="14" height="29.8" rx="3" style="fill:var(--bar-fill);opacity:0.62"/><rect x="20" y="42.4" width="14" height="23.6" rx="3" style="fill:var(--bar-fill);opacity:0.54"/><rect x="40" y="26.3" width="14" height="39.7" rx="3" style="fill:var(--bar-fill);opacity:0.75"/><rect x="60" y="45.5" width="14" height="20.5" rx="3" style="fill:var(--bar-fill);opacity:0.51"/><rect x="80" y="29.4" width="14" height="36.6" rx="3" style="fill:var(--bar-fill);opacity:0.71"/><rect x="100" y="17.4" width="14" height="48.6" rx="3" style="fill:var(--bar-fill);opacity:0.86"/><rect x="120" y="39.3" width="14" height="26.7" rx="3" style="fill:var(--bar-fill);opacity:0.58"/><rect x="140" y="47.6" width="14" height="18.4" rx="3" style="fill:var(--bar-fill);opacity:0.48"/><rect x="160" y="33.0" width="14" height="33.0" rx="3" style="fill:var(--bar-fill);opacity:0.66"/><rect x="180" y="23.7" width="14" height="42.3" rx="3" style="fill:var(--bar-fill);opacity:0.78"/><rect x="200" y="42.9" width="14" height="23.1" rx="3" style="fill:var(--bar-fill);opacity:0.54"/><rect x="220" y="11.2" width="14" height="54.8" rx="3" style="fill:var(--bar-fill);opacity:0.94"/><rect x="240" y="31.0" width="14" height="35.0" rx="3" style="fill:var(--bar-fill);opacity:0.69"/><rect x="260" y="40.3" width="14" height="25.7" rx="3" style="fill:var(--bar-fill);opacity:0.57"/></svg>
+  </div>
+  <div class="scroll-pad"></div>
+</div>
+<nav class="nav"><a class="navitem" data-goto="ledger"><svg width="22" height="22" aria-hidden="true"><use href="#ic_nav_ledger"/></svg><span class="navlab">流水</span></a><a class="navitem on" data-goto="reports"><svg width="22" height="22" aria-hidden="true"><use href="#ic_nav_report"/></svg><span class="navlab">报表</span></a><a class="navitem navcenter" data-goto="add"><span class="navfab"><svg width="22" height="22" aria-hidden="true"><use href="#ic_nav_add"/></svg></span></a><a class="navitem" data-goto="assets"><svg width="22" height="22" aria-hidden="true"><use href="#ic_nav_assets"/></svg><span class="navlab">资产</span></a><a class="navitem" data-goto="settings"><svg width="22" height="22" aria-hidden="true"><use href="#ic_nav_profile"/></svg><span class="navlab">我的</span></a></nav>
+</div></div></section><section class="frame" data-screen="assets" data-lang="zh"><div class="flabel">资产 / Assets</div><div class="bezelless"><div class="screen"><div class="statusbar"><span class="sb-time">14:55</span><span class="sb-marks"><svg width="18" height="12" aria-hidden="true"><rect x="0" y="5" width="3" height="4" rx="1" fill="currentColor"/><rect x="5" y="3" width="3" height="6" rx="1" fill="currentColor"/><rect x="10" y="0" width="3" height="9" rx="1" fill="currentColor"/><rect x="15" y="-3" width="3" height="12" rx="1" fill="currentColor"/></svg><svg width="18" height="12" aria-hidden="true"><rect x="0.5" y="1.5" width="14" height="9" rx="3" fill="none" stroke="currentColor" opacity=".45"/><rect x="2.5" y="3.5" width="9" height="5" rx="1.5" fill="currentColor"/></svg></span></div>
+<header class="topbar">
+  <button class="iconbtn ghost"><svg width="20" height="20" aria-hidden="true"><use href="#ic_shield"/></svg></button>
+  <h1>资产</h1>
+  <div class="tb-right"><button class="iconbtn"><svg width="20" height="20" aria-hidden="true"><use href="#ic_eye_off"/></svg></button></div>
+</header>
+<div class="scroll">
+  <section class="hero">
+    <div class="hairline"></div>
+    <div class="hero-label">净资产</div>
+    <div class="hero-amt"><span class="amt xl tone-ink"><span class="cur">¥</span><span class="int">86,420</span><span class="pnt">.</span><span class="dec">50</span></span></div>
+    <div class="hairline"></div>
+  </section>
+  <section class="grp"><div class="eyebrow">资产</div><div class="panel"><div class="row"><span class="ricos"><svg width="22" height="22" aria-hidden="true"><use href="#ic_card"/></svg></span><span class="rcol"><span class="rt">招行储蓄卡</span><span class="sub">储蓄卡 ····6217</span></span><span class="rw-amt tone-ink"><span class="amt s tone-ink"><span class="cur">¥</span><span class="int">52,180</span><span class="pnt">.</span><span class="dec">30</span></span></span><svg class="chev" width="16" height="16" aria-hidden="true"><use href="#ic_chevron_right"/></svg></div><div class="row"><span class="ricos"><svg width="22" height="22" aria-hidden="true"><use href="#ic_wallet"/></svg></span><span class="rcol"><span class="rt">微信零钱</span><span class="sub">现金</span></span><span class="rw-amt tone-ink"><span class="amt s tone-ink"><span class="cur">¥</span><span class="int">1,240</span><span class="pnt">.</span><span class="dec">20</span></span></span><svg class="chev" width="16" height="16" aria-hidden="true"><use href="#ic_chevron_right"/></svg></div><div class="row"><span class="ricos"><svg width="22" height="22" aria-hidden="true"><use href="#ic_chart_line"/></svg></span><span class="rcol"><span class="rt">指数基金</span><span class="sub">投资 · 3 只持仓</span></span><span class="rw-amt tone-ink"><span class="amt s tone-ink"><span class="cur">¥</span><span class="int">38,000</span><span class="pnt">.</span><span class="dec">00</span></span></span><svg class="chev" width="16" height="16" aria-hidden="true"><use href="#ic_chevron_right"/></svg></div></div></section>
+  <section class="grp"><div class="eyebrow">负债</div><div class="panel"><div class="row"><span class="ricos"><svg width="22" height="22" aria-hidden="true"><use href="#ic_receipt"/></svg></span><span class="rcol"><span class="rt">招行信用卡</span><span class="sub">信用卡 · 本期应还</span></span><span class="rw-amt tone-ink"><span class="amt s tone-ink"><span class="cur">¥</span>−<span class="int">5,000</span><span class="pnt">.</span><span class="dec">00</span></span></span><svg class="chev" width="16" height="16" aria-hidden="true"><use href="#ic_chevron_right"/></svg></div></div></section>
+  <div class="scroll-pad"></div>
+</div>
+<nav class="nav"><a class="navitem" data-goto="ledger"><svg width="22" height="22" aria-hidden="true"><use href="#ic_nav_ledger"/></svg><span class="navlab">流水</span></a><a class="navitem" data-goto="reports"><svg width="22" height="22" aria-hidden="true"><use href="#ic_nav_report"/></svg><span class="navlab">报表</span></a><a class="navitem navcenter" data-goto="add"><span class="navfab"><svg width="22" height="22" aria-hidden="true"><use href="#ic_nav_add"/></svg></span></a><a class="navitem on" data-goto="assets"><svg width="22" height="22" aria-hidden="true"><use href="#ic_nav_assets"/></svg><span class="navlab">资产</span></a><a class="navitem" data-goto="settings"><svg width="22" height="22" aria-hidden="true"><use href="#ic_nav_profile"/></svg><span class="navlab">我的</span></a></nav>
+</div></div></section><section class="frame" data-screen="categories" data-lang="zh"><div class="flabel">分类管理 / Categories</div><div class="bezelless"><div class="screen"><div class="statusbar"><span class="sb-time">14:55</span><span class="sb-marks"><svg width="18" height="12" aria-hidden="true"><rect x="0" y="5" width="3" height="4" rx="1" fill="currentColor"/><rect x="5" y="3" width="3" height="6" rx="1" fill="currentColor"/><rect x="10" y="0" width="3" height="9" rx="1" fill="currentColor"/><rect x="15" y="-3" width="3" height="12" rx="1" fill="currentColor"/></svg><svg width="18" height="12" aria-hidden="true"><rect x="0.5" y="1.5" width="14" height="9" rx="3" fill="none" stroke="currentColor" opacity=".45"/><rect x="2.5" y="3.5" width="9" height="5" rx="1.5" fill="currentColor"/></svg></span></div>
+<header class="topbar">
+  <button class="iconbtn" data-back><svg width="22" height="22" aria-hidden="true"><use href="#ic_back"/></svg></button>
+  <h1>分类管理</h1>
+  <div class="tb-right"><button class="iconbtn"><svg width="20" height="20" aria-hidden="true"><use href="#ic_plus"/></svg></button></div>
+</header>
+<div class="segwrap"><div class="seg">
+  <button class="segi on">支出</button>
+  <button class="segi">收入</button>
+</div></div>
+<div class="scroll"><div class="panel catpanel"><div class="crow2"><span class="cicon" style="color:var(--cat-ink-food)"><svg width="24" height="24" aria-hidden="true"><use href="#ic_cat_food"/></svg></span><span class="rcol"><span class="rt">餐饮</span><span class="sub">三餐、外卖、堂食</span></span><span class="cnt">128 笔</span><svg class="drag" width="18" height="18" aria-hidden="true"><use href="#ic_drag_handle"/></svg></div><div class="crow2"><span class="cicon" style="color:var(--cat-ink-fruit)"><svg width="24" height="24" aria-hidden="true"><use href="#ic_cat_grocery"/></svg></span><span class="rcol"><span class="rt">食材</span><span class="sub">买菜、生鲜、米面粮油</span></span><span class="cnt">46 笔</span><svg class="drag" width="18" height="18" aria-hidden="true"><use href="#ic_drag_handle"/></svg></div><div class="crow2"><span class="cicon" style="color:var(--cat-ink-shopping)"><svg width="24" height="24" aria-hidden="true"><use href="#ic_cat_shopping"/></svg></span><span class="rcol"><span class="rt">购物</span><span class="sub">服饰、数码、家居</span></span><span class="cnt">33 笔</span><svg class="drag" width="18" height="18" aria-hidden="true"><use href="#ic_drag_handle"/></svg></div><div class="crow2"><span class="cicon" style="color:var(--cat-ink-daily)"><svg width="24" height="24" aria-hidden="true"><use href="#ic_cat_daily"/></svg></span><span class="rcol"><span class="rt">日用</span><span class="sub">洗护、纸品、清洁</span></span><span class="cnt">61 笔</span><svg class="drag" width="18" height="18" aria-hidden="true"><use href="#ic_drag_handle"/></svg></div><div class="crow2"><span class="cicon" style="color:var(--cat-ink-transport)"><svg width="24" height="24" aria-hidden="true"><use href="#ic_cat_transport"/></svg></span><span class="rcol"><span class="rt">交通</span><span class="sub">通勤、打车、加油</span></span><span class="cnt">88 笔</span><svg class="drag" width="18" height="18" aria-hidden="true"><use href="#ic_drag_handle"/></svg></div><div class="crow2"><span class="cicon" style="color:var(--cat-ink-housing)"><svg width="24" height="24" aria-hidden="true"><use href="#ic_cat_housing"/></svg></span><span class="rcol"><span class="rt">居住</span><span class="sub">房租、房贷、水电</span></span><span class="cnt">6 笔</span><svg class="drag" width="18" height="18" aria-hidden="true"><use href="#ic_drag_handle"/></svg></div><div class="crow2"><span class="cicon" style="color:var(--cat-ink-telecom)"><svg width="24" height="24" aria-hidden="true"><use href="#ic_cat_telecom"/></svg></span><span class="rcol"><span class="rt">通讯</span><span class="sub">话费、宽带、会员</span></span><span class="cnt">4 笔</span><svg class="drag" width="18" height="18" aria-hidden="true"><use href="#ic_drag_handle"/></svg></div><div class="crow2"><span class="cicon" style="color:var(--cat-ink-entertainment)"><svg width="24" height="24" aria-hidden="true"><use href="#ic_cat_entertainment"/></svg></span><span class="rcol"><span class="rt">娱乐</span><span class="sub">影视、游戏、演出</span></span><span class="cnt">12 笔</span><svg class="drag" width="18" height="18" aria-hidden="true"><use href="#ic_drag_handle"/></svg></div><div class="crow2"><span class="cicon" style="color:var(--cat-ink-medical)"><svg width="24" height="24" aria-hidden="true"><use href="#ic_cat_medical"/></svg></span><span class="rcol"><span class="rt">医疗</span><span class="sub">门诊、药品、体检</span></span><span class="cnt">3 笔</span><svg class="drag" width="18" height="18" aria-hidden="true"><use href="#ic_drag_handle"/></svg></div><div class="crow2"><span class="cicon" style="color:var(--cat-ink-study)"><svg width="24" height="24" aria-hidden="true"><use href="#ic_cat_study"/></svg></span><span class="rcol"><span class="rt">学习</span><span class="sub">书籍、课程、考试</span></span><span class="cnt">7 笔</span><svg class="drag" width="18" height="18" aria-hidden="true"><use href="#ic_drag_handle"/></svg></div><div class="crow2"><span class="cicon" style="color:var(--cat-ink-social)"><svg width="24" height="24" aria-hidden="true"><use href="#ic_cat_social"/></svg></span><span class="rcol"><span class="rt">人情</span><span class="sub">红包、礼物、请客</span></span><span class="cnt">9 笔</span><svg class="drag" width="18" height="18" aria-hidden="true"><use href="#ic_drag_handle"/></svg></div><div class="crow2"><span class="cicon" style="color:var(--cat-ink-other)"><svg width="24" height="24" aria-hidden="true"><use href="#ic_cat_other"/></svg></span><span class="rcol"><span class="rt">其他</span><span class="sub">未归类的支出</span></span><span class="cnt">2 笔</span><svg class="drag" width="18" height="18" aria-hidden="true"><use href="#ic_drag_handle"/></svg></div></div>
+  <div class="scroll-pad"></div></div>
+<div class="footbar"><button class="btn2 wide"><svg width="18" height="18" aria-hidden="true"><use href="#ic_plus"/></svg><span>新建分类</span></button>
+<div class="safearea"></div></div>
+</div></div></section><section class="frame" data-screen="settings" data-lang="zh"><div class="flabel">我的/设置 / Me</div><div class="bezelless"><div class="screen"><div class="statusbar"><span class="sb-time">14:55</span><span class="sb-marks"><svg width="18" height="12" aria-hidden="true"><rect x="0" y="5" width="3" height="4" rx="1" fill="currentColor"/><rect x="5" y="3" width="3" height="6" rx="1" fill="currentColor"/><rect x="10" y="0" width="3" height="9" rx="1" fill="currentColor"/><rect x="15" y="-3" width="3" height="12" rx="1" fill="currentColor"/></svg><svg width="18" height="12" aria-hidden="true"><rect x="0.5" y="1.5" width="14" height="9" rx="3" fill="none" stroke="currentColor" opacity=".45"/><rect x="2.5" y="3.5" width="9" height="5" rx="1.5" fill="currentColor"/></svg></span></div>
+<header class="topbar"><button class="iconbtn ghost"><svg width="20" height="20" aria-hidden="true"><use href="#ic_nav_profile"/></svg></button>
+  <h1>我的</h1><div class="tb-right"></div></header>
+<div class="scroll">
+  <div class="privacy-strip"><svg width="18" height="18" aria-hidden="true"><use href="#ic_shield"/></svg>
+    <span class="pcol"><span class="pt">隐私承诺</span>
+    <span class="ps">无广告、无外联、无埋点上报</span></span></div>
+  <section class="grp"><div class="eyebrow">记账</div><div class="panel"><div class="row srow"><span class="rcol"><span class="rt">月起始日</span></span><span class="sval">10 日</span><svg class="chev" width="16" height="16" aria-hidden="true"><use href="#ic_chevron_right"/></svg></div><div class="row srow"><span class="rcol"><span class="rt">字体大小</span></span><span class="sval">标准</span><svg class="chev" width="16" height="16" aria-hidden="true"><use href="#ic_chevron_right"/></svg></div><div class="row srow"><span class="rcol"><span class="rt">记账确认音效</span></span><span class="switch"><span class="knob"></span></span></div><div class="row srow"><span class="rcol"><span class="rt">保存后停留在记账页</span></span><span class="switch on"><span class="knob"></span></span></div></div></section>
+  <section class="grp"><div class="eyebrow">安全</div><div class="panel"><div class="row srow"><span class="rcol"><span class="rt">应用锁</span></span><span class="switch"><span class="knob"></span></span></div><div class="row srow"><span class="rcol"><span class="rt">隐藏金额</span></span><span class="switch"><span class="knob"></span></span></div></div></section>
+  <section class="grp"><div class="eyebrow">外观</div><div class="panel"><div class="row srow"><span class="rcol"><span class="rt">主题</span></span><span class="sval">素白</span><svg class="chev" width="16" height="16" aria-hidden="true"><use href="#ic_chevron_right"/></svg></div><div class="row srow"><span class="rcol"><span class="rt">外观模式</span></span><span class="sval">跟随系统</span><svg class="chev" width="16" height="16" aria-hidden="true"><use href="#ic_chevron_right"/></svg></div></div></section>
+  <section class="grp"><div class="eyebrow">数据</div><div class="panel"><div class="row srow"><svg class="sicon" width="20" height="20" aria-hidden="true"><use href="#ic_cloud"/></svg><span class="rcol"><span class="rt">备份与恢复</span></span><svg class="chev" width="16" height="16" aria-hidden="true"><use href="#ic_chevron_right"/></svg></div><div class="row srow"><svg class="sicon" width="20" height="20" aria-hidden="true"><use href="#ic_import"/></svg><span class="rcol"><span class="rt">批量导入</span></span><svg class="chev" width="16" height="16" aria-hidden="true"><use href="#ic_chevron_right"/></svg></div></div></section>
+  <section class="grp"><div class="eyebrow">关于</div><div class="panel"><div class="row srow"><svg class="sicon" width="20" height="20" aria-hidden="true"><use href="#ic_shield"/></svg><span class="rcol"><span class="rt">隐私承诺</span></span><svg class="chev" width="16" height="16" aria-hidden="true"><use href="#ic_chevron_right"/></svg></div><div class="row srow"><span class="rcol"><span class="rt">版本</span></span><span class="sval">V1.0.0</span><svg class="chev" width="16" height="16" aria-hidden="true"><use href="#ic_chevron_right"/></svg></div></div></section>
+  <div class="scroll-pad"></div>
+</div>
+<nav class="nav"><a class="navitem" data-goto="ledger"><svg width="22" height="22" aria-hidden="true"><use href="#ic_nav_ledger"/></svg><span class="navlab">流水</span></a><a class="navitem" data-goto="reports"><svg width="22" height="22" aria-hidden="true"><use href="#ic_nav_report"/></svg><span class="navlab">报表</span></a><a class="navitem navcenter" data-goto="add"><span class="navfab"><svg width="22" height="22" aria-hidden="true"><use href="#ic_nav_add"/></svg></span></a><a class="navitem" data-goto="assets"><svg width="22" height="22" aria-hidden="true"><use href="#ic_nav_assets"/></svg><span class="navlab">资产</span></a><a class="navitem on" data-goto="settings"><svg width="22" height="22" aria-hidden="true"><use href="#ic_nav_profile"/></svg><span class="navlab">我的</span></a></nav>
+</div></div></section>
+<section class="frame" data-screen="guide" data-lang="en"><div class="flabel">引导 / Onboarding</div><div class="bezelless"><div class="screen page-guide"><div class="statusbar"><span class="sb-time">14:55</span><span class="sb-marks"><svg width="18" height="12" aria-hidden="true"><rect x="0" y="5" width="3" height="4" rx="1" fill="currentColor"/><rect x="5" y="3" width="3" height="6" rx="1" fill="currentColor"/><rect x="10" y="0" width="3" height="9" rx="1" fill="currentColor"/><rect x="15" y="-3" width="3" height="12" rx="1" fill="currentColor"/></svg><svg width="18" height="12" aria-hidden="true"><rect x="0.5" y="1.5" width="14" height="9" rx="3" fill="none" stroke="currentColor" opacity=".45"/><rect x="2.5" y="3.5" width="9" height="5" rx="1.5" fill="currentColor"/></svg></span></div>
+<div class="guide-top"><span class="wordmark">Plain</span></div>
+<h2 class="guide-h">Log it in three seconds.</h2>
+<p class="guide-p">Local only · No ads · No investing</p>
+<div class="guide-hero">
+  <div class="hairline"></div>
+  <div class="hero-label">Balance this month</div>
+  <div class="hero-amt"><span class="amt xl tone-ink"><span class="cur">¥</span><span class="int">12,480</span><span class="pnt">.</span><span class="dec">00</span></span></div>
+  <div class="hairline"></div>
+</div>
+<div class="featlist"><div class="feat"><svg width="22" height="22" aria-hidden="true"><use href="#ic_nav_add"/></svg><span class="fcol"><span class="ft">Three-second entry</span><span class="fs">Just the number, no forms</span></span></div><div class="feat"><svg width="22" height="22" aria-hidden="true"><use href="#ic_lock"/></svg><span class="fcol"><span class="ft">Data stays on your phone</span><span class="fs">No account, no server</span></span></div><div class="feat"><svg width="22" height="22" aria-hidden="true"><use href="#ic_palette"/></svg><span class="fcol"><span class="ft">Ten palettes, day and night</span><span class="fs">Cool base, warm accents</span></span></div></div>
+<div class="guide-foot">
+  <button class="btn primary" data-goto="ledger">Start tracking</button>
+  <p class="foot-note">Stored locally · Back up before uninstalling</p>
+</div></div></div></section><section class="frame" data-screen="ledger" data-lang="en"><div class="flabel">首页流水 / Home</div><div class="bezelless"><div class="screen"><div class="statusbar"><span class="sb-time">14:55</span><span class="sb-marks"><svg width="18" height="12" aria-hidden="true"><rect x="0" y="5" width="3" height="4" rx="1" fill="currentColor"/><rect x="5" y="3" width="3" height="6" rx="1" fill="currentColor"/><rect x="10" y="0" width="3" height="9" rx="1" fill="currentColor"/><rect x="15" y="-3" width="3" height="12" rx="1" fill="currentColor"/></svg><svg width="18" height="12" aria-hidden="true"><rect x="0.5" y="1.5" width="14" height="9" rx="3" fill="none" stroke="currentColor" opacity=".45"/><rect x="2.5" y="3.5" width="9" height="5" rx="1.5" fill="currentColor"/></svg></span></div>
+<header class="topbar">
+  <button class="iconbtn" data-goto="reports"><svg width="20" height="20" aria-hidden="true"><use href="#ic_calendar"/></svg></button>
+  <h1>Sep 2026</h1>
+  <div class="tb-right">
+    <button class="iconbtn"><svg width="20" height="20" aria-hidden="true"><use href="#ic_search"/></svg></button>
+    <button class="iconbtn"><svg width="20" height="20" aria-hidden="true"><use href="#ic_more"/></svg></button>
+  </div>
+</header>
+<div class="scroll">
+  <section class="hero">
+    <div class="hairline"></div>
+    <div class="hero-label">Balance this month</div>
+    <div class="hero-amt"><span class="amt xl tone-ink"><span class="cur">¥</span><span class="int">3,420</span><span class="pnt">.</span><span class="dec">50</span></span></div>
+    <div class="hero-split">
+      <div class="hs"><span class="hs-l">Spent</span>
+        <span class="hs-v"><span class="amt s tone-ink"><span class="cur">¥</span><span class="int">5,879</span><span class="pnt">.</span><span class="dec">50</span></span></span></div>
+      <div class="hs"><span class="hs-l">Received</span>
+        <span class="hs-v"><span class="amt s tone-income"><span class="cur">¥</span>+<span class="int">9,300</span><span class="pnt">.</span><span class="dec">00</span></span></span></div>
+    </div>
+    <div class="hairline"></div>
+    <div class="month-note"><svg width="13" height="13" aria-hidden="true"><use href="#ic_calendar"/></svg><span>Month starts on day 10</span></div>
+  </section>
+  <section class="grp"><div class="eyebrow">Sun, Sep 28</div><div class="panel"><a class="row" data-goto="detail"><span class="dot6" style="background:var(--cat-food)"></span><span class="rcol"><span class="rt">Dining</span><span class="sub">Lunch · Near the office</span></span><span class="rw-amt tone-ink">32.00</span></a><a class="row" data-goto="detail"><span class="dot6" style="background:var(--cat-transport)"></span><span class="rcol"><span class="rt">Transport</span><span class="sub">Metro · Commute</span></span><span class="rw-amt tone-ink">4.00</span></a></div></section>
+  <section class="grp"><div class="eyebrow">Sat, Sep 27</div><div class="panel"><a class="row" data-goto="detail"><span class="dot6" style="background:var(--cat-shopping)"></span><span class="rcol"><span class="rt">Shopping</span><span class="sub">Household · Supermarket</span></span><span class="rw-amt tone-ink">128.60</span></a><a class="row" data-goto="detail"><span class="dot6" style="background:var(--cat-social)"></span><span class="rcol"><span class="rt">Social</span><span class="sub">Birthday gift</span></span><span class="rw-amt tone-ink">300.00</span></a></div></section>
+  <section class="grp"><div class="eyebrow">Fri, Sep 26</div><div class="panel"><a class="row" data-goto="detail"><span class="dot6" style="background:var(--cat-telecom)"></span><span class="rcol"><span class="rt">Telecom</span><span class="sub">Phone bill top-up</span></span><span class="rw-amt tone-ink">50.00</span></a></div></section>
+  <div class="scroll-pad"></div>
+</div>
+<nav class="nav"><a class="navitem on" data-goto="ledger"><svg width="22" height="22" aria-hidden="true"><use href="#ic_nav_ledger"/></svg><span class="navlab">Ledger</span></a><a class="navitem" data-goto="reports"><svg width="22" height="22" aria-hidden="true"><use href="#ic_nav_report"/></svg><span class="navlab">Reports</span></a><a class="navitem navcenter" data-goto="add"><span class="navfab"><svg width="22" height="22" aria-hidden="true"><use href="#ic_nav_add"/></svg></span></a><a class="navitem" data-goto="assets"><svg width="22" height="22" aria-hidden="true"><use href="#ic_nav_assets"/></svg><span class="navlab">Assets</span></a><a class="navitem" data-goto="settings"><svg width="22" height="22" aria-hidden="true"><use href="#ic_nav_profile"/></svg><span class="navlab">Me</span></a></nav>
+</div></div></section><section class="frame" data-screen="add" data-lang="en"><div class="flabel">记一笔 / Add</div><div class="bezelless"><div class="screen"><div class="statusbar"><span class="sb-time">14:55</span><span class="sb-marks"><svg width="18" height="12" aria-hidden="true"><rect x="0" y="5" width="3" height="4" rx="1" fill="currentColor"/><rect x="5" y="3" width="3" height="6" rx="1" fill="currentColor"/><rect x="10" y="0" width="3" height="9" rx="1" fill="currentColor"/><rect x="15" y="-3" width="3" height="12" rx="1" fill="currentColor"/></svg><svg width="18" height="12" aria-hidden="true"><rect x="0.5" y="1.5" width="14" height="9" rx="3" fill="none" stroke="currentColor" opacity=".45"/><rect x="2.5" y="3.5" width="9" height="5" rx="1.5" fill="currentColor"/></svg></span></div>
+<header class="topbar"><button class="iconbtn" data-back><svg width="22" height="22" aria-hidden="true"><use href="#ic_close"/></svg></button><h1 class="">Add expense</h1><div class="tb-right"></div></header>
+<div class="ttabs"><button class="ttab on">Expense</button><button class="ttab">Income</button><button class="ttab">Transfer</button><button class="ttab">Lend</button><button class="ttab">Borrow</button></div>
+<div class="amount-block">
+  <div class="expr">25<span class="caret"></span></div>
+  <div class="amt-line"><span class="amt input tone-ink"><span class="cur">¥</span><span class="int">25</span><span class="pnt">.</span><span class="dec">00</span></span></div>
+</div>
+<div class="addbody">
+  <div class="catgrid"><button class="tile on"><span style="color:var(--cat-ink-food);display:flex"><svg width="23" height="23" aria-hidden="true"><use href="#ic_cat_food"/></svg></span><span class="tile-n">Dining</span></button><button class="tile"><span style="color:var(--cat-ink-fruit);display:flex"><svg width="23" height="23" aria-hidden="true"><use href="#ic_cat_grocery"/></svg></span><span class="tile-n">Groceries</span></button><button class="tile"><span style="color:var(--cat-ink-transport);display:flex"><svg width="23" height="23" aria-hidden="true"><use href="#ic_cat_transport"/></svg></span><span class="tile-n">Transport</span></button><button class="tile"><span style="color:var(--cat-ink-shopping);display:flex"><svg width="23" height="23" aria-hidden="true"><use href="#ic_cat_shopping"/></svg></span><span class="tile-n">Shopping</span></button><button class="tile"><span style="color:var(--cat-ink-daily);display:flex"><svg width="23" height="23" aria-hidden="true"><use href="#ic_cat_daily"/></svg></span><span class="tile-n">Household</span></button><button class="tile"><span style="color:var(--cat-ink-housing);display:flex"><svg width="23" height="23" aria-hidden="true"><use href="#ic_cat_housing"/></svg></span><span class="tile-n">Housing</span></button><button class="tile"><span style="color:var(--cat-ink-telecom);display:flex"><svg width="23" height="23" aria-hidden="true"><use href="#ic_cat_telecom"/></svg></span><span class="tile-n">Telecom</span></button><button class="tile"><span style="color:var(--cat-ink-entertainment);display:flex"><svg width="23" height="23" aria-hidden="true"><use href="#ic_cat_entertainment"/></svg></span><span class="tile-n">Fun</span></button><button class="tile"><span style="color:var(--cat-ink-medical);display:flex"><svg width="23" height="23" aria-hidden="true"><use href="#ic_cat_medical"/></svg></span><span class="tile-n">Health</span></button><button class="tile"><span style="color:var(--cat-ink-study);display:flex"><svg width="23" height="23" aria-hidden="true"><use href="#ic_cat_study"/></svg></span><span class="tile-n">Learning</span></button><button class="tile"><span style="color:var(--cat-ink-social);display:flex"><svg width="23" height="23" aria-hidden="true"><use href="#ic_cat_social"/></svg></span><span class="tile-n">Social</span></button><button class="tile"><span style="color:var(--cat-ink-other);display:flex"><svg width="23" height="23" aria-hidden="true"><use href="#ic_cat_other"/></svg></span><span class="tile-n">Other</span></button></div>
+  <div class="attrchips">
+    <button class="chip"><svg width="16" height="16" aria-hidden="true"><use href="#ic_account"/></svg>CMB Savings</button>
+    <button class="chip"><svg width="16" height="16" aria-hidden="true"><use href="#ic_calendar"/></svg>Today</button>
+    <button class="chip ph"><svg width="16" height="16" aria-hidden="true"><use href="#ic_note"/></svg>Add note</button>
+  </div>
+</div>
+<div class="keypad"><button class="key">1</button><button class="key">2</button><button class="key">3</button><button class="key op"><svg width="22" height="22" aria-hidden="true"><use href="#ic_back"/></svg></button><button class="key">4</button><button class="key">5</button><button class="key">6</button><button class="key op"><svg width="19" height="19" aria-hidden="true"><use href="#ic_close"/></svg></button><button class="key">7</button><button class="key">8</button><button class="key">9</button><span class="key blank"></span><button class="key">.</button><button class="key">0</button><button class="key ok">Save</button></div>
+<div class="safearea"></div>
+</div></div></section><section class="frame" data-screen="detail" data-lang="en"><div class="flabel">账单详情 / Detail</div><div class="bezelless"><div class="screen"><div class="statusbar"><span class="sb-time">14:55</span><span class="sb-marks"><svg width="18" height="12" aria-hidden="true"><rect x="0" y="5" width="3" height="4" rx="1" fill="currentColor"/><rect x="5" y="3" width="3" height="6" rx="1" fill="currentColor"/><rect x="10" y="0" width="3" height="9" rx="1" fill="currentColor"/><rect x="15" y="-3" width="3" height="12" rx="1" fill="currentColor"/></svg><svg width="18" height="12" aria-hidden="true"><rect x="0.5" y="1.5" width="14" height="9" rx="3" fill="none" stroke="currentColor" opacity=".45"/><rect x="2.5" y="3.5" width="9" height="5" rx="1.5" fill="currentColor"/></svg></span></div>
+<header class="topbar"><button class="iconbtn" data-back><svg width="22" height="22" aria-hidden="true"><use href="#ic_back"/></svg></button><h1 class="">Entry detail</h1><div class="tb-right"><button class="textbtn">Edit</button></div></header>
+<div class="scroll">
+  <section class="detail-hero">
+    <div class="hero-label">Amount</div>
+    <div class="hero-amt"><span class="amt xl tone-ink"><span class="cur">¥</span><span class="int">32</span><span class="pnt">.</span><span class="dec">00</span></span></div>
+    <div class="dh-meta"><span class="dot6" style="background:var(--cat-food)"></span>
+      <span>Dining</span><span class="sep">·</span>
+      <span>CMB Savings</span></div>
+  </section>
+  <div class="panel detail-panel"><div class="drow"><span class="dk">Category</span><span class="dv"><span class="dot6" style="background:var(--cat-food)"></span>Dining</span></div><div class="drow"><span class="dk">Account</span><span class="dv">CMB Savings</span></div><div class="drow"><span class="dk">Date</span><span class="dv">Sep 28, 2026 12:34</span></div><div class="drow"><span class="dk">Note</span><span class="dv note">Near the office · Weekday lunch</span></div><div class="drow"><span class="dk">Source</span><span class="dv">Manual entry</span></div></div>
+  <div class="danger-zone">
+    <button class="btn2 danger"><svg width="18" height="18" aria-hidden="true"><use href="#ic_delete"/></svg><span>Delete this entry</span></button>
+    <p class="foot-note">Restorable from Trash (30 days)</p>
+  </div>
+</div></div></div></section><section class="frame" data-screen="reports" data-lang="en"><div class="flabel">报表 / Reports</div><div class="bezelless"><div class="screen"><div class="statusbar"><span class="sb-time">14:55</span><span class="sb-marks"><svg width="18" height="12" aria-hidden="true"><rect x="0" y="5" width="3" height="4" rx="1" fill="currentColor"/><rect x="5" y="3" width="3" height="6" rx="1" fill="currentColor"/><rect x="10" y="0" width="3" height="9" rx="1" fill="currentColor"/><rect x="15" y="-3" width="3" height="12" rx="1" fill="currentColor"/></svg><svg width="18" height="12" aria-hidden="true"><rect x="0.5" y="1.5" width="14" height="9" rx="3" fill="none" stroke="currentColor" opacity=".45"/><rect x="2.5" y="3.5" width="9" height="5" rx="1.5" fill="currentColor"/></svg></span></div>
+<header class="topbar">
+  <button class="iconbtn" data-goto="ledger"><svg width="20" height="20" aria-hidden="true"><use href="#ic_calendar"/></svg></button>
+  <h1>Reports</h1>
+  <div class="tb-right">
+    <button class="iconbtn"><svg width="20" height="20" aria-hidden="true"><use href="#ic_filter"/></svg></button>
+    <button class="iconbtn"><svg width="20" height="20" aria-hidden="true"><use href="#ic_more"/></svg></button>
+  </div>
+</header>
+<div class="scroll">
+  <div class="month-note tight"><svg width="13" height="13" aria-hidden="true"><use href="#ic_calendar"/></svg><span>Month starts on day 10</span>
+    <span class="dot-sep">·</span><span>45 entries</span></div>
+  <div class="panel cmppanel">
+    <div class="eyebrow">Compared with last month</div>
+    <div class="crow"><span class="ck">Spent</span><span class="cv"><span class="amt s tone-ink"><span class="cur">¥</span><span class="int">5,879</span><span class="pnt">.</span><span class="dec">50</span></span></span><span class="cd tone-up"><svg width="14" height="14" aria-hidden="true"><use href="#ic_trend_up"/></svg>12.4%</span></div><div class="crow"><span class="ck">Received</span><span class="cv tone-income"><span class="amt s tone-income"><span class="cur">¥</span>+<span class="int">9,300</span><span class="pnt">.</span><span class="dec">00</span></span></span><span class="cd tone-up"><svg width="14" height="14" aria-hidden="true"><use href="#ic_trend_up"/></svg>8.1%</span></div><div class="crow"><span class="ck">Net</span><span class="cv"><span class="amt s tone-ink"><span class="cur">¥</span><span class="int">3,420</span><span class="pnt">.</span><span class="dec">50</span></span></span><span class="cd tone-dn"><svg width="14" height="14" aria-hidden="true"><use href="#ic_trend_down"/></svg>6.2%</span></div>
+  </div>
+  <div class="panel chartpanel">
+    <div class="eyebrow">By category</div>
+    <div class="donut-wrap"><svg class="donut" width="136" height="136" viewBox="0 0 136 136"><g fill="none" stroke-width="13" stroke-linecap="butt"><circle class="dn-seg" cx="68.0" cy="68.0" r="52.0" style="stroke:var(--cat-food);stroke-dasharray:104.55 326.73;stroke-dashoffset:-0.00"/><circle class="dn-seg" cx="68.0" cy="68.0" r="52.0" style="stroke:var(--cat-shopping);stroke-dasharray:78.41 326.73;stroke-dashoffset:-104.55"/><circle class="dn-seg" cx="68.0" cy="68.0" r="52.0" style="stroke:var(--cat-other);stroke-dasharray:58.81 326.73;stroke-dashoffset:-182.97"/><circle class="dn-seg" cx="68.0" cy="68.0" r="52.0" style="stroke:var(--cat-transport);stroke-dasharray:45.74 326.73;stroke-dashoffset:-241.78"/><circle class="dn-seg" cx="68.0" cy="68.0" r="52.0" style="stroke:var(--cat-housing);stroke-dasharray:39.21 326.73;stroke-dashoffset:-287.52"/></g><text class="dn-c1" x="68.0" y="64.0" text-anchor="middle" style="font-size:18px"><tspan class="dn-cur">¥</tspan>5,879<tspan class="dn-pnt">.</tspan><tspan class="dn-dec">50</tspan></text><text class="dn-c2" x="68.0" y="84.0" text-anchor="middle">TOTAL</text></svg></div>
+    <div class="legend"><div class="lrow"><span class="dot8" style="background:var(--cat-food)"></span><span class="lname">Dining</span><span class="lpct">32%</span><span class="lamt"><span class="amt s tone-ink"><span class="cur">¥</span><span class="int">1,881</span><span class="pnt">.</span><span class="dec">44</span></span></span></div><div class="lrow"><span class="dot8" style="background:var(--cat-shopping)"></span><span class="lname">Shopping</span><span class="lpct">24%</span><span class="lamt"><span class="amt s tone-ink"><span class="cur">¥</span><span class="int">1,411</span><span class="pnt">.</span><span class="dec">08</span></span></span></div><div class="lrow"><span class="dot8" style="background:var(--cat-other)"></span><span class="lname">Other</span><span class="lpct">18%</span><span class="lamt"><span class="amt s tone-ink"><span class="cur">¥</span><span class="int">1,058</span><span class="pnt">.</span><span class="dec">31</span></span></span></div><div class="lrow"><span class="dot8" style="background:var(--cat-transport)"></span><span class="lname">Transport</span><span class="lpct">14%</span><span class="lamt"><span class="amt s tone-ink"><span class="cur">¥</span><span class="int">823</span><span class="pnt">.</span><span class="dec">13</span></span></span></div><div class="lrow"><span class="dot8" style="background:var(--cat-housing)"></span><span class="lname">Housing</span><span class="lpct">12%</span><span class="lamt"><span class="amt s tone-ink"><span class="cur">¥</span><span class="int">705</span><span class="pnt">.</span><span class="dec">54</span></span></span></div></div>
+  </div>
+  <div class="panel chartpanel">
+    <div class="eyebrow">Daily spending</div>
+    <svg class="bars" viewBox="0 0 274 72" preserveAspectRatio="none" width="100%" height="72"><line x1="0" y1="66.5" x2="274" y2="66.5" style="stroke:var(--line)"/><rect x="0" y="36.2" width="14" height="29.8" rx="3" style="fill:var(--bar-fill);opacity:0.62"/><rect x="20" y="42.4" width="14" height="23.6" rx="3" style="fill:var(--bar-fill);opacity:0.54"/><rect x="40" y="26.3" width="14" height="39.7" rx="3" style="fill:var(--bar-fill);opacity:0.75"/><rect x="60" y="45.5" width="14" height="20.5" rx="3" style="fill:var(--bar-fill);opacity:0.51"/><rect x="80" y="29.4" width="14" height="36.6" rx="3" style="fill:var(--bar-fill);opacity:0.71"/><rect x="100" y="17.4" width="14" height="48.6" rx="3" style="fill:var(--bar-fill);opacity:0.86"/><rect x="120" y="39.3" width="14" height="26.7" rx="3" style="fill:var(--bar-fill);opacity:0.58"/><rect x="140" y="47.6" width="14" height="18.4" rx="3" style="fill:var(--bar-fill);opacity:0.48"/><rect x="160" y="33.0" width="14" height="33.0" rx="3" style="fill:var(--bar-fill);opacity:0.66"/><rect x="180" y="23.7" width="14" height="42.3" rx="3" style="fill:var(--bar-fill);opacity:0.78"/><rect x="200" y="42.9" width="14" height="23.1" rx="3" style="fill:var(--bar-fill);opacity:0.54"/><rect x="220" y="11.2" width="14" height="54.8" rx="3" style="fill:var(--bar-fill);opacity:0.94"/><rect x="240" y="31.0" width="14" height="35.0" rx="3" style="fill:var(--bar-fill);opacity:0.69"/><rect x="260" y="40.3" width="14" height="25.7" rx="3" style="fill:var(--bar-fill);opacity:0.57"/></svg>
+  </div>
+  <div class="scroll-pad"></div>
+</div>
+<nav class="nav"><a class="navitem" data-goto="ledger"><svg width="22" height="22" aria-hidden="true"><use href="#ic_nav_ledger"/></svg><span class="navlab">Ledger</span></a><a class="navitem on" data-goto="reports"><svg width="22" height="22" aria-hidden="true"><use href="#ic_nav_report"/></svg><span class="navlab">Reports</span></a><a class="navitem navcenter" data-goto="add"><span class="navfab"><svg width="22" height="22" aria-hidden="true"><use href="#ic_nav_add"/></svg></span></a><a class="navitem" data-goto="assets"><svg width="22" height="22" aria-hidden="true"><use href="#ic_nav_assets"/></svg><span class="navlab">Assets</span></a><a class="navitem" data-goto="settings"><svg width="22" height="22" aria-hidden="true"><use href="#ic_nav_profile"/></svg><span class="navlab">Me</span></a></nav>
+</div></div></section><section class="frame" data-screen="assets" data-lang="en"><div class="flabel">资产 / Assets</div><div class="bezelless"><div class="screen"><div class="statusbar"><span class="sb-time">14:55</span><span class="sb-marks"><svg width="18" height="12" aria-hidden="true"><rect x="0" y="5" width="3" height="4" rx="1" fill="currentColor"/><rect x="5" y="3" width="3" height="6" rx="1" fill="currentColor"/><rect x="10" y="0" width="3" height="9" rx="1" fill="currentColor"/><rect x="15" y="-3" width="3" height="12" rx="1" fill="currentColor"/></svg><svg width="18" height="12" aria-hidden="true"><rect x="0.5" y="1.5" width="14" height="9" rx="3" fill="none" stroke="currentColor" opacity=".45"/><rect x="2.5" y="3.5" width="9" height="5" rx="1.5" fill="currentColor"/></svg></span></div>
+<header class="topbar">
+  <button class="iconbtn ghost"><svg width="20" height="20" aria-hidden="true"><use href="#ic_shield"/></svg></button>
+  <h1>Assets</h1>
+  <div class="tb-right"><button class="iconbtn"><svg width="20" height="20" aria-hidden="true"><use href="#ic_eye_off"/></svg></button></div>
+</header>
+<div class="scroll">
+  <section class="hero">
+    <div class="hairline"></div>
+    <div class="hero-label">Net worth</div>
+    <div class="hero-amt"><span class="amt xl tone-ink"><span class="cur">¥</span><span class="int">86,420</span><span class="pnt">.</span><span class="dec">50</span></span></div>
+    <div class="hairline"></div>
+  </section>
+  <section class="grp"><div class="eyebrow">Assets</div><div class="panel"><div class="row"><span class="ricos"><svg width="22" height="22" aria-hidden="true"><use href="#ic_card"/></svg></span><span class="rcol"><span class="rt">CMB Savings</span><span class="sub">Savings ····6217</span></span><span class="rw-amt tone-ink"><span class="amt s tone-ink"><span class="cur">¥</span><span class="int">52,180</span><span class="pnt">.</span><span class="dec">30</span></span></span><svg class="chev" width="16" height="16" aria-hidden="true"><use href="#ic_chevron_right"/></svg></div><div class="row"><span class="ricos"><svg width="22" height="22" aria-hidden="true"><use href="#ic_wallet"/></svg></span><span class="rcol"><span class="rt">WeChat Balance</span><span class="sub">Cash</span></span><span class="rw-amt tone-ink"><span class="amt s tone-ink"><span class="cur">¥</span><span class="int">1,240</span><span class="pnt">.</span><span class="dec">20</span></span></span><svg class="chev" width="16" height="16" aria-hidden="true"><use href="#ic_chevron_right"/></svg></div><div class="row"><span class="ricos"><svg width="22" height="22" aria-hidden="true"><use href="#ic_chart_line"/></svg></span><span class="rcol"><span class="rt">Index Funds</span><span class="sub">Investing · 3 holdings</span></span><span class="rw-amt tone-ink"><span class="amt s tone-ink"><span class="cur">¥</span><span class="int">38,000</span><span class="pnt">.</span><span class="dec">00</span></span></span><svg class="chev" width="16" height="16" aria-hidden="true"><use href="#ic_chevron_right"/></svg></div></div></section>
+  <section class="grp"><div class="eyebrow">Debts</div><div class="panel"><div class="row"><span class="ricos"><svg width="22" height="22" aria-hidden="true"><use href="#ic_receipt"/></svg></span><span class="rcol"><span class="rt">CMB Credit Card</span><span class="sub">Credit · due this cycle</span></span><span class="rw-amt tone-ink"><span class="amt s tone-ink"><span class="cur">¥</span>−<span class="int">5,000</span><span class="pnt">.</span><span class="dec">00</span></span></span><svg class="chev" width="16" height="16" aria-hidden="true"><use href="#ic_chevron_right"/></svg></div></div></section>
+  <div class="scroll-pad"></div>
+</div>
+<nav class="nav"><a class="navitem" data-goto="ledger"><svg width="22" height="22" aria-hidden="true"><use href="#ic_nav_ledger"/></svg><span class="navlab">Ledger</span></a><a class="navitem" data-goto="reports"><svg width="22" height="22" aria-hidden="true"><use href="#ic_nav_report"/></svg><span class="navlab">Reports</span></a><a class="navitem navcenter" data-goto="add"><span class="navfab"><svg width="22" height="22" aria-hidden="true"><use href="#ic_nav_add"/></svg></span></a><a class="navitem on" data-goto="assets"><svg width="22" height="22" aria-hidden="true"><use href="#ic_nav_assets"/></svg><span class="navlab">Assets</span></a><a class="navitem" data-goto="settings"><svg width="22" height="22" aria-hidden="true"><use href="#ic_nav_profile"/></svg><span class="navlab">Me</span></a></nav>
+</div></div></section><section class="frame" data-screen="categories" data-lang="en"><div class="flabel">分类管理 / Categories</div><div class="bezelless"><div class="screen"><div class="statusbar"><span class="sb-time">14:55</span><span class="sb-marks"><svg width="18" height="12" aria-hidden="true"><rect x="0" y="5" width="3" height="4" rx="1" fill="currentColor"/><rect x="5" y="3" width="3" height="6" rx="1" fill="currentColor"/><rect x="10" y="0" width="3" height="9" rx="1" fill="currentColor"/><rect x="15" y="-3" width="3" height="12" rx="1" fill="currentColor"/></svg><svg width="18" height="12" aria-hidden="true"><rect x="0.5" y="1.5" width="14" height="9" rx="3" fill="none" stroke="currentColor" opacity=".45"/><rect x="2.5" y="3.5" width="9" height="5" rx="1.5" fill="currentColor"/></svg></span></div>
+<header class="topbar">
+  <button class="iconbtn" data-back><svg width="22" height="22" aria-hidden="true"><use href="#ic_back"/></svg></button>
+  <h1>Categories</h1>
+  <div class="tb-right"><button class="iconbtn"><svg width="20" height="20" aria-hidden="true"><use href="#ic_plus"/></svg></button></div>
+</header>
+<div class="segwrap"><div class="seg">
+  <button class="segi on">Expense</button>
+  <button class="segi">Income</button>
+</div></div>
+<div class="scroll"><div class="panel catpanel"><div class="crow2"><span class="cicon" style="color:var(--cat-ink-food)"><svg width="24" height="24" aria-hidden="true"><use href="#ic_cat_food"/></svg></span><span class="rcol"><span class="rt">Dining</span><span class="sub">Meals, takeout, dine-in</span></span><span class="cnt">128 entries</span><svg class="drag" width="18" height="18" aria-hidden="true"><use href="#ic_drag_handle"/></svg></div><div class="crow2"><span class="cicon" style="color:var(--cat-ink-fruit)"><svg width="24" height="24" aria-hidden="true"><use href="#ic_cat_grocery"/></svg></span><span class="rcol"><span class="rt">Groceries</span><span class="sub">Groceries, fresh food, staples</span></span><span class="cnt">46 entries</span><svg class="drag" width="18" height="18" aria-hidden="true"><use href="#ic_drag_handle"/></svg></div><div class="crow2"><span class="cicon" style="color:var(--cat-ink-shopping)"><svg width="24" height="24" aria-hidden="true"><use href="#ic_cat_shopping"/></svg></span><span class="rcol"><span class="rt">Shopping</span><span class="sub">Clothing, gadgets, home</span></span><span class="cnt">33 entries</span><svg class="drag" width="18" height="18" aria-hidden="true"><use href="#ic_drag_handle"/></svg></div><div class="crow2"><span class="cicon" style="color:var(--cat-ink-daily)"><svg width="24" height="24" aria-hidden="true"><use href="#ic_cat_daily"/></svg></span><span class="rcol"><span class="rt">Household</span><span class="sub">Personal care, paper goods</span></span><span class="cnt">61 entries</span><svg class="drag" width="18" height="18" aria-hidden="true"><use href="#ic_drag_handle"/></svg></div><div class="crow2"><span class="cicon" style="color:var(--cat-ink-transport)"><svg width="24" height="24" aria-hidden="true"><use href="#ic_cat_transport"/></svg></span><span class="rcol"><span class="rt">Transport</span><span class="sub">Commute, taxi, fuel</span></span><span class="cnt">88 entries</span><svg class="drag" width="18" height="18" aria-hidden="true"><use href="#ic_drag_handle"/></svg></div><div class="crow2"><span class="cicon" style="color:var(--cat-ink-housing)"><svg width="24" height="24" aria-hidden="true"><use href="#ic_cat_housing"/></svg></span><span class="rcol"><span class="rt">Housing</span><span class="sub">Rent, mortgage, utilities</span></span><span class="cnt">6 entries</span><svg class="drag" width="18" height="18" aria-hidden="true"><use href="#ic_drag_handle"/></svg></div><div class="crow2"><span class="cicon" style="color:var(--cat-ink-telecom)"><svg width="24" height="24" aria-hidden="true"><use href="#ic_cat_telecom"/></svg></span><span class="rcol"><span class="rt">Telecom</span><span class="sub">Phone, broadband, plans</span></span><span class="cnt">4 entries</span><svg class="drag" width="18" height="18" aria-hidden="true"><use href="#ic_drag_handle"/></svg></div><div class="crow2"><span class="cicon" style="color:var(--cat-ink-entertainment)"><svg width="24" height="24" aria-hidden="true"><use href="#ic_cat_entertainment"/></svg></span><span class="rcol"><span class="rt">Fun</span><span class="sub">Movies, games, shows</span></span><span class="cnt">12 entries</span><svg class="drag" width="18" height="18" aria-hidden="true"><use href="#ic_drag_handle"/></svg></div><div class="crow2"><span class="cicon" style="color:var(--cat-ink-medical)"><svg width="24" height="24" aria-hidden="true"><use href="#ic_cat_medical"/></svg></span><span class="rcol"><span class="rt">Health</span><span class="sub">Clinic, pharmacy, checkup</span></span><span class="cnt">3 entries</span><svg class="drag" width="18" height="18" aria-hidden="true"><use href="#ic_drag_handle"/></svg></div><div class="crow2"><span class="cicon" style="color:var(--cat-ink-study)"><svg width="24" height="24" aria-hidden="true"><use href="#ic_cat_study"/></svg></span><span class="rcol"><span class="rt">Learning</span><span class="sub">Books, courses, exams</span></span><span class="cnt">7 entries</span><svg class="drag" width="18" height="18" aria-hidden="true"><use href="#ic_drag_handle"/></svg></div><div class="crow2"><span class="cicon" style="color:var(--cat-ink-social)"><svg width="24" height="24" aria-hidden="true"><use href="#ic_cat_social"/></svg></span><span class="rcol"><span class="rt">Social</span><span class="sub">Gifts, red packets, treats</span></span><span class="cnt">9 entries</span><svg class="drag" width="18" height="18" aria-hidden="true"><use href="#ic_drag_handle"/></svg></div><div class="crow2"><span class="cicon" style="color:var(--cat-ink-other)"><svg width="24" height="24" aria-hidden="true"><use href="#ic_cat_other"/></svg></span><span class="rcol"><span class="rt">Other</span><span class="sub">Uncategorised spending</span></span><span class="cnt">2 entries</span><svg class="drag" width="18" height="18" aria-hidden="true"><use href="#ic_drag_handle"/></svg></div></div>
+  <div class="scroll-pad"></div></div>
+<div class="footbar"><button class="btn2 wide"><svg width="18" height="18" aria-hidden="true"><use href="#ic_plus"/></svg><span>New category</span></button>
+<div class="safearea"></div></div>
+</div></div></section><section class="frame" data-screen="settings" data-lang="en"><div class="flabel">我的/设置 / Me</div><div class="bezelless"><div class="screen"><div class="statusbar"><span class="sb-time">14:55</span><span class="sb-marks"><svg width="18" height="12" aria-hidden="true"><rect x="0" y="5" width="3" height="4" rx="1" fill="currentColor"/><rect x="5" y="3" width="3" height="6" rx="1" fill="currentColor"/><rect x="10" y="0" width="3" height="9" rx="1" fill="currentColor"/><rect x="15" y="-3" width="3" height="12" rx="1" fill="currentColor"/></svg><svg width="18" height="12" aria-hidden="true"><rect x="0.5" y="1.5" width="14" height="9" rx="3" fill="none" stroke="currentColor" opacity=".45"/><rect x="2.5" y="3.5" width="9" height="5" rx="1.5" fill="currentColor"/></svg></span></div>
+<header class="topbar"><button class="iconbtn ghost"><svg width="20" height="20" aria-hidden="true"><use href="#ic_nav_profile"/></svg></button>
+  <h1>Me</h1><div class="tb-right"></div></header>
+<div class="scroll">
+  <div class="privacy-strip"><svg width="18" height="18" aria-hidden="true"><use href="#ic_shield"/></svg>
+    <span class="pcol"><span class="pt">Privacy promise</span>
+    <span class="ps">No ads, no network, no tracking</span></span></div>
+  <section class="grp"><div class="eyebrow">Tracking</div><div class="panel"><div class="row srow"><span class="rcol"><span class="rt">Month starts on</span></span><span class="sval">Day 10</span><svg class="chev" width="16" height="16" aria-hidden="true"><use href="#ic_chevron_right"/></svg></div><div class="row srow"><span class="rcol"><span class="rt">Text size</span></span><span class="sval">Standard</span><svg class="chev" width="16" height="16" aria-hidden="true"><use href="#ic_chevron_right"/></svg></div><div class="row srow"><span class="rcol"><span class="rt">Confirmation sound</span></span><span class="switch"><span class="knob"></span></span></div><div class="row srow"><span class="rcol"><span class="rt">Stay on entry page after saving</span></span><span class="switch on"><span class="knob"></span></span></div></div></section>
+  <section class="grp"><div class="eyebrow">Security</div><div class="panel"><div class="row srow"><span class="rcol"><span class="rt">App lock</span></span><span class="switch"><span class="knob"></span></span></div><div class="row srow"><span class="rcol"><span class="rt">Hide amounts</span></span><span class="switch"><span class="knob"></span></span></div></div></section>
+  <section class="grp"><div class="eyebrow">Appearance</div><div class="panel"><div class="row srow"><span class="rcol"><span class="rt">Theme</span></span><span class="sval">Plain White</span><svg class="chev" width="16" height="16" aria-hidden="true"><use href="#ic_chevron_right"/></svg></div><div class="row srow"><span class="rcol"><span class="rt">Appearance</span></span><span class="sval">Follow system</span><svg class="chev" width="16" height="16" aria-hidden="true"><use href="#ic_chevron_right"/></svg></div></div></section>
+  <section class="grp"><div class="eyebrow">Data</div><div class="panel"><div class="row srow"><svg class="sicon" width="20" height="20" aria-hidden="true"><use href="#ic_cloud"/></svg><span class="rcol"><span class="rt">Backup & restore</span></span><svg class="chev" width="16" height="16" aria-hidden="true"><use href="#ic_chevron_right"/></svg></div><div class="row srow"><svg class="sicon" width="20" height="20" aria-hidden="true"><use href="#ic_import"/></svg><span class="rcol"><span class="rt">Bulk import</span></span><svg class="chev" width="16" height="16" aria-hidden="true"><use href="#ic_chevron_right"/></svg></div></div></section>
+  <section class="grp"><div class="eyebrow">About</div><div class="panel"><div class="row srow"><svg class="sicon" width="20" height="20" aria-hidden="true"><use href="#ic_shield"/></svg><span class="rcol"><span class="rt">Privacy promise</span></span><svg class="chev" width="16" height="16" aria-hidden="true"><use href="#ic_chevron_right"/></svg></div><div class="row srow"><span class="rcol"><span class="rt">Version</span></span><span class="sval">V1.0.0</span><svg class="chev" width="16" height="16" aria-hidden="true"><use href="#ic_chevron_right"/></svg></div></div></section>
+  <div class="scroll-pad"></div>
+</div>
+<nav class="nav"><a class="navitem" data-goto="ledger"><svg width="22" height="22" aria-hidden="true"><use href="#ic_nav_ledger"/></svg><span class="navlab">Ledger</span></a><a class="navitem" data-goto="reports"><svg width="22" height="22" aria-hidden="true"><use href="#ic_nav_report"/></svg><span class="navlab">Reports</span></a><a class="navitem navcenter" data-goto="add"><span class="navfab"><svg width="22" height="22" aria-hidden="true"><use href="#ic_nav_add"/></svg></span></a><a class="navitem" data-goto="assets"><svg width="22" height="22" aria-hidden="true"><use href="#ic_nav_assets"/></svg><span class="navlab">Assets</span></a><a class="navitem on" data-goto="settings"><svg width="22" height="22" aria-hidden="true"><use href="#ic_nav_profile"/></svg><span class="navlab">Me</span></a></nav>
+</div></div></section>
+</div>
+<script>
+(function () {
+  var body = document.body;
+  var tpl = {};
+  document.querySelectorAll('.frame').forEach(function (f) {
+    tpl[f.dataset.screen] = f.querySelector('.screen').innerHTML;
+  });
+
+  function setScreen(frame, id) {
+    if (!tpl[id]) return;
+    frame.dataset.screen = id;
+    frame.querySelector('.screen').innerHTML = tpl[id];
+    frame.querySelector('.screen').scrollTop = 0;
+  }
+
+  // 记录每个 frame 的来路，支持返回
+  var stack = new WeakMap();
+
+  document.addEventListener('click', function (e) {
+    var frame = e.target.closest('.frame');
+    if (!frame) return;
+    var go = e.target.closest('[data-goto]');
+    var back = e.target.closest('[data-back]');
+    if (go) {
+      e.preventDefault();
+      var from = frame.dataset.screen, to = go.dataset.goto;
+      if (from === to) return;
+      stack.set(frame, (stack.get(frame) || []).concat([from]));
+      setScreen(frame, to);
+      if (body.dataset.view === 'single') syncPicker(to);
+      return;
+    }
+    if (back) {
+      e.preventDefault();
+      var st = stack.get(frame) || [];
+      var prev = st.pop() || 'ledger';
+      stack.set(frame, st);
+      setScreen(frame, prev);
+      if (body.dataset.view === 'single') syncPicker(prev);
+    }
+  });
+
+  function syncPicker(id) {
+    document.querySelectorAll('.screenpicker button').forEach(function (b) {
+      b.classList.toggle('on', b.dataset.screen === id);
+    });
+  }
+
+  // 工具条
+  document.querySelectorAll('[data-set]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var key = btn.dataset.set, val = btn.dataset.val;
+      body.dataset[key] = val;
+      btn.parentNode.querySelectorAll('button').forEach(function (b) {
+        b.classList.toggle('on', b === btn);
+      });
+      if (key === 'size') applySize(val);
+      if (key === 'view' && val === 'single') {
+        var active = document.querySelector('.frame.active') || document.querySelector('.frame');
+        document.querySelectorAll('.frame').forEach(function (f) { f.classList.remove('active'); });
+        active.classList.add('active');
+        syncPicker(active.dataset.screen);
+      }
+    });
+  });
+
+  // 字号三档：字号列四舍五入到整数（不动行高与字重）
+  var BASE = {title: 20, heading: 15, body: 14, caption: 12,
+              'amount-input': 44, 'amount-xl': 34, 'amount-l': 22, 'amount-s': 15,
+              'key': 22};
+  function applySize(tier) {
+    var k = tier === 'large' ? 1.12 : (tier === 'xlarge' ? 1.26 : 1.0);
+    var map = {
+      '--fs-title': Math.round(BASE.title * k),
+      '--fs-heading': Math.round(BASE.heading * k),
+      '--fs-body': Math.round(BASE.body * k),
+      '--fs-caption': Math.round(BASE.caption * k)
+    };
+    Object.keys(map).forEach(function (n) {
+      document.querySelectorAll('.stage').forEach(function (s) {
+        s.style.setProperty(n, map[n] + 'px');
+      });
+    });
+    // 舞台整体缩放因子：以下所有 calc() 都乘它
+    document.querySelectorAll('.stage').forEach(function (s) { s.style.setProperty('--tscale', k); });
+  }
+
+  document.querySelectorAll('.screenpicker button').forEach(function (b) {
+    b.addEventListener('click', function () {
+      var first = document.querySelector('.frame');
+      setScreen(first, b.dataset.screen);
+      document.querySelectorAll('.frame').forEach(function (f) { f.classList.remove('active'); });
+      first.classList.add('active');
+      syncPicker(b.dataset.screen);
+    });
+  });
+
+  applySize('standard');
+
+  // 单屏模式下点击缩略图同步
+  document.querySelectorAll('.frame').forEach(function (f, i) {
+    f.addEventListener('click', function () {
+      document.querySelectorAll('.frame').forEach(function (x) { x.classList.remove('active'); });
+      f.classList.add('active');
+    });
+  });
+})();
+</script>
+</body></html>

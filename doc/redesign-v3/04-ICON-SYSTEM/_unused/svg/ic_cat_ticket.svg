@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" role="img" aria-label="ic_cat_ticket">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <rect x="3.5" y="7.5" width="17" height="9" rx="2"/>
+  <path d="M9 7.5v9"/>
+  <path d="M12.5 11h5"/>
+  <path d="M12.5 14h5"/>
+  </g>
+</svg>

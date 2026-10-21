@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" role="img" aria-label="ic_cat_vegetable">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M9 12.5 12 20.5 15 12.5Z"/>
+  <path d="M12 12.5V9.25"/>
+  <path d="M12 11 9.75 9.25"/>
+  <path d="M12 11l2.25-1.75"/>
+  </g>
+</svg>

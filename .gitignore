@@ -51,13 +51,5 @@ app.*.map.json
 .widget_preview/
 
 # Signing & secrets — never commit these
-*.jks
-*.keystore
-*.p12
-*.pem
-key.properties
-local.properties
-google-services.json
-GoogleService-Info.plist
 
 # Keep pubspec.lock for application projects (do not ignore *.lock)

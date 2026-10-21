@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" role="img" aria-label="ic_wallet">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <rect x="3.75" y="7.25" width="16.5" height="11.5" rx="3"/>
+  <path d="M3.75 11.25h16.5"/>
+  <circle cx="16.5" cy="14.75" r="1.35" fill="currentColor" stroke="none"/>
+  </g>
+</svg>

@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" role="img" aria-label="ic_cat_social">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <rect x="3" y="6.25" width="18" height="3.75" rx="1.75"/>
+  <rect x="4.5" y="10" width="15" height="10.25" rx="2"/>
+  <path d="M12 6.25v14"/>
+  </g>
+</svg>

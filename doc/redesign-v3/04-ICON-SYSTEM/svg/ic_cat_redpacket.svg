@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" role="img" aria-label="ic_cat_redpacket">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <rect x="5.5" y="6.75" width="13" height="12.5" rx="2.5"/>
+  <path d="M5.5 10.5h13"/>
+  <rect x="10.5" y="13" width="3" height="3" rx="0.75"/>
+  </g>
+</svg>

@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" role="img" aria-label="ic_cat_invoice">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M6 4.75h7.5l4.5 4.5V19.25a1.5 1.5 0 0 1-1.5 1.5H6a1.5 1.5 0 0 1-1.5-1.5V6.25A1.5 1.5 0 0 1 6 4.75Z"/>
+  <path d="M13.5 4.75V9.25H18"/>
+  <path d="M8.5 12.5h7"/>
+  <path d="M8.5 15.75h4.5"/>
+  </g>
+</svg>

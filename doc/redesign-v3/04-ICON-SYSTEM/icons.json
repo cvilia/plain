@@ -1,0 +1,1552 @@
+{
+  "version": "3.0",
+  "grid": 24,
+  "stroke": 1.75,
+  "strokeLinecap": "round",
+  "strokeLinejoin": "round",
+  "fill": "none",
+  "color": "currentColor",
+  "contentBox": [
+    2,
+    22
+  ],
+  "paintedExtent": [
+    1.125,
+    22.875
+  ],
+  "codepointStart": "0xE001",
+  "codepointRule": "自 0xE001 起连续分配。本轮为**全新一套造型**，与旧 PlainIcons 无继承关系，码位仅作新字体/映射表用，不承诺与旧字体一致。",
+  "count": 119,
+  "byCategory": {
+    "nav": 5,
+    "category": 31,
+    "op": 27,
+    "status": 9,
+    "entry": 13,
+    "chart": 5,
+    "ui": 29
+  },
+  "icons": [
+    {
+      "name": "ic_nav_ledger",
+      "file": "svg/ic_nav_ledger.svg",
+      "category": "nav",
+      "categoryLabel": "导航",
+      "codepoint": "0xE001",
+      "tags": [
+        "ledger",
+        "list",
+        "transactions",
+        "流水",
+        "账单"
+      ]
+    },
+    {
+      "name": "ic_nav_report",
+      "file": "svg/ic_nav_report.svg",
+      "category": "nav",
+      "categoryLabel": "导航",
+      "codepoint": "0xE002",
+      "tags": [
+        "report",
+        "chart",
+        "pie",
+        "报表",
+        "图表"
+      ]
+    },
+    {
+      "name": "ic_nav_add",
+      "file": "svg/ic_nav_add.svg",
+      "category": "nav",
+      "categoryLabel": "导航",
+      "codepoint": "0xE003",
+      "tags": [
+        "add",
+        "new",
+        "plus",
+        "记一笔",
+        "记帐"
+      ]
+    },
+    {
+      "name": "ic_nav_assets",
+      "file": "svg/ic_nav_assets.svg",
+      "category": "nav",
+      "categoryLabel": "导航",
+      "codepoint": "0xE004",
+      "tags": [
+        "assets",
+        "wallet",
+        "balance",
+        "资产",
+        "钱包"
+      ]
+    },
+    {
+      "name": "ic_nav_profile",
+      "file": "svg/ic_nav_profile.svg",
+      "category": "nav",
+      "categoryLabel": "导航",
+      "codepoint": "0xE005",
+      "tags": [
+        "profile",
+        "me",
+        "user",
+        "我的",
+        "设置"
+      ]
+    },
+    {
+      "name": "ic_cat_food",
+      "file": "svg/ic_cat_food.svg",
+      "category": "category",
+      "categoryLabel": "分类",
+      "codepoint": "0xE006",
+      "tags": [
+        "food",
+        "meal",
+        "restaurant",
+        "餐饮",
+        "吃"
+      ]
+    },
+    {
+      "name": "ic_cat_grocery",
+      "file": "svg/ic_cat_grocery.svg",
+      "category": "category",
+      "categoryLabel": "分类",
+      "codepoint": "0xE007",
+      "tags": [
+        "grocery",
+        "fruit",
+        "market",
+        "食材",
+        "买菜"
+      ]
+    },
+    {
+      "name": "ic_cat_daily",
+      "file": "svg/ic_cat_daily.svg",
+      "category": "category",
+      "categoryLabel": "分类",
+      "codepoint": "0xE009",
+      "tags": [
+        "daily",
+        "household",
+        "bottle",
+        "日用",
+        "生活"
+      ]
+    },
+    {
+      "name": "ic_cat_transport",
+      "file": "svg/ic_cat_transport.svg",
+      "category": "category",
+      "categoryLabel": "分类",
+      "codepoint": "0xE00A",
+      "tags": [
+        "transport",
+        "bus",
+        "car",
+        "交通",
+        "出行"
+      ]
+    },
+    {
+      "name": "ic_cat_housing",
+      "file": "svg/ic_cat_housing.svg",
+      "category": "category",
+      "categoryLabel": "分类",
+      "codepoint": "0xE00B",
+      "tags": [
+        "housing",
+        "rent",
+        "home",
+        "居住",
+        "房租"
+      ]
+    },
+    {
+      "name": "ic_cat_telecom",
+      "file": "svg/ic_cat_telecom.svg",
+      "category": "category",
+      "categoryLabel": "分类",
+      "codepoint": "0xE00C",
+      "tags": [
+        "telecom",
+        "signal",
+        "phone",
+        "通讯",
+        "话费"
+      ]
+    },
+    {
+      "name": "ic_cat_entertainment",
+      "file": "svg/ic_cat_entertainment.svg",
+      "category": "category",
+      "categoryLabel": "分类",
+      "codepoint": "0xE00D",
+      "tags": [
+        "fun",
+        "music",
+        "headphone",
+        "娱乐",
+        "玩"
+      ]
+    },
+    {
+      "name": "ic_cat_medical",
+      "file": "svg/ic_cat_medical.svg",
+      "category": "category",
+      "categoryLabel": "分类",
+      "codepoint": "0xE00E",
+      "tags": [
+        "medical",
+        "health",
+        "医疗",
+        "看病"
+      ]
+    },
+    {
+      "name": "ic_cat_study",
+      "file": "svg/ic_cat_study.svg",
+      "category": "category",
+      "categoryLabel": "分类",
+      "codepoint": "0xE00F",
+      "tags": [
+        "study",
+        "book",
+        "learn",
+        "学习",
+        "教育"
+      ]
+    },
+    {
+      "name": "ic_cat_social",
+      "file": "svg/ic_cat_social.svg",
+      "category": "category",
+      "categoryLabel": "分类",
+      "codepoint": "0xE010",
+      "tags": [
+        "social",
+        "gift",
+        "present",
+        "人情",
+        "礼物"
+      ]
+    },
+    {
+      "name": "ic_cat_other",
+      "file": "svg/ic_cat_other.svg",
+      "category": "category",
+      "categoryLabel": "分类",
+      "codepoint": "0xE011",
+      "tags": [
+        "other",
+        "misc",
+        "grid",
+        "其他",
+        "杂项"
+      ]
+    },
+    {
+      "name": "ic_back",
+      "file": "svg/ic_back.svg",
+      "category": "op",
+      "categoryLabel": "操作",
+      "codepoint": "0xE012",
+      "tags": [
+        "back",
+        "arrow-left",
+        "返回"
+      ]
+    },
+    {
+      "name": "ic_chevron_right",
+      "file": "svg/ic_chevron_right.svg",
+      "category": "op",
+      "categoryLabel": "操作",
+      "codepoint": "0xE013",
+      "tags": [
+        "chevron",
+        "next",
+        "右"
+      ]
+    },
+    {
+      "name": "ic_chevron_left",
+      "file": "svg/ic_chevron_left.svg",
+      "category": "op",
+      "categoryLabel": "操作",
+      "codepoint": "0xE014",
+      "tags": [
+        "chevron",
+        "prev",
+        "左"
+      ]
+    },
+    {
+      "name": "ic_chevron_down",
+      "file": "svg/ic_chevron_down.svg",
+      "category": "op",
+      "categoryLabel": "操作",
+      "codepoint": "0xE015",
+      "tags": [
+        "chevron",
+        "expand",
+        "下"
+      ]
+    },
+    {
+      "name": "ic_close",
+      "file": "svg/ic_close.svg",
+      "category": "op",
+      "categoryLabel": "操作",
+      "codepoint": "0xE016",
+      "tags": [
+        "close",
+        "x",
+        "dismiss",
+        "关闭"
+      ]
+    },
+    {
+      "name": "ic_search",
+      "file": "svg/ic_search.svg",
+      "category": "op",
+      "categoryLabel": "操作",
+      "codepoint": "0xE017",
+      "tags": [
+        "search",
+        "find",
+        "搜索",
+        "查找"
+      ]
+    },
+    {
+      "name": "ic_filter",
+      "file": "svg/ic_filter.svg",
+      "category": "op",
+      "categoryLabel": "操作",
+      "codepoint": "0xE018",
+      "tags": [
+        "filter",
+        "funnel",
+        "筛选"
+      ]
+    },
+    {
+      "name": "ic_edit",
+      "file": "svg/ic_edit.svg",
+      "category": "op",
+      "categoryLabel": "操作",
+      "codepoint": "0xE019",
+      "tags": [
+        "edit",
+        "pencil",
+        "write",
+        "编辑",
+        "修改"
+      ]
+    },
+    {
+      "name": "ic_delete",
+      "file": "svg/ic_delete.svg",
+      "category": "op",
+      "categoryLabel": "操作",
+      "codepoint": "0xE01A",
+      "tags": [
+        "delete",
+        "trash",
+        "remove",
+        "删除"
+      ]
+    },
+    {
+      "name": "ic_check",
+      "file": "svg/ic_check.svg",
+      "category": "op",
+      "categoryLabel": "操作",
+      "codepoint": "0xE01B",
+      "tags": [
+        "check",
+        "done",
+        "ok",
+        "确认"
+      ]
+    },
+    {
+      "name": "ic_plus",
+      "file": "svg/ic_plus.svg",
+      "category": "op",
+      "categoryLabel": "操作",
+      "codepoint": "0xE01C",
+      "tags": [
+        "plus",
+        "add",
+        "加"
+      ]
+    },
+    {
+      "name": "ic_minus",
+      "file": "svg/ic_minus.svg",
+      "category": "op",
+      "categoryLabel": "操作",
+      "codepoint": "0xE01D",
+      "tags": [
+        "minus",
+        "subtract",
+        "减"
+      ]
+    },
+    {
+      "name": "ic_more",
+      "file": "svg/ic_more.svg",
+      "category": "op",
+      "categoryLabel": "操作",
+      "codepoint": "0xE01E",
+      "tags": [
+        "more",
+        "ellipsis",
+        "menu",
+        "更多"
+      ]
+    },
+    {
+      "name": "ic_more_vertical",
+      "file": "svg/ic_more_vertical.svg",
+      "category": "op",
+      "categoryLabel": "操作",
+      "codepoint": "0xE01F",
+      "tags": [
+        "more",
+        "ellipsis",
+        "kebab",
+        "更多"
+      ]
+    },
+    {
+      "name": "ic_share",
+      "file": "svg/ic_share.svg",
+      "category": "op",
+      "categoryLabel": "操作",
+      "codepoint": "0xE020",
+      "tags": [
+        "share",
+        "nodes",
+        "分享"
+      ]
+    },
+    {
+      "name": "ic_undo",
+      "file": "svg/ic_undo.svg",
+      "category": "op",
+      "categoryLabel": "操作",
+      "codepoint": "0xE021",
+      "tags": [
+        "undo",
+        "revert",
+        "撤销"
+      ]
+    },
+    {
+      "name": "ic_sort",
+      "file": "svg/ic_sort.svg",
+      "category": "op",
+      "categoryLabel": "操作",
+      "codepoint": "0xE022",
+      "tags": [
+        "sort",
+        "order",
+        "排序"
+      ]
+    },
+    {
+      "name": "ic_drag_handle",
+      "file": "svg/ic_drag_handle.svg",
+      "category": "op",
+      "categoryLabel": "操作",
+      "codepoint": "0xE023",
+      "tags": [
+        "drag",
+        "handle",
+        "reorder",
+        "拖动"
+      ]
+    },
+    {
+      "name": "ic_scan",
+      "file": "svg/ic_scan.svg",
+      "category": "op",
+      "categoryLabel": "操作",
+      "codepoint": "0xE024",
+      "tags": [
+        "scan",
+        "qr",
+        "扫描"
+      ]
+    },
+    {
+      "name": "ic_status_success",
+      "file": "svg/ic_status_success.svg",
+      "category": "status",
+      "categoryLabel": "状态",
+      "codepoint": "0xE025",
+      "tags": [
+        "success",
+        "ok",
+        "check",
+        "成功"
+      ]
+    },
+    {
+      "name": "ic_status_error",
+      "file": "svg/ic_status_error.svg",
+      "category": "status",
+      "categoryLabel": "状态",
+      "codepoint": "0xE026",
+      "tags": [
+        "error",
+        "fail",
+        "失败"
+      ]
+    },
+    {
+      "name": "ic_status_warning",
+      "file": "svg/ic_status_warning.svg",
+      "category": "status",
+      "categoryLabel": "状态",
+      "codepoint": "0xE027",
+      "tags": [
+        "warning",
+        "alert",
+        "警告"
+      ]
+    },
+    {
+      "name": "ic_status_info",
+      "file": "svg/ic_status_info.svg",
+      "category": "status",
+      "categoryLabel": "状态",
+      "codepoint": "0xE028",
+      "tags": [
+        "info",
+        "about",
+        "信息"
+      ]
+    },
+    {
+      "name": "ic_lock",
+      "file": "svg/ic_lock.svg",
+      "category": "status",
+      "categoryLabel": "状态",
+      "codepoint": "0xE029",
+      "tags": [
+        "lock",
+        "secure",
+        "锁"
+      ]
+    },
+    {
+      "name": "ic_offline",
+      "file": "svg/ic_offline.svg",
+      "category": "status",
+      "categoryLabel": "状态",
+      "codepoint": "0xE02A",
+      "tags": [
+        "offline",
+        "no-network",
+        "离线"
+      ]
+    },
+    {
+      "name": "ic_empty",
+      "file": "svg/ic_empty.svg",
+      "category": "status",
+      "categoryLabel": "状态",
+      "codepoint": "0xE02B",
+      "tags": [
+        "empty",
+        "inbox",
+        "tray",
+        "空态"
+      ]
+    },
+    {
+      "name": "ic_loading",
+      "file": "svg/ic_loading.svg",
+      "category": "status",
+      "categoryLabel": "状态",
+      "codepoint": "0xE02C",
+      "tags": [
+        "loading",
+        "spinner",
+        "加载"
+      ]
+    },
+    {
+      "name": "ic_calendar",
+      "file": "svg/ic_calendar.svg",
+      "category": "entry",
+      "categoryLabel": "记账",
+      "codepoint": "0xE02D",
+      "tags": [
+        "calendar",
+        "date",
+        "日历",
+        "日期"
+      ]
+    },
+    {
+      "name": "ic_account",
+      "file": "svg/ic_account.svg",
+      "category": "entry",
+      "categoryLabel": "记账",
+      "codepoint": "0xE02E",
+      "tags": [
+        "account",
+        "card",
+        "bank",
+        "账户",
+        "银行卡"
+      ]
+    },
+    {
+      "name": "ic_note",
+      "file": "svg/ic_note.svg",
+      "category": "entry",
+      "categoryLabel": "记账",
+      "codepoint": "0xE02F",
+      "tags": [
+        "note",
+        "memo",
+        "text",
+        "备注"
+      ]
+    },
+    {
+      "name": "ic_amount",
+      "file": "svg/ic_amount.svg",
+      "category": "entry",
+      "categoryLabel": "记账",
+      "codepoint": "0xE030",
+      "tags": [
+        "amount",
+        "money",
+        "yuan",
+        "金额"
+      ]
+    },
+    {
+      "name": "ic_transfer",
+      "file": "svg/ic_transfer.svg",
+      "category": "entry",
+      "categoryLabel": "记账",
+      "codepoint": "0xE031",
+      "tags": [
+        "transfer",
+        "swap",
+        "转账"
+      ]
+    },
+    {
+      "name": "ic_budget",
+      "file": "svg/ic_budget.svg",
+      "category": "entry",
+      "categoryLabel": "记账",
+      "codepoint": "0xE032",
+      "tags": [
+        "budget",
+        "target",
+        "limit",
+        "预算"
+      ]
+    },
+    {
+      "name": "ic_recurring",
+      "file": "svg/ic_recurring.svg",
+      "category": "entry",
+      "categoryLabel": "记账",
+      "codepoint": "0xE033",
+      "tags": [
+        "recurring",
+        "repeat",
+        "cycle",
+        "周期"
+      ]
+    },
+    {
+      "name": "ic_export",
+      "file": "svg/ic_export.svg",
+      "category": "entry",
+      "categoryLabel": "记账",
+      "codepoint": "0xE034",
+      "tags": [
+        "export",
+        "upload",
+        "导出"
+      ]
+    },
+    {
+      "name": "ic_import",
+      "file": "svg/ic_import.svg",
+      "category": "entry",
+      "categoryLabel": "记账",
+      "codepoint": "0xE035",
+      "tags": [
+        "import",
+        "download",
+        "导入"
+      ]
+    },
+    {
+      "name": "ic_attachment",
+      "file": "svg/ic_attachment.svg",
+      "category": "entry",
+      "categoryLabel": "记账",
+      "codepoint": "0xE036",
+      "tags": [
+        "attachment",
+        "clip",
+        "附件"
+      ]
+    },
+    {
+      "name": "ic_goal",
+      "file": "svg/ic_goal.svg",
+      "category": "entry",
+      "categoryLabel": "记账",
+      "codepoint": "0xE037",
+      "tags": [
+        "goal",
+        "flag",
+        "saving",
+        "目标"
+      ]
+    },
+    {
+      "name": "ic_receipt",
+      "file": "svg/ic_receipt.svg",
+      "category": "entry",
+      "categoryLabel": "记账",
+      "codepoint": "0xE038",
+      "tags": [
+        "receipt",
+        "bill",
+        "invoice",
+        "报销",
+        "票据"
+      ]
+    },
+    {
+      "name": "ic_chart_pie",
+      "file": "svg/ic_chart_pie.svg",
+      "category": "chart",
+      "categoryLabel": "图表",
+      "codepoint": "0xE039",
+      "tags": [
+        "pie",
+        "donut",
+        "占比"
+      ]
+    },
+    {
+      "name": "ic_chart_bars",
+      "file": "svg/ic_chart_bars.svg",
+      "category": "chart",
+      "categoryLabel": "图表",
+      "codepoint": "0xE03A",
+      "tags": [
+        "bars",
+        "column",
+        "柱状"
+      ]
+    },
+    {
+      "name": "ic_chart_line",
+      "file": "svg/ic_chart_line.svg",
+      "category": "chart",
+      "categoryLabel": "图表",
+      "codepoint": "0xE03B",
+      "tags": [
+        "line",
+        "trend",
+        "折线"
+      ]
+    },
+    {
+      "name": "ic_trend_up",
+      "file": "svg/ic_trend_up.svg",
+      "category": "chart",
+      "categoryLabel": "图表",
+      "codepoint": "0xE03C",
+      "tags": [
+        "up",
+        "increase",
+        "涨"
+      ]
+    },
+    {
+      "name": "ic_trend_down",
+      "file": "svg/ic_trend_down.svg",
+      "category": "chart",
+      "categoryLabel": "图表",
+      "codepoint": "0xE03D",
+      "tags": [
+        "down",
+        "decrease",
+        "跌"
+      ]
+    },
+    {
+      "name": "ic_settings",
+      "file": "svg/ic_settings.svg",
+      "category": "ui",
+      "categoryLabel": "通用",
+      "codepoint": "0xE03E",
+      "tags": [
+        "settings",
+        "preferences",
+        "sliders",
+        "设置"
+      ]
+    },
+    {
+      "name": "ic_bell",
+      "file": "svg/ic_bell.svg",
+      "category": "ui",
+      "categoryLabel": "通用",
+      "codepoint": "0xE03F",
+      "tags": [
+        "bell",
+        "notification",
+        "reminder",
+        "提醒"
+      ]
+    },
+    {
+      "name": "ic_moon",
+      "file": "svg/ic_moon.svg",
+      "category": "ui",
+      "categoryLabel": "通用",
+      "codepoint": "0xE040",
+      "tags": [
+        "moon",
+        "dark",
+        "夜"
+      ]
+    },
+    {
+      "name": "ic_sun",
+      "file": "svg/ic_sun.svg",
+      "category": "ui",
+      "categoryLabel": "通用",
+      "codepoint": "0xE041",
+      "tags": [
+        "sun",
+        "light",
+        "日"
+      ]
+    },
+    {
+      "name": "ic_palette",
+      "file": "svg/ic_palette.svg",
+      "category": "ui",
+      "categoryLabel": "通用",
+      "codepoint": "0xE042",
+      "tags": [
+        "palette",
+        "theme",
+        "color",
+        "swatch",
+        "主题",
+        "配色"
+      ]
+    },
+    {
+      "name": "ic_font",
+      "file": "svg/ic_font.svg",
+      "category": "ui",
+      "categoryLabel": "通用",
+      "codepoint": "0xE043",
+      "tags": [
+        "font",
+        "text-size",
+        "字号"
+      ]
+    },
+    {
+      "name": "ic_volume",
+      "file": "svg/ic_volume.svg",
+      "category": "ui",
+      "categoryLabel": "通用",
+      "codepoint": "0xE044",
+      "tags": [
+        "volume",
+        "sound",
+        "音效"
+      ]
+    },
+    {
+      "name": "ic_qr",
+      "file": "svg/ic_qr.svg",
+      "category": "ui",
+      "categoryLabel": "通用",
+      "codepoint": "0xE045",
+      "tags": [
+        "qr",
+        "code",
+        "二维码"
+      ]
+    },
+    {
+      "name": "ic_copy",
+      "file": "svg/ic_copy.svg",
+      "category": "ui",
+      "categoryLabel": "通用",
+      "codepoint": "0xE046",
+      "tags": [
+        "copy",
+        "duplicate",
+        "复制"
+      ]
+    },
+    {
+      "name": "ic_star",
+      "file": "svg/ic_star.svg",
+      "category": "ui",
+      "categoryLabel": "通用",
+      "codepoint": "0xE047",
+      "tags": [
+        "star",
+        "favorite",
+        "收藏"
+      ]
+    },
+    {
+      "name": "ic_tag",
+      "file": "svg/ic_tag.svg",
+      "category": "ui",
+      "categoryLabel": "通用",
+      "codepoint": "0xE048",
+      "tags": [
+        "tag",
+        "label",
+        "标签"
+      ]
+    },
+    {
+      "name": "ic_shield",
+      "file": "svg/ic_shield.svg",
+      "category": "ui",
+      "categoryLabel": "通用",
+      "codepoint": "0xE049",
+      "tags": [
+        "shield",
+        "privacy",
+        "secure",
+        "隐私"
+      ]
+    },
+    {
+      "name": "ic_fingerprint",
+      "file": "svg/ic_fingerprint.svg",
+      "category": "ui",
+      "categoryLabel": "通用",
+      "codepoint": "0xE04A",
+      "tags": [
+        "fingerprint",
+        "biometric",
+        "指纹"
+      ]
+    },
+    {
+      "name": "ic_storage",
+      "file": "svg/ic_storage.svg",
+      "category": "ui",
+      "categoryLabel": "通用",
+      "codepoint": "0xE04B",
+      "tags": [
+        "storage",
+        "database",
+        "存储"
+      ]
+    },
+    {
+      "name": "ic_image",
+      "file": "svg/ic_image.svg",
+      "category": "ui",
+      "categoryLabel": "通用",
+      "codepoint": "0xE04C",
+      "tags": [
+        "image",
+        "photo",
+        "图片"
+      ]
+    },
+    {
+      "name": "ic_camera",
+      "file": "svg/ic_camera.svg",
+      "category": "ui",
+      "categoryLabel": "通用",
+      "codepoint": "0xE04D",
+      "tags": [
+        "camera",
+        "photo",
+        "拍照"
+      ]
+    },
+    {
+      "name": "ic_eye",
+      "file": "svg/ic_eye.svg",
+      "category": "ui",
+      "categoryLabel": "通用",
+      "codepoint": "0xE04E",
+      "tags": [
+        "eye",
+        "show",
+        "visible",
+        "显示"
+      ]
+    },
+    {
+      "name": "ic_eye_off",
+      "file": "svg/ic_eye_off.svg",
+      "category": "ui",
+      "categoryLabel": "通用",
+      "codepoint": "0xE04F",
+      "tags": [
+        "eye-off",
+        "hide",
+        "hidden",
+        "隐藏"
+      ]
+    },
+    {
+      "name": "ic_cloud",
+      "file": "svg/ic_cloud.svg",
+      "category": "ui",
+      "categoryLabel": "通用",
+      "codepoint": "0xE050",
+      "tags": [
+        "cloud",
+        "sync",
+        "backup",
+        "云同步"
+      ]
+    },
+    {
+      "name": "ic_wallet",
+      "file": "svg/ic_wallet.svg",
+      "category": "ui",
+      "categoryLabel": "通用",
+      "codepoint": "0xE051",
+      "tags": [
+        "wallet",
+        "balance",
+        "钱包",
+        "余额"
+      ]
+    },
+    {
+      "name": "ic_card",
+      "file": "svg/ic_card.svg",
+      "category": "ui",
+      "categoryLabel": "通用",
+      "codepoint": "0xE052",
+      "tags": [
+        "card",
+        "credit",
+        "银行卡"
+      ]
+    },
+    {
+      "name": "ic_arrow_up_right",
+      "file": "svg/ic_arrow_up_right.svg",
+      "category": "ui",
+      "categoryLabel": "通用",
+      "codepoint": "0xE053",
+      "tags": [
+        "arrow",
+        "up-right",
+        "out"
+      ]
+    },
+    {
+      "name": "ic_arrow_down_left",
+      "file": "svg/ic_arrow_down_left.svg",
+      "category": "ui",
+      "categoryLabel": "通用",
+      "codepoint": "0xE054",
+      "tags": [
+        "arrow",
+        "down-left",
+        "in"
+      ]
+    },
+    {
+      "name": "ic_chevron_up",
+      "file": "svg/ic_chevron_up.svg",
+      "category": "op",
+      "categoryLabel": "操作",
+      "codepoint": "0xE055",
+      "tags": [
+        "chevron",
+        "collapse",
+        "expand-less",
+        "向上",
+        "收起"
+      ]
+    },
+    {
+      "name": "ic_circle_plus",
+      "file": "svg/ic_circle_plus.svg",
+      "category": "op",
+      "categoryLabel": "操作",
+      "codepoint": "0xE056",
+      "tags": [
+        "add",
+        "plus",
+        "circle",
+        "新增",
+        "添加"
+      ]
+    },
+    {
+      "name": "ic_circle_minus",
+      "file": "svg/ic_circle_minus.svg",
+      "category": "op",
+      "categoryLabel": "操作",
+      "codepoint": "0xE057",
+      "tags": [
+        "remove",
+        "minus",
+        "circle",
+        "移除",
+        "删除"
+      ]
+    },
+    {
+      "name": "ic_play",
+      "file": "svg/ic_play.svg",
+      "category": "op",
+      "categoryLabel": "操作",
+      "codepoint": "0xE058",
+      "tags": [
+        "play",
+        "run",
+        "start",
+        "执行",
+        "开始"
+      ]
+    },
+    {
+      "name": "ic_list_check",
+      "file": "svg/ic_list_check.svg",
+      "category": "op",
+      "categoryLabel": "操作",
+      "codepoint": "0xE059",
+      "tags": [
+        "list",
+        "check",
+        "todo",
+        "核对",
+        "勾选"
+      ]
+    },
+    {
+      "name": "ic_merge",
+      "file": "svg/ic_merge.svg",
+      "category": "op",
+      "categoryLabel": "操作",
+      "codepoint": "0xE05A",
+      "tags": [
+        "merge",
+        "combine",
+        "consolidate",
+        "合并"
+      ]
+    },
+    {
+      "name": "ic_folder_plus",
+      "file": "svg/ic_folder_plus.svg",
+      "category": "op",
+      "categoryLabel": "操作",
+      "codepoint": "0xE05B",
+      "tags": [
+        "folder",
+        "new",
+        "create",
+        "新建文件夹"
+      ]
+    },
+    {
+      "name": "ic_folder_move",
+      "file": "svg/ic_folder_move.svg",
+      "category": "op",
+      "categoryLabel": "操作",
+      "codepoint": "0xE05C",
+      "tags": [
+        "folder",
+        "move",
+        "移动文件夹"
+      ]
+    },
+    {
+      "name": "ic_history",
+      "file": "svg/ic_history.svg",
+      "category": "entry",
+      "categoryLabel": "记账",
+      "codepoint": "0xE05D",
+      "tags": [
+        "history",
+        "log",
+        "recent",
+        "历史",
+        "操作日志"
+      ]
+    },
+    {
+      "name": "ic_mood",
+      "file": "svg/ic_mood.svg",
+      "category": "status",
+      "categoryLabel": "状态",
+      "codepoint": "0xE05E",
+      "tags": [
+        "mood",
+        "smile",
+        "happy",
+        "正向",
+        "情绪"
+      ]
+    },
+    {
+      "name": "ic_gift",
+      "file": "svg/ic_gift.svg",
+      "category": "ui",
+      "categoryLabel": "通用",
+      "codepoint": "0xE05F",
+      "tags": [
+        "gift",
+        "present",
+        "reward",
+        "礼物",
+        "奖励"
+      ]
+    },
+    {
+      "name": "ic_trophy",
+      "file": "svg/ic_trophy.svg",
+      "category": "ui",
+      "categoryLabel": "通用",
+      "codepoint": "0xE060",
+      "tags": [
+        "trophy",
+        "award",
+        "win",
+        "成就",
+        "奖杯"
+      ]
+    },
+    {
+      "name": "ic_flame",
+      "file": "svg/ic_flame.svg",
+      "category": "ui",
+      "categoryLabel": "通用",
+      "codepoint": "0xE061",
+      "tags": [
+        "flame",
+        "fire",
+        "streak",
+        "连续",
+        "火苗"
+      ]
+    },
+    {
+      "name": "ic_celebration",
+      "file": "svg/ic_celebration.svg",
+      "category": "ui",
+      "categoryLabel": "通用",
+      "codepoint": "0xE062",
+      "tags": [
+        "celebration",
+        "party",
+        "achievement",
+        "庆祝",
+        "达成"
+      ]
+    },
+    {
+      "name": "ic_cloud_upload",
+      "file": "svg/ic_cloud_upload.svg",
+      "category": "ui",
+      "categoryLabel": "通用",
+      "codepoint": "0xE063",
+      "tags": [
+        "cloud",
+        "upload",
+        "backup",
+        "上传",
+        "备份"
+      ]
+    },
+    {
+      "name": "ic_cloud_download",
+      "file": "svg/ic_cloud_download.svg",
+      "category": "ui",
+      "categoryLabel": "通用",
+      "codepoint": "0xE064",
+      "tags": [
+        "cloud",
+        "download",
+        "restore",
+        "下载",
+        "恢复"
+      ]
+    },
+    {
+      "name": "ic_cat_clothes",
+      "file": "svg/ic_cat_clothes.svg",
+      "category": "category",
+      "categoryLabel": "分类",
+      "codepoint": "0xE074",
+      "tags": [
+        "clothes",
+        "shirt",
+        "apparel",
+        "衣服"
+      ]
+    },
+    {
+      "name": "ic_cat_cosmetics",
+      "file": "svg/ic_cat_cosmetics.svg",
+      "category": "category",
+      "categoryLabel": "分类",
+      "codepoint": "0xE078",
+      "tags": [
+        "cosmetics",
+        "lipstick",
+        "makeup",
+        "化妆品"
+      ]
+    },
+    {
+      "name": "ic_cat_umbrella",
+      "file": "svg/ic_cat_umbrella.svg",
+      "category": "category",
+      "categoryLabel": "分类",
+      "codepoint": "0xE07C",
+      "tags": [
+        "umbrella",
+        "rain",
+        "雨伞"
+      ]
+    },
+    {
+      "name": "ic_cat_cleaning",
+      "file": "svg/ic_cat_cleaning.svg",
+      "category": "category",
+      "categoryLabel": "分类",
+      "codepoint": "0xE07D",
+      "tags": [
+        "cleaning",
+        "spray",
+        "清洁"
+      ]
+    },
+    {
+      "name": "ic_cat_haircut",
+      "file": "svg/ic_cat_haircut.svg",
+      "category": "category",
+      "categoryLabel": "分类",
+      "codepoint": "0xE080",
+      "tags": [
+        "haircut",
+        "scissors",
+        "salon",
+        "理发"
+      ]
+    },
+    {
+      "name": "ic_cat_pet",
+      "file": "svg/ic_cat_pet.svg",
+      "category": "category",
+      "categoryLabel": "分类",
+      "codepoint": "0xE081",
+      "tags": [
+        "pet",
+        "paw",
+        "宠物"
+      ]
+    },
+    {
+      "name": "ic_cat_baby",
+      "file": "svg/ic_cat_baby.svg",
+      "category": "category",
+      "categoryLabel": "分类",
+      "codepoint": "0xE082",
+      "tags": [
+        "baby",
+        "bottle",
+        "婴儿"
+      ]
+    },
+    {
+      "name": "ic_cat_furniture",
+      "file": "svg/ic_cat_furniture.svg",
+      "category": "category",
+      "categoryLabel": "分类",
+      "codepoint": "0xE084",
+      "tags": [
+        "furniture",
+        "sofa",
+        "家具"
+      ]
+    },
+    {
+      "name": "ic_cat_car",
+      "file": "svg/ic_cat_car.svg",
+      "category": "category",
+      "categoryLabel": "分类",
+      "codepoint": "0xE085",
+      "tags": [
+        "car",
+        "vehicle",
+        "汽车"
+      ]
+    },
+    {
+      "name": "ic_cat_electricity",
+      "file": "svg/ic_cat_electricity.svg",
+      "category": "category",
+      "categoryLabel": "分类",
+      "codepoint": "0xE091",
+      "tags": [
+        "electricity",
+        "bulb",
+        "电费"
+      ]
+    },
+    {
+      "name": "ic_cat_game",
+      "file": "svg/ic_cat_game.svg",
+      "category": "category",
+      "categoryLabel": "分类",
+      "codepoint": "0xE09C",
+      "tags": [
+        "game",
+        "controller",
+        "游戏"
+      ]
+    },
+    {
+      "name": "ic_cat_sports",
+      "file": "svg/ic_cat_sports.svg",
+      "category": "category",
+      "categoryLabel": "分类",
+      "codepoint": "0xE09D",
+      "tags": [
+        "sports",
+        "ball",
+        "运动"
+      ]
+    },
+    {
+      "name": "ic_cat_travel",
+      "file": "svg/ic_cat_travel.svg",
+      "category": "category",
+      "categoryLabel": "分类",
+      "codepoint": "0xE09E",
+      "tags": [
+        "travel",
+        "luggage",
+        "旅行"
+      ]
+    },
+    {
+      "name": "ic_cat_tv",
+      "file": "svg/ic_cat_tv.svg",
+      "category": "category",
+      "categoryLabel": "分类",
+      "codepoint": "0xE0A4",
+      "tags": [
+        "tv",
+        "screen",
+        "电视"
+      ]
+    },
+    {
+      "name": "ic_cat_laptop",
+      "file": "svg/ic_cat_laptop.svg",
+      "category": "category",
+      "categoryLabel": "分类",
+      "codepoint": "0xE0AC",
+      "tags": [
+        "laptop",
+        "computer",
+        "电脑"
+      ]
+    },
+    {
+      "name": "ic_cat_printer",
+      "file": "svg/ic_cat_printer.svg",
+      "category": "category",
+      "categoryLabel": "分类",
+      "codepoint": "0xE0AE",
+      "tags": [
+        "printer",
+        "print",
+        "打印"
+      ]
+    },
+    {
+      "name": "ic_cat_library",
+      "file": "svg/ic_cat_library.svg",
+      "category": "category",
+      "categoryLabel": "分类",
+      "codepoint": "0xE0AF",
+      "tags": [
+        "library",
+        "shelf",
+        "图书馆"
+      ]
+    },
+    {
+      "name": "ic_cat_redpacket",
+      "file": "svg/ic_cat_redpacket.svg",
+      "category": "category",
+      "categoryLabel": "分类",
+      "codepoint": "0xE0B2",
+      "tags": [
+        "redpacket",
+        "hongbao",
+        "红包"
+      ]
+    },
+    {
+      "name": "ic_cat_bill",
+      "file": "svg/ic_cat_bill.svg",
+      "category": "category",
+      "categoryLabel": "分类",
+      "codepoint": "0xE0B9",
+      "tags": [
+        "bill",
+        "cash",
+        "钞票"
+      ]
+    },
+    {
+      "name": "ic_cat_percent",
+      "file": "svg/ic_cat_percent.svg",
+      "category": "category",
+      "categoryLabel": "分类",
+      "codepoint": "0xE0BC",
+      "tags": [
+        "percent",
+        "rate",
+        "费率"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" role="img" aria-label="ic_cat_piggy">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <circle cx="12" cy="12.75" r="6.25"/>
+  <path d="M7.5 9.5 6.25 7.75l2.5.75"/>
+  <path d="M5.75 13h2.5"/>
+  <path d="M9 18.75v1.5"/>
+  <path d="M15 18.75v1.5"/>
+  <path d="M10.5 7v2"/>
+  </g>
+</svg>

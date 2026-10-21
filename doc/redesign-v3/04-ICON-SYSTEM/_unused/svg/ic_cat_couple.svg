@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" role="img" aria-label="ic_cat_couple">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <circle cx="8.5" cy="8.5" r="3.25"/>
+  <circle cx="15.5" cy="8.5" r="3.25"/>
+  <path d="M4.25 19.75c0-3.25 1.9-5.25 4.25-5.25s4.25 2 4.25 5.25"/>
+  <path d="M11.25 19.75c0-3.25 1.9-5.25 4.25-5.25s4.25 2 4.25 5.25"/>
+  </g>
+</svg>

@@ -1,0 +1,1888 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>素记 Plain · 全部页面高保真 · 亮态中文</title>
+<style>
+
+/* ── 字体：交付自带优先（12-FONTS/），仓库路径兜底 ──
+   本机与仓库均无 Inter；MiSans 是仓库内唯一真实存在、免费可商用、且带 tnum 的字体。
+   双 src 列表：第一个 404 时浏览器自动降级到第二个（已实测 Chrome 行为）。        */
+@font-face{font-family:"MiSans";font-style:normal;font-weight:400;font-display:swap;
+  src:url("12-FONTS/MiSans-Regular.ttf") format("truetype"),
+      url("../plain/assets/fonts/misans/MiSans-Regular.ttf") format("truetype")}
+@font-face{font-family:"MiSans";font-style:normal;font-weight:500;font-display:swap;
+  src:url("12-FONTS/MiSans-Medium.ttf") format("truetype"),
+      url("../plain/assets/fonts/misans/MiSans-Medium.ttf") format("truetype")}
+@font-face{font-family:"MiSans";font-style:normal;font-weight:600;font-display:swap;
+  src:url("12-FONTS/MiSans-Semibold.ttf") format("truetype"),
+      url("../plain/assets/fonts/misans/MiSans-Semibold.ttf") format("truetype")}
+@font-face{font-family:"MiSans";font-style:normal;font-weight:700;font-display:swap;
+  src:url("12-FONTS/MiSans-Bold.ttf") format("truetype"),
+      url("../plain/assets/fonts/misans/MiSans-Bold.ttf") format("truetype")}
+
+*{box-sizing:border-box;margin:0;padding:0;-webkit-font-smoothing:antialiased}
+html,body{background:#E9E9EC;color:#121214;
+  font-family:"MiSans",Inter,"Segoe UI",system-ui,-apple-system,"HarmonyOS Sans SC","PingFang SC","Microsoft YaHei",sans-serif;
+  /* 账本类应用：全站数字走等宽数字。tnum 只作用于 0-9 与相关标点，不影响中文。
+     MiSans 的 tnum 已实测存在（GSUB: pnum + tnum，开后数字统一 594/1000）。 */
+  font-variant-numeric:tabular-nums;font-feature-settings:"tnum" 1}
+body{padding:0 0 72px}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+a{text-decoration:none;color:inherit;cursor:pointer}
+svg{display:block}
+
+/* ── 顶部工具条（不参与设计系统，纯脚手架） ── */
+.toolbar{position:sticky;top:0;z-index:50;display:flex;flex-wrap:wrap;gap:18px;align-items:center;
+  padding:14px 22px;background:#FFFFFF;border-bottom:1px solid #D8D8DE;box-shadow:0 1px 3px rgba(0,0,0,.05)}
+.tb-brand{font-weight:700;font-size:15px;letter-spacing:.01em}
+.tb-brand small{font-weight:500;color:#5E5E65;margin-left:8px;font-size:12px}
+.tb-group{display:flex;align-items:center;gap:6px}
+.tb-lab{font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#7A7A82}
+.seg2{display:inline-flex;background:#F0F0F3;border-radius:9px;padding:2px}
+.seg2 button{padding:5px 11px;border-radius:7px;font-size:12.5px;font-weight:600;color:#5E5E65}
+.seg2 button.on{background:#FFFFFF;color:#121214;box-shadow:0 1px 2px rgba(0,0,0,.10)}
+.screenpicker{display:flex;flex-wrap:wrap;gap:6px}
+.screenpicker button{padding:5px 10px;border-radius:7px;font-size:12.5px;font-weight:600;
+  background:#F0F0F3;color:#5E5E65}
+.screenpicker button.on{background:#121214;color:#fff}
+
+/* ── 舞台 ── */
+.stage{display:flex;flex-wrap:wrap;gap:34px;justify-content:center;padding:34px 22px;
+  --tscale:1}
+body[data-view="single"] .frame:not(.active){display:none}
+body[data-view="single"] .stage{justify-content:center}
+
+/* ── 手机壳 ── */
+.frame{position:relative;width:390px;height:844px;flex:0 0 auto}
+.frame .bezel{position:absolute;inset:0;border-radius:46px;background:var(--surface);
+  border:1px solid var(--line);box-shadow:0 18px 44px var(--shadow-3);overflow:hidden}
+.frame .flabel{position:absolute;top:-24px;left:2px;font-size:11.5px;font-weight:700;
+  letter-spacing:.05em;color:#5E5E65;text-transform:uppercase}
+.screen{position:absolute;inset:0;display:flex;flex-direction:column;overflow:hidden;
+  background:var(--app-bg);color:var(--ink)}
+
+/* ── 状态栏 ── */
+.statusbar{height:47px;flex:0 0 47px;display:flex;align-items:flex-end;justify-content:space-between;
+  padding:0 22px 6px;color:var(--ink);font-size:14.5px;font-weight:600;letter-spacing:.01em}
+.sb-marks{display:flex;gap:6px;align-items:center;color:var(--ink)}
+
+/* ── 顶栏 ── */
+.topbar{height:56px;flex:0 0 56px;display:flex;align-items:center;gap:4px;padding:0 8px;
+  background:var(--app-bg)}
+.topbar h1{flex:1;text-align:center;font-size:calc(20px * var(--tscale));font-weight:600;
+  letter-spacing:0;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  padding:0 4px}
+.tb-right{display:flex;align-items:center;gap:2px;min-width:40px;justify-content:flex-end}
+.iconbtn{width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;
+  color:var(--ink-2);flex:0 0 auto;background:none}
+.iconbtn:active{background:var(--surface-inset);transform:scale(.93)}
+.iconbtn.ghost{color:var(--ink-2)}
+.textbtn{height:34px;padding:0 10px;border-radius:12px;font-size:calc(15px * var(--tscale));
+  font-weight:500;color:var(--primary-ink);display:flex;align-items:center}
+.textbtn:active{background:var(--primary-tint)}
+
+/* ── 滚动区 ── */
+.scroll{flex:1;overflow-y:auto;overflow-x:hidden;padding:0 16px}
+.scroll::-webkit-scrollbar{width:0}
+.scroll-pad{height:24px}
+.hairline{height:1px;background:var(--line);margin:0}
+.eyebrow{font-size:calc(12px * var(--tscale));font-weight:600;letter-spacing:.08em;
+  text-transform:uppercase;color:var(--muted);margin:0 0 8px 2px}
+
+/* ── 金额（四段式） ── */
+.amt{display:inline-flex;align-items:baseline;font-variant-numeric:tabular-nums;
+  font-feature-settings:"tnum" 1;letter-spacing:-.02em;color:var(--ink)}
+.amt .cur{font-size:.62em;color:var(--muted);margin-right:.06em;font-weight:600}
+.amt .pnt,.amt .int{font-size:1em}
+.amt .dec{font-size:.62em;color:var(--muted);font-weight:600}
+.amt.xl{font-size:calc(34px * var(--tscale));font-weight:700;line-height:1.16}
+.amt.l{font-size:calc(22px * var(--tscale));font-weight:600;line-height:1.24}
+.amt.s{font-size:calc(15px * var(--tscale));font-weight:600;line-height:1.34;letter-spacing:-.01em}
+.amt.input{font-size:calc(44px * var(--tscale));font-weight:600;line-height:1.12;letter-spacing:-.03em}
+.amt.s .dec{font-size:1em;color:inherit}
+.tone-income{color:var(--income)}
+.tone-income .int,.tone-income .pnt{color:var(--income)}
+.tone-income .cur,.tone-income .dec{color:var(--income);opacity:.7}
+/* 涨红跌绿：中国股市/记账惯例，涨=红、跌=绿。方向另由箭头图标承担。 */
+.tone-up{color:var(--income-ink)}
+.tone-dn{color:var(--dn-ink)}
+.tone-muted{color:var(--muted)}
+
+/* ── Hero 区（无卡片、无渐变、无光晕） ── */
+.hero{padding:14px 0 0}
+.hero .hairline{margin:0}
+.hero-label{font-size:calc(12px * var(--tscale));font-weight:600;letter-spacing:.08em;
+  text-transform:uppercase;color:var(--muted);margin:16px 0 8px 2px}
+.hero-amt{font-size:calc(34px * var(--tscale));margin:0 0 16px 0}
+.hero-split{display:flex;gap:28px;padding:0 0 16px}
+.hs{display:flex;flex-direction:column;gap:3px}
+.hs-l{font-size:calc(12px * var(--tscale));font-weight:600;letter-spacing:.04em;color:var(--muted)}
+.month-note{display:flex;align-items:center;gap:6px;padding:12px 0 0 2px;
+  font-size:calc(12px * var(--tscale));font-weight:500;color:var(--muted)}
+.month-note.tight{padding:14px 2px 12px}
+.month-note svg{color:var(--faint)}
+.dot-sep{color:var(--faint);margin:0 2px}
+
+/* ── 分组面板 ── */
+.grp{margin-top:32px}
+.panel{border-radius:16px;background:var(--surface);border:1px solid var(--line);overflow:hidden}
+
+/* ── 列表行 ── */
+.row{display:flex;align-items:center;gap:10px;min-height:60px;padding:9px 16px;color:inherit}
+.row + .row{border-top:1px solid var(--line-soft);margin-top:0}
+.row:active{background:var(--surface-inset)}
+/* ⚠️ 这里必须是独立类，不能写成 `.row .rcol`。
+   早先写成 `.row .rcol` 时，分类管理页（用 .crow2 而不是 .row）拿不到
+   flex-direction:column，结果「餐饮」和它的别名挤成一行
+   「餐饮三餐、外卖、堂食」——看起来像忘了加分隔符，其实是作用域没命中。 */
+.rcol{flex:1;display:flex;flex-direction:column;align-items:flex-start;gap:2px;min-width:0}
+.rcol .rt{font-size:calc(15px * var(--tscale));font-weight:500;color:var(--ink);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.rcol .sub{font-size:calc(12px * var(--tscale));font-weight:500;color:var(--muted);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.rw-amt{font-variant-numeric:tabular-nums;font-size:calc(15px * var(--tscale));font-weight:600;
+  letter-spacing:-.01em;flex:0 0 auto}
+.dot6{width:6px;height:6px;border-radius:50%;flex:0 0 6px}
+.dot6-none{background:transparent}
+.dot8{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+.chev{color:var(--faint);flex:0 0 auto}
+.ricos{width:26px;height:22px;display:flex;align-items:center;color:var(--ink-2);flex:0 0 auto}
+.sicon{color:var(--ink-2);flex:0 0 auto;width:20px}
+.srow .rcol{margin-left:2px}
+.sval{font-size:calc(14px * var(--tscale));font-weight:500;color:var(--muted);margin-right:2px}
+.crow2{display:flex;align-items:center;gap:12px;min-height:72px;padding:12px 16px}
+.crow2 + .crow2{border-top:1px solid var(--line-soft)}
+.cicon{flex:0 0 24px;display:flex;align-items:center;justify-content:center}
+.cnt{font-size:calc(12px * var(--tscale));font-weight:500;color:var(--muted);flex:0 0 auto}
+.drag{color:var(--faint);flex:0 0 auto}
+
+/* ── 底部导航 ── */
+.nav{height:60px;flex:0 0 60px;display:flex;border-top:1px solid var(--line);background:var(--app-bg);
+  padding-bottom:env(safe-area-inset-bottom)}
+.navitem{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;
+  color:var(--muted)}
+.navitem.on{color:var(--primary-ink)}
+.navitem:active svg{transform:scale(.93)}
+.navlab{font-size:calc(12px * var(--tscale));font-weight:500;white-space:nowrap}
+.navcenter{justify-content:center}
+.navfab{width:44px;height:44px;border-radius:14px;background:var(--accent);color:var(--fab-ic);
+  display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px var(--shadow-accent)}
+.navcenter:active .navfab{background:var(--accent-pressed);transform:scale(.94)}
+
+/* ── 按钮 ── */
+.btn{height:52px;border-radius:12px;display:flex;align-items:center;justify-content:center;gap:8px;
+  font-size:calc(15px * var(--tscale));font-weight:600;padding:0 20px;min-width:88px}
+.btn.primary{background:var(--primary);color:var(--on-primary);box-shadow:0 1px 2px var(--shadow-1)}
+.btn.primary:active{background:var(--primary-pressed);transform:scale(.97)}
+.btn2{height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;gap:8px;
+  font-size:calc(15px * var(--tscale));font-weight:500;padding:0 16px;
+  border:1px solid var(--line-strong);color:var(--ink);background:none}
+.btn2:active{background:var(--surface-inset);transform:scale(.97)}
+/* 危险按钮：整颗走危险色，不能只是图标红、文字黑。
+   删除是不可逆操作，按钮本身必须读起来「危险」。 */
+.btn2.danger{border-color:var(--income-line);color:var(--income-ink)}
+.btn2.danger svg{color:var(--income-ink)}
+.btn2.wide{width:100%}
+.foot-note{font-size:calc(12px * var(--tscale));color:var(--muted);text-align:center;line-height:1.5}
+
+/* ── 引导页 ── */
+.page-guide{padding:0 24px;background:var(--app-bg)}
+.guide-top{padding:22px 0 0}
+.wordmark{font-size:calc(15px * var(--tscale));font-weight:700;letter-spacing:.06em;color:var(--ink)}
+.guide-hero{margin:26px 0 0}
+.guide-hero .hairline{margin:0}
+.guide-hero .hero-amt{margin:18px 0 18px}
+.guide-h{font-size:calc(20px * var(--tscale));font-weight:600;line-height:1.4;margin:30px 0 8px 2px;
+  color:var(--ink)}
+.guide-p{font-size:calc(14px * var(--tscale));line-height:1.65;color:var(--muted);margin:0 0 4px 2px}
+.featlist{margin:28px 0 0}
+.feat{display:flex;gap:14px;align-items:flex-start;padding:14px 0;border-top:1px solid var(--line-soft)}
+.feat svg{color:var(--ink-2);margin-top:1px;flex:0 0 auto}
+.fcol{display:flex;flex-direction:column;gap:3px}
+.ft{font-size:calc(15px * var(--tscale));font-weight:500;color:var(--ink)}
+.fs{font-size:calc(12px * var(--tscale));font-weight:500;color:var(--muted)}
+.guide-foot{margin:auto 0 0;padding:0 0 34px;display:flex;flex-direction:column;gap:14px}
+
+/* ── 记一笔 ── */
+.ttabs{display:flex;gap:4px;padding:0 12px 6px;overflow-x:auto;flex:0 0 auto}
+.ttabs::-webkit-scrollbar{display:none}
+/* 右缘渐隐：英文 5 个 Tab 放不下时必须能滚（已实测）。
+   没有这个提示，被切一半的 "Borrow" 看起来像渲染错误而不是「还有内容」。
+   中文场景下右侧本来就是空的，遮罩作用在空白上，无副作用。 */
+.ttabs{-webkit-mask-image:linear-gradient(90deg,#000 calc(100% - 28px),transparent);
+  mask-image:linear-gradient(90deg,#000 calc(100% - 28px),transparent)}
+.ttab{height:44px;padding:0 14px;border-radius:12px;font-size:calc(14px * var(--tscale));
+  font-weight:500;color:var(--muted);white-space:nowrap;flex:0 0 auto;
+  display:inline-flex;align-items:center}
+.ttab.on{color:var(--ink);font-weight:600;background:var(--primary-tint);
+  box-shadow:inset 0 0 0 1px var(--primary-ink)}
+.amount-block{padding:2px 16px 10px;display:flex;flex-direction:column;align-items:flex-end;
+  flex:0 0 auto}
+/* 记一笔的中段（分类格 + 属性行）——唯一可滚区，键盘永远贴底。
+   这样在「特大字号 × 英文」下也只是这一区滚动，不会把键盘顶出屏幕。 */
+.addbody{flex:1 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden}
+.chip{position:relative;height:40px;padding:0 12px;border-radius:999px;
+  border:1px solid var(--line);background:var(--surface);display:inline-flex;align-items:center;
+  gap:6px;font-size:calc(12px * var(--tscale));font-weight:600;color:var(--ink-2);
+  white-space:nowrap;flex:0 0 auto}
+.chip svg{color:var(--muted);flex:0 0 auto}
+.chip.ph{border-style:dashed;color:var(--muted);font-weight:500}
+.chip::after{content:"";position:absolute;left:0;top:50%;transform:translateY(-50%);
+  width:100%;height:44px}
+.attrchips{display:flex;flex-wrap:wrap;gap:8px;padding:2px 16px 10px}
+.expr{font-size:calc(14px * var(--tscale));font-weight:500;color:var(--muted);
+  font-variant-numeric:tabular-nums;display:flex;align-items:center;height:20px}
+.caret{display:inline-block;width:2px;height:15px;background:var(--primary);margin-left:3px;
+  vertical-align:-2px}
+.amt-line{margin-top:4px}
+.catgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;padding:10px 16px;flex:0 0 auto}
+.tile{height:62px;border-radius:12px;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;gap:6px;background:none;border:1.5px solid transparent;padding:0 2px}
+.tile-n{font-size:calc(12px * var(--tscale));font-weight:500;color:var(--ink-2);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.tile.on{background:var(--primary-tint);border-color:var(--primary-ink)}
+.tile.on .tile-n{color:var(--primary-ink);font-weight:600}
+.tile:active{background:var(--surface-inset);transform:scale(.96)}
+.tile.more svg{color:var(--muted)}
+.keypad{flex:0 0 auto;display:grid;grid-template-columns:repeat(4,1fr);gap:6px;padding:8px 12px 10px}
+.key{height:62px;border-radius:12px;background:var(--surface-2);border:1px solid var(--line);
+  box-shadow:0 1px 2px var(--shadow-1);font-size:calc(22px * var(--tscale));font-weight:500;
+  color:var(--ink);display:flex;align-items:center;justify-content:center;
+  font-variant-numeric:tabular-nums}
+.key:active{background:var(--primary-tint);transform:scale(.96)}
+.key.op{color:var(--ink-2)}
+.key.blank{background:none;border:0;box-shadow:none}
+.key.ok{grid-column:span 2;background:var(--accent);border-color:var(--accent);
+  color:var(--on-accent);font-size:calc(15px * var(--tscale));font-weight:600;
+  box-shadow:0 2px 8px var(--shadow-accent)}
+.key.ok:active{background:var(--accent-pressed)}
+.safearea{height:34px;flex:0 0 34px}
+
+/* ── 详情 ── */
+.detail-hero{padding:22px 0 26px;text-align:center}
+.detail-hero .hero-label{margin:0 0 10px}
+.dh-amt{display:flex;justify-content:center}
+.dh-meta{display:flex;align-items:center;justify-content:center;gap:8px;margin-top:14px;
+  font-size:calc(12px * var(--tscale));font-weight:500;color:var(--muted)}
+.dh-meta .sep{color:var(--faint)}
+.detail-panel{margin:0}
+.drow{display:flex;align-items:center;gap:16px;min-height:56px;padding:10px 16px}
+.drow + .drow{border-top:1px solid var(--line-soft)}
+.dk{font-size:calc(14px * var(--tscale));font-weight:400;color:var(--muted);flex:0 0 76px}
+.dv{flex:1;display:flex;align-items:center;gap:8px;justify-content:flex-end;text-align:right;
+  font-size:calc(15px * var(--tscale));font-weight:500;color:var(--ink)}
+.dv.note{font-size:calc(14px * var(--tscale));font-weight:400;color:var(--ink-2);line-height:1.5}
+.danger-zone{margin:32px 0 0;display:flex;flex-direction:column;gap:10px}
+.danger-zone .btn2{width:100%}
+
+/* ── 报表 ── */
+.cmppanel{margin-top:4px;padding:18px 16px 10px}
+.cmppanel .eyebrow{margin-left:0}
+.crow{display:flex;align-items:center;height:44px;gap:12px}
+.crow + .crow{border-top:1px solid var(--line-soft)}
+.ck{flex:1;font-size:calc(15px * var(--tscale));font-weight:500;color:var(--ink)}
+.cv{flex:0 0 auto}
+.cd{display:flex;align-items:center;gap:3px;flex:0 0 76px;justify-content:flex-end;
+  font-size:calc(12px * var(--tscale));font-weight:600}
+.chartpanel{margin-top:12px;padding:18px 16px 16px}
+.chartpanel .eyebrow{margin-left:0}
+.donut-wrap{display:flex;justify-content:center;padding:4px 0 14px}
+.dn-c1{font-size:18px;font-weight:600;fill:var(--ink);font-variant-numeric:tabular-nums}
+.dn-c1 .dn-cur,.dn-c1 .dn-dec{font-size:.62em;fill:var(--muted)}
+.dn-c2{font-size:8.5px;font-weight:600;letter-spacing:.1em;fill:var(--muted)}
+.legend{display:flex;flex-direction:column}
+.lrow{display:flex;align-items:center;height:40px;gap:0}
+.lname{flex:1;font-size:calc(14px * var(--tscale));color:var(--ink);margin-left:12px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-right:8px}
+.lpct{flex:0 0 48px;text-align:right;font-size:calc(15px * var(--tscale));font-weight:600;
+  color:var(--ink-2);font-variant-numeric:tabular-nums}
+.lamt{flex:0 0 92px;text-align:right;font-size:calc(15px * var(--tscale));font-weight:600;
+  color:var(--ink);font-variant-numeric:tabular-nums}
+.bars{display:block;margin-top:6px}
+
+/* ── 分类管理 ── */
+.segwrap{padding:0 16px 12px;flex:0 0 auto}
+.seg{display:flex;background:var(--surface-inset);border-radius:12px;padding:3px;height:36px}
+.segi{flex:1;border-radius:9px;font-size:calc(14px * var(--tscale));font-weight:500;
+  color:var(--muted)}
+.segi.on{background:var(--surface);color:var(--ink);font-weight:600;
+  box-shadow:0 1px 2px var(--shadow-1)}
+.catpanel{margin-top:0}
+.footbar{padding:10px 16px 0;flex:0 0 auto;background:var(--app-bg);
+  border-top:1px solid var(--line)}
+
+/* ── 设置 ── */
+.privacy-strip{display:flex;gap:12px;align-items:center;margin-top:4px;padding:14px 16px;
+  border-radius:16px;background:var(--ok-soft);color:var(--ok-ink)}
+.privacy-strip svg{color:var(--ok-ink);flex:0 0 auto}
+.pcol{display:flex;flex-direction:column;gap:2px}
+.pt{font-size:calc(14px * var(--tscale));font-weight:600}
+.ps{font-size:calc(12px * var(--tscale));font-weight:500;opacity:.9}
+
+/* ── 开关 ── */
+.switch{width:48px;height:28px;border-radius:999px;background:var(--line);border:1px solid var(--line);
+  position:relative;flex:0 0 48px;display:inline-block}
+.switch .knob{position:absolute;top:2px;left:2px;width:22px;height:22px;border-radius:50%;
+  background:var(--surface);box-shadow:0 1px 2px var(--shadow-1);transition:transform .15s cubic-bezier(.4,0,.2,1)}
+.switch.on{background:var(--primary);border-color:var(--primary)}
+.switch.on .knob{transform:translateX(20px)}
+
+/* ── 触控命中区补足 ──────────────────────────────────────────────
+   规则：视觉尺寸允许小于 44，但「命中区」必须 ≥ 44×44。
+   做法：用 ::after 撑一层透明覆盖层，不改变视觉与布局。
+   仅对视觉尺寸 < 44 的可点元素使用；≥44 的元素（.key 62 / .navitem 60 /
+   .row 60 / .drow 56 / .attrrow 44 / .crow 44 / .navfab 44 / .tile 68）
+   本身已合规，不加。                                                */
+.textbtn,.segi,.switch{position:relative}
+.textbtn::after,.segi::after,.switch::after{
+  content:"";position:absolute;left:0;top:50%;transform:translateY(-50%);
+  width:100%;height:44px;pointer-events:auto}
+.switch::after{left:50%;transform:translate(-50%,-50%);width:44px}
+
+/* ── 响应式：窄屏时缩放整个舞台 ── */
+@media (max-width:520px){
+  .frame{transform:scale(.82);transform-origin:top center;margin-bottom:-152px}
+}
+
+/* ═══ 全部页面追加件（与 8 屏同源：中性面 + 1px 线，无装饰） ═══ */
+
+/* ── 进度条 Progress Bar（05-COMPONENT-SPECS §24） ──
+   轨道 6 / pill / chartTrack；填充 primary，超支 → income(红)；
+   超支必须同时出「警告图标 + 已超支文案」，不靠颜色单独表意（C2）。 */
+.pbar{height:6px;border-radius:999px;background:var(--chart-track);overflow:hidden}
+.pbar > i{display:block;height:100%;border-radius:999px;background:var(--primary)}
+.pbar.warn > i{background:var(--warn-ink)}
+.pbar.over > i{background:var(--income)}
+.prowname{display:flex;align-items:baseline;gap:8px;font-size:calc(15px * var(--tscale));
+  font-weight:500;color:var(--ink)}
+.prowname .pamt{flex:1;text-align:right;font-size:calc(12px * var(--tscale));font-weight:500;
+  color:var(--muted);font-variant-numeric:tabular-nums}
+.prowfoot{display:flex;align-items:center;gap:5px;margin-top:7px;
+  font-size:calc(12px * var(--tscale));font-weight:600;color:var(--ink-2)}
+.prowfoot.warn{color:var(--warn-ink)}
+.prowfoot.over{color:var(--income-ink)}
+.prow{padding:14px 0}
+.prow + .prow{border-top:1px solid var(--line-soft)}
+.pbarwrap{margin-top:9px}
+
+/* ── 说明块（功能口径、生效范围、副作用预览） ── */
+.notepanel{padding:14px 16px;font-size:calc(12px * var(--tscale));line-height:1.72;
+  color:var(--muted)}
+.notepanel b{color:var(--ink-2);font-weight:600}
+.notepanel .nl{display:block;margin-top:3px}
+
+/* ── 键值行（汇总、口径明细） ── */
+.kvr{display:flex;align-items:center;gap:12px;min-height:44px;padding:4px 16px;
+  font-size:calc(14px * var(--tscale));color:var(--ink)}
+.kvr + .kvr{border-top:1px solid var(--line-soft)}
+.kvr > span:first-child{flex:1;min-width:0;white-space:nowrap;overflow:hidden;
+  text-overflow:ellipsis}
+.kvr > b{font-weight:600;font-variant-numeric:tabular-nums;flex:0 0 auto}
+
+/* ── 数据表（还款计划、交叉分析） ── */
+.dtbl{display:grid;gap:0;padding:0 2px}
+.dtbl > span{padding:10px 2px;font-size:calc(14px * var(--tscale));color:var(--ink);
+  border-bottom:1px solid var(--line-soft);font-variant-numeric:tabular-nums}
+.dtbl > span.r{text-align:right}
+.dtbl > span.h{font-size:calc(12px * var(--tscale));font-weight:600;color:var(--muted);
+  border-bottom-color:var(--line)}
+.dtbl > span.mut{color:var(--muted)}
+.dtbl.cols4{grid-template-columns:1.15fr 1fr 1fr 1.25fr}
+.dtbl.cols4 > span:nth-last-child(-n+4){border-bottom:0}
+
+/* ── 热力矩阵（分类 × 账户） ── */
+.heat{display:grid;gap:2px;padding:0 2px}
+.heat.cols4{grid-template-columns:64px repeat(3,1fr)}
+.heat > span{display:flex;align-items:center;justify-content:center;height:38px;
+  border-radius:8px;font-size:calc(12px * var(--tscale));font-variant-numeric:tabular-nums}
+.heat > span.hd{justify-content:flex-start;color:var(--muted);font-weight:600;
+  padding-left:2px}
+.heat > span.hc{color:var(--muted);font-weight:600}
+.heat > span.cell{font-weight:600;background:var(--surface-2);color:var(--muted)}
+.heat > span.mut{background:transparent;color:var(--faint)}
+
+/* ── 迷你柱（净值走势 / 资金年龄） ── */
+.minibars{display:flex;align-items:flex-end;gap:7px;height:92px}
+.minibars > i{flex:1;border-radius:4px 4px 0 0;background:var(--bar-fill);opacity:.30;
+  display:block}
+.minibars > i.on{background:var(--primary);opacity:1}
+.mblabels{display:flex;gap:7px;margin-top:7px}
+.mblabels > span{flex:1;text-align:center;font-size:calc(12px * var(--tscale));color:var(--muted)}
+
+/* ── 堆叠条（资产构成） ── */
+.stack{display:flex;height:10px;border-radius:999px;overflow:hidden;margin:2px 0 12px}
+.stack > i{display:block;height:100%}
+.lgdot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:8px;
+  vertical-align:middle}
+
+/* ── 标签 chip（提醒级别、端支持状态） ── */
+.tagx{height:22px;padding:0 8px;border-radius:999px;font-size:calc(12px * var(--tscale));
+  font-weight:600;display:inline-flex;align-items:center;flex:0 0 auto;
+  background:var(--surface-2);color:var(--muted)}
+.tagx.ring{background:var(--warn-soft);color:var(--warn-ink)}
+.tagx.silent{background:var(--surface-2);color:var(--muted)}
+.tagx.done{background:var(--ok-soft);color:var(--ok-ink)}
+
+/* ── 主题行 ── */
+.throw{display:flex;align-items:center;gap:12px;min-height:64px;padding:10px 16px}
+.throw + .throw{border-top:1px solid var(--line-soft)}
+.thsw{display:flex;gap:4px;flex:0 0 auto}
+.thsw > i{width:18px;height:18px;border-radius:6px;display:block}
+.thtick{color:var(--primary-ink);flex:0 0 auto;display:flex}
+
+/* ── 分段器上方留白（分类管理既有 .segwrap，这里给二级页用） ── */
+.segwrap.top{padding-top:4px}
+
+/* ── 空态 ── */
+.emptybox{padding:32px 16px;text-align:center;color:var(--muted);
+  font-size:calc(14px * var(--tscale));line-height:1.7}
+
+/* ── 规则行（IF / THEN） ── */
+.rulerow{display:flex;gap:12px;padding:14px 16px}
+.rulerow + .rulerow{border-top:1px solid var(--line-soft)}
+.ruleno{width:22px;height:22px;border-radius:7px;flex:0 0 22px;display:flex;
+  align-items:center;justify-content:center;font-size:12px;font-weight:600;
+  background:var(--primary-tint);color:var(--primary-ink)}
+.ruleno.off{background:var(--surface-2);color:var(--muted)}
+.rulecond{font-size:calc(12px * var(--tscale));color:var(--muted);line-height:1.6;
+  margin-top:3px}
+.rulecond code{font-family:inherit;font-weight:600;color:var(--ink-2)}
+
+/* ── 副作用预览 / 结算明细的双列 ── */
+.duocol{display:flex;justify-content:space-between;align-items:baseline;gap:12px;
+  font-size:calc(14px * var(--tscale));color:var(--ink);min-height:34px;padding:2px 16px}
+.duocol + .duocol{border-top:1px solid var(--line-soft)}
+.duocol > b{font-weight:600;font-variant-numeric:tabular-nums}
+
+/* ── 开关 · 永不可授予（禁用态） ──
+   ⚠️ 禁用**不能只靠 opacity** —— 半透明和「关闭」态长得几乎一样，
+      用户会以为只是没打开。必须换底色 + 换滑块色。
+      ⚠️ CSS 变量名是短横线（--disabled-bg / --disabled-fg），
+         不是 Dart 侧的驼峰（disabledBg / disabledFg）—— 写驼峰会静默回退
+         （background 落到 transparent、border-color 落到 currentColor），
+         页面照常渲染、无任何报错，只有肉眼能看出「禁用态和关闭态长得一样」。 */
+.switch.lock{background:var(--disabled-bg);border-color:var(--disabled-fg)}
+.switch.lock .knob{background:var(--disabled-fg);box-shadow:none}
+
+/* ── 屏内首组（不需要 32px 上边距） ── */
+.grp0{margin-top:20px}
+
+/* ── 空态图标居中（G.CSS 里 svg{display:block}，需显式 auto） ── */
+.emptyic{margin:0 auto;color:var(--faint)}
+
+/* ── 序号圆片（首页卡片自定义的排序位） ── */
+.ricnt{width:22px;height:22px;border-radius:7px;flex:0 0 22px;display:flex;
+  align-items:center;justify-content:center;font-size:12px;font-weight:600;
+  background:var(--surface-2);color:var(--muted)}
+
+/* ── 分组大标题（舞台级，非屏内） ── */
+.vergrouph{width:100%;margin:26px 0 -6px;font-size:14px;font-weight:700;letter-spacing:.06em;
+  color:#5E5E65;text-transform:uppercase;padding:0 4px}
+.vergrouph:first-child{margin-top:0}
+
+
+/* 桑基图 */
+.sankey{display:block;width:100%;height:auto;margin-top:2px}
+.skl{fill:var(--ink)}
+.skc{fill:var(--ink-2)}
+.skv{fill:var(--ink)}
+.skg{fill:var(--ok-ink)}
+.sknote{font-size:calc(12px * var(--tscale));font-weight:500;color:var(--muted);
+  margin:-4px 0 10px}
+/* 热力表脚注 */
+.heatfoot{margin-top:10px;font-size:calc(12px * var(--tscale));color:var(--muted);
+  line-height:1.6}
+/* 头像圆片 */
+.avt{width:30px;height:30px;border-radius:10px;flex:0 0 30px;display:flex;
+  align-items:center;justify-content:center;font-size:14px;font-weight:600}
+
+/* ── 单一配色：素白 · 亮态（值全部来自 01-tokens.json，页面里没有裸色号） ── */
+.stage{
+  --bg: #F5F5F6FF;
+  --app-bg: #FBFBFCFF;
+  --surface: #FFFFFFFF;
+  --surface-2: #F6F6F8FF;
+  --ink: #101012FF;
+  --ink-2: #38383DFF;
+  --muted: #5E5E65FF;
+  --faint: #838389FF;
+  --line: #E4E4E8FF;
+  --line-soft: #EFEFF2FF;
+  --primary: #3F3F46FF;
+  --primary-deep: #27272AFF;
+  --primary-soft: #3F3F461F;
+  --primary-tint: #3F3F4612;
+  --on-primary: #FFFFFFFF;
+  --accent: #FB923CFF;
+  --accent-deep: #F97316FF;
+  --accent-soft: #FB923C1F;
+  --on-accent: #101012FF;
+  --income: #DC2626FF;
+  --income-soft: #FFF1F2FF;
+  --income-line: #FECDD3FF;
+  --income-ink: #D12424FF;
+  --ok-soft: #ECFDF5FF;
+  --ok-ink: #048059FF;
+  --warn-soft: #FDF3E3FF;
+  --warn-ink: #7A4E14FF;
+  --dn-bg: #ECFDF5FF;
+  --dn-ink: #048059FF;
+  --primary-ink: #3F3F46FF;
+  --accent-ink: #975824FF;
+  --fab-bg: #FB923CFF;
+  --fab-fg: #101012FF;
+  --fab-ic: #101012FF;
+  --toast-bg: #101012FF;
+  --chart-track: #C2C2C6FF;
+  --bar-fill: #3F3F46FF;
+  --dash: #ACACB1FF;
+  --shadow-1: #0000000F;
+  --shadow-2: #0000001A;
+  --shadow-3: #00000029;
+  --shadow-accent: #FB923C1A;
+  --glow-primary: #3F3F460F;
+  --line-strong: #89898BFF;
+  --line-strong-soft: #A8A8ACFF;
+  --focus-ring: #3F3F46FF;
+  --surface-inset: #FAFAFAFF;
+  --disabled-fg: #BBBBBEFF;
+  --disabled-bg: #F8F8F9FF;
+  --overlay: #00000052;
+  --skeleton: #F6F6F7FF;
+  --primary-pressed: #39393FFF;
+  --accent-pressed: #FB9D50FF;
+  --cat-food: #FF6B6BFF;
+  --cat-fruit: #4ADE80FF;
+  --cat-shopping: #F472B6FF;
+  --cat-daily: #A78BFAFF;
+  --cat-transport: #38BDF8FF;
+  --cat-housing: #FDBA74FF;
+  --cat-telecom: #2DD4BFFF;
+  --cat-entertainment: #E879F9FF;
+  --cat-medical: #F87171FF;
+  --cat-study: #60A5FAFF;
+  --cat-social: #C084FCFF;
+  --cat-other: #94A3B8FF;
+  --cat-ink-food: #B24B4BFF;
+  --cat-ink-fruit: #297A46FF;
+  --cat-ink-shopping: #9F4A76FF;
+  --cat-ink-daily: #7561AFFF;
+  --cat-ink-transport: #227195FF;
+  --cat-ink-housing: #8B6640FF;
+  --cat-ink-telecom: #197569FF;
+  --cat-ink-entertainment: #974FA2FF;
+  --cat-ink-medical: #AE4F4FFF;
+  --cat-ink-study: #3E6BA2FF;
+  --cat-ink-social: #865CB0FF;
+  --cat-ink-other: #606A78FF;
+  --th-qingci-p: #14B8A6FF;
+  --th-qingci-a: #FF6B6BFF;
+  --th-dianlan-p: #3B82F6FF;
+  --th-dianlan-a: #F59E0BFF;
+  --th-zhuqing-p: #4ADE80FF;
+  --th-zhuqing-a: #A78BFAFF;
+  --th-haiyan-p: #06B6D4FF;
+  --th-haiyan-a: #FB7185FF;
+  --th-ouhe-p: #A78BFAFF;
+  --th-ouhe-a: #FBBF24FF;
+  --th-taoyao-p: #F472B6FF;
+  --th-taoyao-a: #2DD4BFFF;
+  --th-feiying-p: #EF4444FF;
+  --th-feiying-a: #10B981FF;
+  --th-xinghuang-p: #F59E0BFF;
+  --th-xinghuang-a: #38BDF8FF;
+  --th-doulv-p: #84CC16FF;
+  --th-doulv-a: #C084FCFF;
+  --th-subai-p: #3F3F46FF;
+  --th-subai-a: #FB923CFF;
+}
+</style></head>
+<body data-theme="subai" data-mode="light">
+<svg xmlns="http://www.w3.org/2000/svg" style="display:none" aria-hidden="true"><symbol id="ic_nav_ledger" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M8.75 6.5h10.75"/>
+  <path d="M8.75 12h10.75"/>
+  <path d="M8.75 17.5h10.75"/>
+  <circle cx="5.25" cy="6.5" r="1.4" fill="currentColor" stroke="none"/>
+  <circle cx="5.25" cy="12" r="1.4" fill="currentColor" stroke="none"/>
+  <circle cx="5.25" cy="17.5" r="1.4" fill="currentColor" stroke="none"/>
+  </g>
+</symbol><symbol id="ic_nav_report" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M12 3.5A8.5 8.5 0 0 1 20.5 12A8.5 8.5 0 0 1 12 20.5A8.5 8.5 0 0 1 3.5 12"/>
+  <path d="M12 12 12 3.5"/>
+  <path d="M12 12 20.5 12"/>
+  </g>
+</symbol><symbol id="ic_nav_add" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M12 5.25v13.5"/>
+  <path d="M5.25 12h13.5"/>
+  </g>
+</symbol><symbol id="ic_nav_assets" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <rect x="3.75" y="7.25" width="16.5" height="11.5" rx="3"/>
+  <path d="M6.75 7.25V6.4a1.75 1.75 0 0 1 1.75-1.75h7a1.75 1.75 0 0 1 1.75 1.75v.85"/>
+  <circle cx="16.5" cy="13" r="1.35" fill="currentColor" stroke="none"/>
+  </g>
+</symbol><symbol id="ic_nav_profile" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <circle cx="12" cy="8.25" r="3.5"/>
+  <path d="M5.5 19.5a6.5 6.5 0 0 1 13 0"/>
+  </g>
+</symbol><symbol id="ic_cat_food" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M3.5 11.75A8.5 8.5 0 0 0 20.5 11.75Z"/>
+  <path d="M9.6 9V6.25"/>
+  <path d="M14.4 9V6.25"/>
+  </g>
+</symbol><symbol id="ic_cat_grocery" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M12 8.75c1.5-1.3 3.95-1.6 5.55-.2 1.9 1.7 1.9 5-.1 8.1-1.2 1.85-2.85 3.25-4.35 3.25-.5 0-.8-.15-1.1-.3-.35-.15-.65-.3-1-.3s-.65.15-1 .3c-.3.15-.6.3-1.1.3-1.5 0-3.15-1.4-4.35-3.25-2-3.1-2-6.4-.1-8.1 1.6-1.4 4.05-1.1 5.55.2z"/>
+  <path d="M12 8.75V6.1"/>
+  <path d="M12 6.1c1.55-.4 2.55-1.45 2.85-2.85-1.55.1-2.6 1.05-2.85 2.85z"/>
+  </g>
+</symbol><symbol id="ic_cat_shopping" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M5.5 8.25h13l-1.05 10.5a2.25 2.25 0 0 1-2.24 2.05H8.79a2.25 2.25 0 0 1-2.24-2.05z"/>
+  <path d="M9.25 8.25V6.5a2.75 2.75 0 0 1 5.5 0v1.75"/>
+  </g>
+</symbol><symbol id="ic_cat_daily" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <rect x="10.25" y="3.25" width="3.5" height="2.25" rx="0.9"/>
+  <path d="M10.25 5.5 8.5 8.25"/>
+  <path d="M13.75 5.5 15.5 8.25"/>
+  <rect x="7.5" y="8.25" width="9" height="12" rx="2.5"/>
+  </g>
+</symbol><symbol id="ic_cat_transport" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <rect x="5" y="4" width="14" height="13" rx="3"/>
+  <path d="M5 10.5h14"/>
+  <circle cx="8.5" cy="19.25" r="1.35" fill="currentColor" stroke="none"/>
+  <circle cx="15.5" cy="19.25" r="1.35" fill="currentColor" stroke="none"/>
+  </g>
+</symbol><symbol id="ic_cat_housing" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M3.5 11.25 12 4l8.5 7.25"/>
+  <path d="M5.75 10.75V18.5a1.75 1.75 0 0 0 1.75 1.75h9a1.75 1.75 0 0 0 1.75-1.75v-7.75"/>
+  <path d="M10.25 20.25v-4a1.75 1.75 0 0 1 3.5 0v4"/>
+  </g>
+</symbol><symbol id="ic_cat_telecom" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M6.75 20.25V15.5"/>
+  <path d="M12 20.25V10.75"/>
+  <path d="M17.25 20.25V6"/>
+  </g>
+</symbol><symbol id="ic_cat_entertainment" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M5 15.25V12a7 7 0 0 1 14 0v3.25"/>
+  <rect x="3.25" y="13.75" width="3.5" height="6.25" rx="1.75"/>
+  <rect x="17.25" y="13.75" width="3.5" height="6.25" rx="1.75"/>
+  </g>
+</symbol><symbol id="ic_cat_medical" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <circle cx="12" cy="12" r="8.5"/>
+  <path d="M12 8.25v7.5"/>
+  <path d="M8.25 12h7.5"/>
+  </g>
+</symbol><symbol id="ic_cat_study" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M12 7.25v11.5"/>
+  <path d="M12 7.25C10.4 5.9 8.4 5.25 5.75 5.25a1.5 1.5 0 0 0-1.5 1.5v9.5a1.5 1.5 0 0 0 1.5 1.5c2.65 0 4.65.65 6.25 2"/>
+  <path d="M12 7.25c1.6-1.35 3.6-2 6.25-2a1.5 1.5 0 0 1 1.5 1.5v9.5a1.5 1.5 0 0 1-1.5 1.5c-2.65 0-4.65.65-6.25 2"/>
+  </g>
+</symbol><symbol id="ic_cat_social" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <rect x="3" y="6.25" width="18" height="3.75" rx="1.75"/>
+  <rect x="4.5" y="10" width="15" height="10.25" rx="2"/>
+  <path d="M12 6.25v14"/>
+  </g>
+</symbol><symbol id="ic_cat_other" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <rect x="4.25" y="4.25" width="6" height="6" rx="1.75"/>
+  <rect x="13.75" y="4.25" width="6" height="6" rx="1.75"/>
+  <rect x="4.25" y="13.75" width="6" height="6" rx="1.75"/>
+  <rect x="13.75" y="13.75" width="6" height="6" rx="1.75"/>
+  </g>
+</symbol><symbol id="ic_back" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M19 12H5.5"/>
+  <path d="M11.25 5.75 5 12l6.25 6.25"/>
+  </g>
+</symbol><symbol id="ic_chevron_right" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M9.5 5.75 15.75 12 9.5 18.25"/>
+  </g>
+</symbol><symbol id="ic_chevron_left" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M14.5 5.75 8.25 12 14.5 18.25"/>
+  </g>
+</symbol><symbol id="ic_chevron_down" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M5.75 9.5 12 15.75 18.25 9.5"/>
+  </g>
+</symbol><symbol id="ic_close" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M6 6 18 18"/>
+  <path d="M18 6 6 18"/>
+  </g>
+</symbol><symbol id="ic_search" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <circle cx="10.75" cy="10.75" r="6.25"/>
+  <path d="M15.4 15.4 20 20"/>
+  </g>
+</symbol><symbol id="ic_filter" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M4.25 5.75h15.5l-6 7.25v5.25l-3.5 2.25v-7.5z"/>
+  </g>
+</symbol><symbol id="ic_edit" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M16.5 3.75 20.25 7.5 8.25 19.5l-4.5 1 1-4.5z"/>
+  <path d="M14.25 6 18 9.75"/>
+  </g>
+</symbol><symbol id="ic_delete" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M3.75 6.5h16.5"/>
+  <path d="M9.25 6.5V4.75a1.5 1.5 0 0 1 1.5-1.5h2.5a1.5 1.5 0 0 1 1.5 1.5V6.5"/>
+  <path d="M6 6.5 6.95 19.4a1.75 1.75 0 0 0 1.75 1.6h6.6a1.75 1.75 0 0 0 1.75-1.6L18 6.5"/>
+  <path d="M10.25 10.25v6.75"/>
+  <path d="M13.75 10.25v6.75"/>
+  </g>
+</symbol><symbol id="ic_check" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M4.75 12.5 9.5 17.25 19.25 6.75"/>
+  </g>
+</symbol><symbol id="ic_plus" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M12 5.5v13"/>
+  <path d="M5.5 12h13"/>
+  </g>
+</symbol><symbol id="ic_minus" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M5.5 12h13"/>
+  </g>
+</symbol><symbol id="ic_more" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <circle cx="6.25" cy="12" r="1.6" fill="currentColor" stroke="none"/>
+  <circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"/>
+  <circle cx="17.75" cy="12" r="1.6" fill="currentColor" stroke="none"/>
+  </g>
+</symbol><symbol id="ic_more_vertical" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <circle cx="12" cy="6.25" r="1.6" fill="currentColor" stroke="none"/>
+  <circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"/>
+  <circle cx="12" cy="17.75" r="1.6" fill="currentColor" stroke="none"/>
+  </g>
+</symbol><symbol id="ic_share" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <circle cx="6" cy="6.75" r="2.25"/>
+  <circle cx="6" cy="17.25" r="2.25"/>
+  <circle cx="17.75" cy="12" r="2.25"/>
+  <path d="M7.9 7.8 15.7 11.1"/>
+  <path d="M7.9 16.2 15.7 12.9"/>
+  </g>
+</symbol><symbol id="ic_undo" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M20.25 17.75v-2.5a5.25 5.25 0 0 0-5.25-5.25H5.75"/>
+  <path d="M9.5 5.75 5.5 10l4 4.25"/>
+  </g>
+</symbol><symbol id="ic_sort" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M7.5 4.75v14.5"/>
+  <path d="M4.25 16 7.5 19.25 10.75 16"/>
+  <path d="M16.5 19.25V4.75"/>
+  <path d="M13.25 8 16.5 4.75 19.75 8"/>
+  </g>
+</symbol><symbol id="ic_drag_handle" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M6.5 9.5h11"/>
+  <path d="M6.5 14.5h11"/>
+  </g>
+</symbol><symbol id="ic_scan" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M3.75 8.75V5.5a1.75 1.75 0 0 1 1.75-1.75h3.25"/>
+  <path d="M20.25 8.75V5.5a1.75 1.75 0 0 0-1.75-1.75h-3.25"/>
+  <path d="M3.75 15.25v3.25a1.75 1.75 0 0 0 1.75 1.75h3.25"/>
+  <path d="M20.25 15.25v3.25a1.75 1.75 0 0 1-1.75 1.75h-3.25"/>
+  <path d="M3.75 12h16.5"/>
+  </g>
+</symbol><symbol id="ic_status_success" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <circle cx="12" cy="12" r="8.5"/>
+  <path d="M8.25 12.25 10.75 14.75 15.75 9.5"/>
+  </g>
+</symbol><symbol id="ic_status_error" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <circle cx="12" cy="12" r="8.5"/>
+  <path d="M9.5 9.5 14.5 14.5"/>
+  <path d="M14.5 9.5 9.5 14.5"/>
+  </g>
+</symbol><symbol id="ic_status_warning" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M10.6 4.4 2.9 17.75a1.6 1.6 0 0 0 1.4 2.4h15.4a1.6 1.6 0 0 0 1.4-2.4L13.4 4.4a1.6 1.6 0 0 0-2.8 0z"/>
+  <path d="M12 9.75v3.75"/>
+  <circle cx="12" cy="17" r="1.05" fill="currentColor" stroke="none"/>
+  </g>
+</symbol><symbol id="ic_status_info" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <circle cx="12" cy="12" r="8.5"/>
+  <path d="M12 11.25v5"/>
+  <circle cx="12" cy="8.25" r="1.05" fill="currentColor" stroke="none"/>
+  </g>
+</symbol><symbol id="ic_lock" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <rect x="4.75" y="10.25" width="14.5" height="10" rx="2.5"/>
+  <path d="M8.25 10.25V7.75a3.75 3.75 0 0 1 7.5 0v2.5"/>
+  </g>
+</symbol><symbol id="ic_offline" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M6.75 17.5h10.5a3.75 3.75 0 0 0 .4-7.5 5.5 5.5 0 0 0-10.6-1.2 4.4 4.4 0 0 0-.3 8.7z"/>
+  <path d="M4.5 4.5 19.5 19.5"/>
+  </g>
+</symbol><symbol id="ic_empty" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <rect x="3" y="6.5" width="18" height="11" rx="2.75"/>
+  <path d="M3 12.5h4.75l1.25 2.25h6l1.25-2.25H21"/>
+  </g>
+</symbol><symbol id="ic_loading" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M12 3.75a8.25 8.25 0 1 0 8.25 8.25"/>
+  </g>
+</symbol><symbol id="ic_calendar" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <rect x="3.75" y="5.25" width="16.5" height="15" rx="2.75"/>
+  <path d="M3.75 10h16.5"/>
+  <path d="M8.25 3.5v3.5"/>
+  <path d="M15.75 3.5v3.5"/>
+  <circle cx="8.5" cy="14.25" r="1.35" fill="currentColor" stroke="none"/>
+  </g>
+</symbol><symbol id="ic_account" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <rect x="3.25" y="5.75" width="17.5" height="12.5" rx="2.75"/>
+  <path d="M3.25 10.25h17.5"/>
+  <path d="M6.75 14.75h3.5"/>
+  </g>
+</symbol><symbol id="ic_note" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <rect x="4.75" y="3.75" width="14.5" height="16.5" rx="2.5"/>
+  <path d="M8.25 8.75h7.5"/>
+  <path d="M8.25 12.5h7.5"/>
+  <path d="M8.25 16.25h4.25"/>
+  </g>
+</symbol><symbol id="ic_amount" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M8.25 5.5 12 11.25 15.75 5.5"/>
+  <path d="M12 11.25v7.25"/>
+  <path d="M8.75 13.5h6.5"/>
+  <path d="M8.75 16.25h6.5"/>
+  </g>
+</symbol><symbol id="ic_transfer" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M4.25 8.75h13.5"/>
+  <path d="M14.25 5.25 17.75 8.75l-3.5 3.5"/>
+  <path d="M19.75 15.25H6.25"/>
+  <path d="M9.75 11.75 6.25 15.25l3.5 3.5"/>
+  </g>
+</symbol><symbol id="ic_budget" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <circle cx="12" cy="12" r="8.25"/>
+  <circle cx="12" cy="12" r="3.5"/>
+  </g>
+</symbol><symbol id="ic_recurring" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M4.75 12a7.25 7.25 0 0 1 12.15-5.35"/>
+  <path d="M17.25 3.5v3.75h-3.75"/>
+  <path d="M19.25 12a7.25 7.25 0 0 1-12.15 5.35"/>
+  <path d="M6.75 20.5v-3.75h3.75"/>
+  </g>
+</symbol><symbol id="ic_export" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M12 15.25V4"/>
+  <path d="M8.25 7.5 12 3.75l3.75 3.75"/>
+  <path d="M4.5 13.5v4.5a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-4.5"/>
+  </g>
+</symbol><symbol id="ic_import" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M12 3.75V15"/>
+  <path d="M8.25 11.5 12 15.25l3.75-3.75"/>
+  <path d="M4.5 13.5v4.5a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-4.5"/>
+  </g>
+</symbol><symbol id="ic_attachment" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M19.75 10.5 10.9 19.35a5 5 0 0 1-7.07-7.07l8.6-8.6a3.35 3.35 0 0 1 4.74 4.74l-8.6 8.6a1.7 1.7 0 0 1-2.4-2.4l7.6-7.6"/>
+  </g>
+</symbol><symbol id="ic_goal" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M6 20.5V4.25"/>
+  <path d="M6 4.75h11.5l-2.25 3.75 2.25 3.75H6"/>
+  </g>
+</symbol><symbol id="ic_receipt" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M5.75 3.75h12.5v16.5l-2.5-1.75-2.5 1.75-2.5-1.75-2.5 1.75-2.5-1.75z"/>
+  <path d="M9.25 8.5h5.5"/>
+  <path d="M9.25 12.25h5.5"/>
+  </g>
+</symbol><symbol id="ic_chart_pie" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M12 3.5a8.5 8.5 0 1 0 8.5 8.5h-8.5z"/>
+  </g>
+</symbol><symbol id="ic_chart_bars" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M6.75 20.25V12"/>
+  <path d="M12 20.25V5.75"/>
+  <path d="M17.25 20.25V15.5"/>
+  </g>
+</symbol><symbol id="ic_chart_line" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M3.75 18.5 9 12l4 3.5 7.25-8.25"/>
+  </g>
+</symbol><symbol id="ic_trend_up" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M4 16.5 9.5 11l3.5 3.5L20 8"/>
+  <path d="M14.75 8H20v5.25"/>
+  </g>
+</symbol><symbol id="ic_trend_down" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M4 8 9.5 13.5l3.5-3.5L20 16.5"/>
+  <path d="M14.75 16.5H20V11.25"/>
+  </g>
+</symbol><symbol id="ic_settings" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M3.75 8.5h16.5"/>
+  <path d="M3.75 15.5h16.5"/>
+  <circle cx="9" cy="8.5" r="2.25"/>
+  <circle cx="15.5" cy="15.5" r="2.25"/>
+  </g>
+</symbol><symbol id="ic_bell" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M5.75 16.75 7 14.25V10.5a5 5 0 0 1 10 0v3.75l1.25 2.5z"/>
+  <path d="M10.25 19.75a2.25 2.25 0 0 0 3.5 0"/>
+  </g>
+</symbol><symbol id="ic_moon" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M20.25 14.75A8.75 8.75 0 0 1 9.25 3.75a8.75 8.75 0 1 0 11 11z"/>
+  </g>
+</symbol><symbol id="ic_sun" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <circle cx="12" cy="12" r="4.25"/>
+  <path d="M12 2.75v2.5"/>
+  <path d="M12 18.75v2.5"/>
+  <path d="M2.75 12h2.5"/>
+  <path d="M18.75 12h2.5"/>
+  <path d="M5.45 5.45 7.2 7.2"/>
+  <path d="M16.8 16.8l1.75 1.75"/>
+  <path d="M18.55 5.45 16.8 7.2"/>
+  <path d="M7.2 16.8 5.45 18.55"/>
+  </g>
+</symbol><symbol id="ic_palette" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <circle cx="12" cy="12" r="8.5"/>
+  <path d="M3.5 12h17"/>
+  <path d="M12 3.5v17"/>
+  </g>
+</symbol><symbol id="ic_font" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M3.5 19.25 8 5.25l4.5 14"/>
+  <path d="M5.1 15h5.8"/>
+  <path d="M16.25 19.25v-6.5a2.75 2.75 0 0 1 5.5 0v6.5"/>
+  <path d="M16.25 15.5h5.5"/>
+  </g>
+</symbol><symbol id="ic_volume" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M11 5.25 6.75 8.75H3.5v6.5h3.25L11 18.75z"/>
+  <path d="M14.75 9.25a4 4 0 0 1 0 5.5"/>
+  <path d="M17.5 6.5a8 8 0 0 1 0 11"/>
+  </g>
+</symbol><symbol id="ic_qr" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M3.75 8.25V5.5a1.75 1.75 0 0 1 1.75-1.75h2.75"/>
+  <path d="M20.25 8.25V5.5a1.75 1.75 0 0 0-1.75-1.75h-2.75"/>
+  <path d="M3.75 15.75v2.75a1.75 1.75 0 0 0 1.75 1.75h2.75"/>
+  <rect x="6.75" y="6.75" width="3.5" height="3.5" rx="1"/>
+  <rect x="13.75" y="6.75" width="3.5" height="3.5" rx="1"/>
+  <rect x="6.75" y="13.75" width="3.5" height="3.5" rx="1"/>
+  <path d="M13.75 17.5h4"/>
+  <path d="M17.5 13.75v4"/>
+  </g>
+</symbol><symbol id="ic_copy" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <rect x="8.25" y="8.25" width="12" height="12" rx="2.5"/>
+  <path d="M15.75 8.25V6.25a2.5 2.5 0 0 0-2.5-2.5H6.25a2.5 2.5 0 0 0-2.5 2.5v7a2.5 2.5 0 0 0 2.5 2.5h2"/>
+  </g>
+</symbol><symbol id="ic_star" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M12 3.75 14.6 9.05 20.5 9.9l-4.25 4.15 1 5.85L12 17.15l-5.25 2.75 1-5.85L3.5 9.9l5.9-.85z"/>
+  </g>
+</symbol><symbol id="ic_tag" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M11.75 3.75H5.5A1.75 1.75 0 0 0 3.75 5.5v6.25L13.5 21.5l7.25-7.25z"/>
+  <circle cx="7.75" cy="7.75" r="1.4" fill="currentColor" stroke="none"/>
+  </g>
+</symbol><symbol id="ic_shield" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M12 3.5 4.75 6.5v5.25c0 4.4 2.9 7.45 7.25 8.75 4.35-1.3 7.25-4.35 7.25-8.75V6.5z"/>
+  </g>
+</symbol><symbol id="ic_fingerprint" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M12 3.75a8.25 8.25 0 0 1 8.25 8.25"/>
+  <path d="M3.75 12A8.25 8.25 0 0 1 12 3.75"/>
+  <path d="M6.75 14.5a5.25 5.25 0 0 1 10.5-2.5"/>
+  <path d="M12 20.25c-2.6 0-4.85-1.6-5.75-3.9"/>
+  <path d="M14.25 20.1a8.25 8.25 0 0 0 2.9-2.35"/>
+  </g>
+</symbol><symbol id="ic_storage" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M4.25 6.5c0-1.5 3.5-2.75 7.75-2.75s7.75 1.25 7.75 2.75"/>
+  <path d="M4.25 6.5v11c0 1.5 3.5 2.75 7.75 2.75s7.75-1.25 7.75-2.75v-11"/>
+  <path d="M4.25 12c0 1.5 3.5 2.75 7.75 2.75s7.75-1.25 7.75-2.75"/>
+  </g>
+</symbol><symbol id="ic_image" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <rect x="3.75" y="4.75" width="16.5" height="14.5" rx="2.5"/>
+  <path d="M3.75 15.75 8.5 11l4.25 4.25 2.5-2.5 5.25 5.25"/>
+  <circle cx="8.75" cy="9.25" r="1.4" fill="currentColor" stroke="none"/>
+  </g>
+</symbol><symbol id="ic_camera" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M4 8.75h3l1.5-2.5h7l1.5 2.5h3a1.75 1.75 0 0 1 1.75 1.75v7A1.75 1.75 0 0 1 20 19.25H4a1.75 1.75 0 0 1-1.75-1.75v-7A1.75 1.75 0 0 1 4 8.75z"/>
+  <circle cx="12" cy="13.5" r="3.25"/>
+  </g>
+</symbol><symbol id="ic_eye" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M2.75 12S6.25 6.25 12 6.25 21.25 12 21.25 12 17.75 17.75 12 17.75 2.75 12 2.75 12z"/>
+  <circle cx="12" cy="12" r="3.25"/>
+  </g>
+</symbol><symbol id="ic_eye_off" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M9.75 6.6A8.6 8.6 0 0 1 12 6.25c5.75 0 9.25 5.75 9.25 5.75a17 17 0 0 1-3.1 3.6"/>
+  <path d="M6.35 8.4A17 17 0 0 0 2.75 12s3.5 5.75 9.25 5.75c1.15 0 2.2-.2 3.15-.55"/>
+  <path d="M10.1 10.1a2.7 2.7 0 0 0 3.8 3.8"/>
+  <path d="M4.5 4.5 19.5 19.5"/>
+  </g>
+</symbol><symbol id="ic_cloud" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M6.75 17.75h10.5a3.75 3.75 0 0 0 .4-7.5 5.5 5.5 0 0 0-10.6-1.2 4.4 4.4 0 0 0-.3 8.7z"/>
+  </g>
+</symbol><symbol id="ic_wallet" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <rect x="3.75" y="7.25" width="16.5" height="11.5" rx="3"/>
+  <path d="M3.75 11.25h16.5"/>
+  <circle cx="16.5" cy="14.75" r="1.35" fill="currentColor" stroke="none"/>
+  </g>
+</symbol><symbol id="ic_card" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <rect x="3.25" y="6.25" width="17.5" height="11.5" rx="2.5"/>
+  <path d="M3.25 10.25h17.5"/>
+  <path d="M6.5 14.25h4"/>
+  </g>
+</symbol><symbol id="ic_arrow_up_right" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M6.75 17.25 17.25 6.75"/>
+  <path d="M8.75 6.75h8.5v8.5"/>
+  </g>
+</symbol><symbol id="ic_arrow_down_left" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M17.25 6.75 6.75 17.25"/>
+  <path d="M15.25 17.25h-8.5v-8.5"/>
+  </g>
+</symbol><symbol id="ic_chevron_up" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M5.75 14.5 12 8.25 18.25 14.5"/>
+  </g>
+</symbol><symbol id="ic_circle_plus" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <circle cx="12" cy="12" r="8.5"/>
+  <path d="M12 8.25v7.5"/>
+  <path d="M8.25 12h7.5"/>
+  </g>
+</symbol><symbol id="ic_circle_minus" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <circle cx="12" cy="12" r="8.5"/>
+  <path d="M8.25 12h7.5"/>
+  </g>
+</symbol><symbol id="ic_play" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M8.25 5.25 18.75 12 8.25 18.75z"/>
+  </g>
+</symbol><symbol id="ic_list_check" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M3.75 7.25 5.75 9.25 9.75 5.25"/>
+  <path d="M13 7.25h7.75"/>
+  <path d="M13 12.25h7.75"/>
+  <path d="M3.75 17.25 5.75 19.25 9.75 15.25"/>
+  <path d="M13 17.25h7.75"/>
+  </g>
+</symbol><symbol id="ic_merge" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M6.75 4.5 12 9.75"/>
+  <path d="M17.25 4.5 12 9.75"/>
+  <path d="M12 9.75v9.75"/>
+  <path d="M9.75 17.25 12 19.5 14.25 17.25"/>
+  </g>
+</symbol><symbol id="ic_folder_plus" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M3.25 19.25V6.75a2 2 0 0 1 2-2h2.85a2 2 0 0 1 1.66.89l.48.72a2 2 0 0 0 1.66.89h6.85a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5.25a2 2 0 0 1-2-2z"/>
+  <path d="M12 10v4.5"/>
+  <path d="M9.75 12.25h4.5"/>
+  </g>
+</symbol><symbol id="ic_folder_move" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M3.25 19.25V6.75a2 2 0 0 1 2-2h2.85a2 2 0 0 1 1.66.89l.48.72a2 2 0 0 0 1.66.89h6.85a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5.25a2 2 0 0 1-2-2z"/>
+  <path d="M9.25 12.5h6.5"/>
+  <path d="M12.75 9.75 15.5 12.5l-2.75 2.75"/>
+  </g>
+</symbol><symbol id="ic_history" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+  <path d="M3 3v5h5"/>
+  <path d="M12 7v5l4 2"/>
+  </g>
+</symbol><symbol id="ic_mood" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <circle cx="12" cy="12" r="8.5"/>
+  <path d="M7.75 13.75a6 6 0 0 0 8.5 0"/>
+  <circle cx="9" cy="9.25" r="1.05" fill="currentColor" stroke="none"/>
+  <circle cx="15" cy="9.25" r="1.05" fill="currentColor" stroke="none"/>
+  </g>
+</symbol><symbol id="ic_gift" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <rect x="3" y="8" width="18" height="4" rx="1"/>
+  <path d="M12 8v13"/>
+  <path d="M19 12v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7"/>
+  <path d="M7.5 8a2.5 2.5 0 0 1 0-5A4.8 8 0 0 1 12 8a4.8 8 0 0 1 4.5-5 2.5 2.5 0 0 1 0 5"/>
+  </g>
+</symbol><symbol id="ic_trophy" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M7.5 3.75h9v5.5a4.5 4.5 0 0 1-9 0z"/>
+  <path d="M7.5 5.25H6a2.25 2.25 0 0 0 0 4.5h1.5"/>
+  <path d="M16.5 5.25H18a2.25 2.25 0 0 1 0 4.5h-1.5"/>
+  <path d="M12 13.75v5"/>
+  <path d="M8.75 18.75h6.5"/>
+  </g>
+</symbol><symbol id="ic_flame" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/>
+  </g>
+</symbol><symbol id="ic_celebration" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M4.25 19.75 10.25 8.25 15.75 13.75z"/>
+  <path d="M14.5 6.75 16.25 5"/>
+  <circle cx="18.25" cy="4.75" r="1.05" fill="currentColor" stroke="none"/>
+  <circle cx="19.75" cy="9" r="1.05" fill="currentColor" stroke="none"/>
+  </g>
+</symbol><symbol id="ic_cloud_upload" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M6.75 17.75h10.5a3.75 3.75 0 0 0 .4-7.5 5.5 5.5 0 0 0-10.6-1.2 4.4 4.4 0 0 0-.3 8.7z"/>
+  <path d="M12 15.5v-4.5"/>
+  <path d="M9.75 13.25 12 11l2.25 2.25"/>
+  </g>
+</symbol><symbol id="ic_cloud_download" viewBox="0 0 24 24" fill="none">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M6.75 17.75h10.5a3.75 3.75 0 0 0 .4-7.5 5.5 5.5 0 0 0-10.6-1.2 4.4 4.4 0 0 0-.3 8.7z"/>
+  <path d="M12 10.5v4.5"/>
+  <path d="M9.75 12.75 12 15l2.25-2.25"/>
+  </g>
+</symbol></svg>
+<div class="toolbar">
+  <div class="tb-brand">素记 Plain · 全部页面<small>Quiet Ledger · 亮态中文 · 29 屏</small></div>
+  <div class="tb-group"><span class="tb-lab">跳屏</span>
+    <div class="screenpicker">
+      <button data-jump="0">引导</button><button data-jump="1">流水</button>
+      <button data-jump="2">记一笔</button><button data-jump="3">详情</button>
+      <button data-jump="4">分类</button><button data-jump="5">资产</button>
+      <button data-jump="6">报表</button><button data-jump="7">备份</button>
+      <button data-jump="8">发现</button><button data-jump="9">主题</button>
+      <button data-jump="10">我的</button><button data-jump="11">转账</button>
+      <button data-jump="12">分割</button><button data-jump="13">报销</button>
+      <button data-jump="14">信用卡</button><button data-jump="15">提醒</button>
+      <button data-jump="16">规则</button><button data-jump="17">目标</button>
+      <button data-jump="18">首页卡片</button><button data-jump="19">投资</button>
+      <button data-jump="20">贷款</button><button data-jump="21">净值</button>
+      <button data-jump="22">资金流向</button><button data-jump="23">交叉分析</button>
+      <button data-jump="24">资金年龄</button><button data-jump="25">预算</button>
+      <button data-jump="26">家庭</button><button data-jump="27">开放接口</button>
+      <button data-jump="28">桌面端</button>
+    </div></div>
+</div>
+<div class="stage">
+<h2 class="vergrouph">V1.0 基线 · 11 屏</h2><section class="frame" data-screen="0"><div class="flabel">SP-0-01 首次启动与权限引导</div><div class="bezelless"><div class="screen page-guide"><div class="statusbar"><span class="sb-time">14:55</span><span class="sb-marks"><svg width="18" height="12" aria-hidden="true"><rect x="0" y="5" width="3" height="4" rx="1" fill="currentColor"/><rect x="5" y="3" width="3" height="6" rx="1" fill="currentColor"/><rect x="10" y="0" width="3" height="9" rx="1" fill="currentColor"/><rect x="15" y="-3" width="3" height="12" rx="1" fill="currentColor"/></svg><svg width="18" height="12" aria-hidden="true"><rect x="0.5" y="1.5" width="14" height="9" rx="3" fill="none" stroke="currentColor" opacity=".45"/><rect x="2.5" y="3.5" width="9" height="5" rx="1.5" fill="currentColor"/></svg></span></div>
+<div class="guide-top"><span class="wordmark">素记 Plain</span></div>
+<h2 class="guide-h">记账，三秒钟的事</h2>
+<p class="guide-p">本地存储 · 无广告 · 无理财</p>
+<div class="guide-hero">
+  <div class="hairline"></div>
+  <div class="hero-label">本月结余</div>
+  <div class="hero-amt"><span class="amt xl tone-ink"><span class="cur">¥</span><span class="int">12,480</span><span class="pnt">.</span><span class="dec">00</span></span></div>
+  <div class="hairline"></div>
+</div>
+<div class="featlist"><div class="feat"><svg width="22" height="22" aria-hidden="true"><use href="#ic_nav_add"/></svg><span class="fcol"><span class="ft">三秒记一笔</span><span class="fs">只记数字，不填表格</span></span></div><div class="feat"><svg width="22" height="22" aria-hidden="true"><use href="#ic_lock"/></svg><span class="fcol"><span class="ft">数据只在你手机里</span><span class="fs">没有账号，没有服务器</span></span></div><div class="feat"><svg width="22" height="22" aria-hidden="true"><use href="#ic_palette"/></svg><span class="fcol"><span class="ft">十套配色，昼夜两态</span><span class="fs">冷底暖点，久看不累</span></span></div></div>
+<div class="guide-foot">
+  <button class="btn primary" data-goto="ledger">开始记账</button>
+  <p class="foot-note">数据全部本地存储 · 卸载前请先备份</p>
+</div></div></div></section><section class="frame" data-screen="1"><div class="flabel">SP-0-02 首页流水</div><div class="bezelless"><div class="screen"><div class="statusbar"><span class="sb-time">14:55</span><span class="sb-marks"><svg width="18" height="12" aria-hidden="true"><rect x="0" y="5" width="3" height="4" rx="1" fill="currentColor"/><rect x="5" y="3" width="3" height="6" rx="1" fill="currentColor"/><rect x="10" y="0" width="3" height="9" rx="1" fill="currentColor"/><rect x="15" y="-3" width="3" height="12" rx="1" fill="currentColor"/></svg><svg width="18" height="12" aria-hidden="true"><rect x="0.5" y="1.5" width="14" height="9" rx="3" fill="none" stroke="currentColor" opacity=".45"/><rect x="2.5" y="3.5" width="9" height="5" rx="1.5" fill="currentColor"/></svg></span></div>
+<header class="topbar">
+  <button class="iconbtn" data-goto="reports"><svg width="20" height="20" aria-hidden="true"><use href="#ic_calendar"/></svg></button>
+  <h1>2026年9月</h1>
+  <div class="tb-right">
+    <button class="iconbtn"><svg width="20" height="20" aria-hidden="true"><use href="#ic_search"/></svg></button>
+    <button class="iconbtn"><svg width="20" height="20" aria-hidden="true"><use href="#ic_more"/></svg></button>
+  </div>
+</header>
+<div class="scroll">
+  <section class="hero">
+    <div class="hairline"></div>
+    <div class="hero-label">本月结余</div>
+    <div class="hero-amt"><span class="amt xl tone-ink"><span class="cur">¥</span><span class="int">3,420</span><span class="pnt">.</span><span class="dec">50</span></span></div>
+    <div class="hero-split">
+      <div class="hs"><span class="hs-l">支出</span>
+        <span class="hs-v"><span class="amt s tone-ink"><span class="cur">¥</span><span class="int">5,879</span><span class="pnt">.</span><span class="dec">50</span></span></span></div>
+      <div class="hs"><span class="hs-l">收入</span>
+        <span class="hs-v"><span class="amt s tone-income"><span class="cur">¥</span>+<span class="int">9,300</span><span class="pnt">.</span><span class="dec">00</span></span></span></div>
+    </div>
+    <div class="hairline"></div>
+    <div class="month-note"><svg width="13" height="13" aria-hidden="true"><use href="#ic_calendar"/></svg><span>记账月起始：10 日</span></div>
+  </section>
+  <section class="grp"><div class="eyebrow">9月28日 周日</div><div class="panel"><a class="row" data-goto="detail"><span class="dot6" style="background:var(--cat-food)"></span><span class="rcol"><span class="rt">餐饮</span><span class="sub">午餐 · 公司楼下</span></span><span class="rw-amt tone-ink">32.00</span></a><a class="row" data-goto="detail"><span class="dot6" style="background:var(--cat-transport)"></span><span class="rcol"><span class="rt">交通</span><span class="sub">地铁 · 通勤</span></span><span class="rw-amt tone-ink">4.00</span></a></div></section>
+  <section class="grp"><div class="eyebrow">9月27日 周六</div><div class="panel"><a class="row" data-goto="detail"><span class="dot6" style="background:var(--cat-shopping)"></span><span class="rcol"><span class="rt">购物</span><span class="sub">日用品 · 超市</span></span><span class="rw-amt tone-ink">128.60</span></a><a class="row" data-goto="detail"><span class="dot6" style="background:var(--cat-social)"></span><span class="rcol"><span class="rt">人情</span><span class="sub">生日礼物</span></span><span class="rw-amt tone-ink">300.00</span></a></div></section>
+  <section class="grp"><div class="eyebrow">9月26日 周五</div><div class="panel"><a class="row" data-goto="detail"><span class="dot6" style="background:var(--cat-telecom)"></span><span class="rcol"><span class="rt">通讯</span><span class="sub">话费充值</span></span><span class="rw-amt tone-ink">50.00</span></a></div></section>
+  <div class="scroll-pad"></div>
+</div>
+<nav class="nav"><a class="navitem on" data-goto="ledger"><svg width="22" height="22" aria-hidden="true"><use href="#ic_nav_ledger"/></svg><span class="navlab">流水</span></a><a class="navitem" data-goto="reports"><svg width="22" height="22" aria-hidden="true"><use href="#ic_nav_report"/></svg><span class="navlab">报表</span></a><a class="navitem navcenter" data-goto="add"><span class="navfab"><svg width="22" height="22" aria-hidden="true"><use href="#ic_nav_add"/></svg></span></a><a class="navitem" data-goto="assets"><svg width="22" height="22" aria-hidden="true"><use href="#ic_nav_assets"/></svg><span class="navlab">资产</span></a><a class="navitem" data-goto="settings"><svg width="22" height="22" aria-hidden="true"><use href="#ic_nav_profile"/></svg><span class="navlab">我的</span></a></nav>
+</div></div></section><section class="frame" data-screen="2"><div class="flabel">SP-1-01 记账输入页</div><div class="bezelless"><div class="screen"><div class="statusbar"><span class="sb-time">14:55</span><span class="sb-marks"><svg width="18" height="12" aria-hidden="true"><rect x="0" y="5" width="3" height="4" rx="1" fill="currentColor"/><rect x="5" y="3" width="3" height="6" rx="1" fill="currentColor"/><rect x="10" y="0" width="3" height="9" rx="1" fill="currentColor"/><rect x="15" y="-3" width="3" height="12" rx="1" fill="currentColor"/></svg><svg width="18" height="12" aria-hidden="true"><rect x="0.5" y="1.5" width="14" height="9" rx="3" fill="none" stroke="currentColor" opacity=".45"/><rect x="2.5" y="3.5" width="9" height="5" rx="1.5" fill="currentColor"/></svg></span></div>
+<header class="topbar"><button class="iconbtn" data-back><svg width="22" height="22" aria-hidden="true"><use href="#ic_close"/></svg></button><h1 class="">记一笔</h1><div class="tb-right"></div></header>
+<div class="ttabs"><button class="ttab on">支出</button><button class="ttab">收入</button><button class="ttab">转账</button><button class="ttab">借出</button><button class="ttab">借入</button></div>
+<div class="amount-block">
+  <div class="expr">25<span class="caret"></span></div>
+  <div class="amt-line"><span class="amt input tone-ink"><span class="cur">¥</span><span class="int">25</span><span class="pnt">.</span><span class="dec">00</span></span></div>
+</div>
+<div class="addbody">
+  <div class="catgrid"><button class="tile on"><span style="color:var(--cat-ink-food);display:flex"><svg width="23" height="23" aria-hidden="true"><use href="#ic_cat_food"/></svg></span><span class="tile-n">餐饮</span></button><button class="tile"><span style="color:var(--cat-ink-fruit);display:flex"><svg width="23" height="23" aria-hidden="true"><use href="#ic_cat_grocery"/></svg></span><span class="tile-n">食材</span></button><button class="tile"><span style="color:var(--cat-ink-transport);display:flex"><svg width="23" height="23" aria-hidden="true"><use href="#ic_cat_transport"/></svg></span><span class="tile-n">交通</span></button><button class="tile"><span style="color:var(--cat-ink-shopping);display:flex"><svg width="23" height="23" aria-hidden="true"><use href="#ic_cat_shopping"/></svg></span><span class="tile-n">购物</span></button><button class="tile"><span style="color:var(--cat-ink-daily);display:flex"><svg width="23" height="23" aria-hidden="true"><use href="#ic_cat_daily"/></svg></span><span class="tile-n">日用</span></button><button class="tile"><span style="color:var(--cat-ink-housing);display:flex"><svg width="23" height="23" aria-hidden="true"><use href="#ic_cat_housing"/></svg></span><span class="tile-n">居住</span></button><button class="tile"><span style="color:var(--cat-ink-telecom);display:flex"><svg width="23" height="23" aria-hidden="true"><use href="#ic_cat_telecom"/></svg></span><span class="tile-n">通讯</span></button><button class="tile"><span style="color:var(--cat-ink-entertainment);display:flex"><svg width="23" height="23" aria-hidden="true"><use href="#ic_cat_entertainment"/></svg></span><span class="tile-n">娱乐</span></button><button class="tile"><span style="color:var(--cat-ink-medical);display:flex"><svg width="23" height="23" aria-hidden="true"><use href="#ic_cat_medical"/></svg></span><span class="tile-n">医疗</span></button><button class="tile"><span style="color:var(--cat-ink-study);display:flex"><svg width="23" height="23" aria-hidden="true"><use href="#ic_cat_study"/></svg></span><span class="tile-n">学习</span></button><button class="tile"><span style="color:var(--cat-ink-social);display:flex"><svg width="23" height="23" aria-hidden="true"><use href="#ic_cat_social"/></svg></span><span class="tile-n">人情</span></button><button class="tile"><span style="color:var(--cat-ink-other);display:flex"><svg width="23" height="23" aria-hidden="true"><use href="#ic_cat_other"/></svg></span><span class="tile-n">其他</span></button></div>
+  <div class="attrchips">
+    <button class="chip"><svg width="16" height="16" aria-hidden="true"><use href="#ic_account"/></svg>招行储蓄卡</button>
+    <button class="chip"><svg width="16" height="16" aria-hidden="true"><use href="#ic_calendar"/></svg>今天</button>
+    <button class="chip ph"><svg width="16" height="16" aria-hidden="true"><use href="#ic_note"/></svg>添加备注</button>
+  </div>
+</div>
+<div class="keypad"><button class="key">1</button><button class="key">2</button><button class="key">3</button><button class="key op"><svg width="22" height="22" aria-hidden="true"><use href="#ic_back"/></svg></button><button class="key">4</button><button class="key">5</button><button class="key">6</button><button class="key op"><svg width="19" height="19" aria-hidden="true"><use href="#ic_close"/></svg></button><button class="key">7</button><button class="key">8</button><button class="key">9</button><span class="key blank"></span><button class="key">.</button><button class="key">0</button><button class="key ok">保存</button></div>
+<div class="safearea"></div>
+</div></div></section><section class="frame" data-screen="3"><div class="flabel">SP-1-02 账单详情</div><div class="bezelless"><div class="screen"><div class="statusbar"><span class="sb-time">14:55</span><span class="sb-marks"><svg width="18" height="12" aria-hidden="true"><rect x="0" y="5" width="3" height="4" rx="1" fill="currentColor"/><rect x="5" y="3" width="3" height="6" rx="1" fill="currentColor"/><rect x="10" y="0" width="3" height="9" rx="1" fill="currentColor"/><rect x="15" y="-3" width="3" height="12" rx="1" fill="currentColor"/></svg><svg width="18" height="12" aria-hidden="true"><rect x="0.5" y="1.5" width="14" height="9" rx="3" fill="none" stroke="currentColor" opacity=".45"/><rect x="2.5" y="3.5" width="9" height="5" rx="1.5" fill="currentColor"/></svg></span></div>
+<header class="topbar"><button class="iconbtn" data-back><svg width="22" height="22" aria-hidden="true"><use href="#ic_back"/></svg></button><h1 class="">账单详情</h1><div class="tb-right"><button class="textbtn">编辑</button></div></header>
+<div class="scroll">
+  <section class="detail-hero">
+    <div class="hero-label">金额</div>
+    <div class="hero-amt"><span class="amt xl tone-ink"><span class="cur">¥</span><span class="int">32</span><span class="pnt">.</span><span class="dec">00</span></span></div>
+    <div class="dh-meta"><span class="dot6" style="background:var(--cat-food)"></span>
+      <span>餐饮</span><span class="sep">·</span>
+      <span>招行储蓄卡</span></div>
+  </section>
+  <div class="panel detail-panel"><div class="drow"><span class="dk">分类</span><span class="dv"><span class="dot6" style="background:var(--cat-food)"></span>餐饮</span></div><div class="drow"><span class="dk">账户</span><span class="dv">招行储蓄卡</span></div><div class="drow"><span class="dk">日期</span><span class="dv">2026年9月28日 12:34</span></div><div class="drow"><span class="dk">备注</span><span class="dv note">公司楼下 · 工作日午餐</span></div><div class="drow"><span class="dk">来源</span><span class="dv">手动录入</span></div></div>
+  <div class="danger-zone">
+    <button class="btn2 danger"><svg width="18" height="18" aria-hidden="true"><use href="#ic_delete"/></svg><span>删除这笔账单</span></button>
+    <p class="foot-note">删除后可在回收站恢复（保留 30 天）</p>
+  </div>
+</div></div></div></section><section class="frame" data-screen="4"><div class="flabel">SP-1-03 分类管理</div><div class="bezelless"><div class="screen"><div class="statusbar"><span class="sb-time">14:55</span><span class="sb-marks"><svg width="18" height="12" aria-hidden="true"><rect x="0" y="5" width="3" height="4" rx="1" fill="currentColor"/><rect x="5" y="3" width="3" height="6" rx="1" fill="currentColor"/><rect x="10" y="0" width="3" height="9" rx="1" fill="currentColor"/><rect x="15" y="-3" width="3" height="12" rx="1" fill="currentColor"/></svg><svg width="18" height="12" aria-hidden="true"><rect x="0.5" y="1.5" width="14" height="9" rx="3" fill="none" stroke="currentColor" opacity=".45"/><rect x="2.5" y="3.5" width="9" height="5" rx="1.5" fill="currentColor"/></svg></span></div>
+<header class="topbar">
+  <button class="iconbtn" data-back><svg width="22" height="22" aria-hidden="true"><use href="#ic_back"/></svg></button>
+  <h1>分类管理</h1>
+  <div class="tb-right"><button class="iconbtn"><svg width="20" height="20" aria-hidden="true"><use href="#ic_plus"/></svg></button></div>
+</header>
+<div class="segwrap"><div class="seg">
+  <button class="segi on">支出</button>
+  <button class="segi">收入</button>
+</div></div>
+<div class="scroll"><div class="panel catpanel"><div class="crow2"><span class="cicon" style="color:var(--cat-ink-food)"><svg width="24" height="24" aria-hidden="true"><use href="#ic_cat_food"/></svg></span><span class="rcol"><span class="rt">餐饮</span><span class="sub">三餐、外卖、堂食</span></span><span class="cnt">128 笔</span><svg class="drag" width="18" height="18" aria-hidden="true"><use href="#ic_drag_handle"/></svg></div><div class="crow2"><span class="cicon" style="color:var(--cat-ink-fruit)"><svg width="24" height="24" aria-hidden="true"><use href="#ic_cat_grocery"/></svg></span><span class="rcol"><span class="rt">食材</span><span class="sub">买菜、生鲜、米面粮油</span></span><span class="cnt">46 笔</span><svg class="drag" width="18" height="18" aria-hidden="true"><use href="#ic_drag_handle"/></svg></div><div class="crow2"><span class="cicon" style="color:var(--cat-ink-shopping)"><svg width="24" height="24" aria-hidden="true"><use href="#ic_cat_shopping"/></svg></span><span class="rcol"><span class="rt">购物</span><span class="sub">服饰、数码、家居</span></span><span class="cnt">33 笔</span><svg class="drag" width="18" height="18" aria-hidden="true"><use href="#ic_drag_handle"/></svg></div><div class="crow2"><span class="cicon" style="color:var(--cat-ink-daily)"><svg width="24" height="24" aria-hidden="true"><use href="#ic_cat_daily"/></svg></span><span class="rcol"><span class="rt">日用</span><span class="sub">洗护、纸品、清洁</span></span><span class="cnt">61 笔</span><svg class="drag" width="18" height="18" aria-hidden="true"><use href="#ic_drag_handle"/></svg></div><div class="crow2"><span class="cicon" style="color:var(--cat-ink-transport)"><svg width="24" height="24" aria-hidden="true"><use href="#ic_cat_transport"/></svg></span><span class="rcol"><span class="rt">交通</span><span class="sub">通勤、打车、加油</span></span><span class="cnt">88 笔</span><svg class="drag" width="18" height="18" aria-hidden="true"><use href="#ic_drag_handle"/></svg></div><div class="crow2"><span class="cicon" style="color:var(--cat-ink-housing)"><svg width="24" height="24" aria-hidden="true"><use href="#ic_cat_housing"/></svg></span><span class="rcol"><span class="rt">居住</span><span class="sub">房租、房贷、水电</span></span><span class="cnt">6 笔</span><svg class="drag" width="18" height="18" aria-hidden="true"><use href="#ic_drag_handle"/></svg></div><div class="crow2"><span class="cicon" style="color:var(--cat-ink-telecom)"><svg width="24" height="24" aria-hidden="true"><use href="#ic_cat_telecom"/></svg></span><span class="rcol"><span class="rt">通讯</span><span class="sub">话费、宽带、会员</span></span><span class="cnt">4 笔</span><svg class="drag" width="18" height="18" aria-hidden="true"><use href="#ic_drag_handle"/></svg></div><div class="crow2"><span class="cicon" style="color:var(--cat-ink-entertainment)"><svg width="24" height="24" aria-hidden="true"><use href="#ic_cat_entertainment"/></svg></span><span class="rcol"><span class="rt">娱乐</span><span class="sub">影视、游戏、演出</span></span><span class="cnt">12 笔</span><svg class="drag" width="18" height="18" aria-hidden="true"><use href="#ic_drag_handle"/></svg></div><div class="crow2"><span class="cicon" style="color:var(--cat-ink-medical)"><svg width="24" height="24" aria-hidden="true"><use href="#ic_cat_medical"/></svg></span><span class="rcol"><span class="rt">医疗</span><span class="sub">门诊、药品、体检</span></span><span class="cnt">3 笔</span><svg class="drag" width="18" height="18" aria-hidden="true"><use href="#ic_drag_handle"/></svg></div><div class="crow2"><span class="cicon" style="color:var(--cat-ink-study)"><svg width="24" height="24" aria-hidden="true"><use href="#ic_cat_study"/></svg></span><span class="rcol"><span class="rt">学习</span><span class="sub">书籍、课程、考试</span></span><span class="cnt">7 笔</span><svg class="drag" width="18" height="18" aria-hidden="true"><use href="#ic_drag_handle"/></svg></div><div class="crow2"><span class="cicon" style="color:var(--cat-ink-social)"><svg width="24" height="24" aria-hidden="true"><use href="#ic_cat_social"/></svg></span><span class="rcol"><span class="rt">人情</span><span class="sub">红包、礼物、请客</span></span><span class="cnt">9 笔</span><svg class="drag" width="18" height="18" aria-hidden="true"><use href="#ic_drag_handle"/></svg></div><div class="crow2"><span class="cicon" style="color:var(--cat-ink-other)"><svg width="24" height="24" aria-hidden="true"><use href="#ic_cat_other"/></svg></span><span class="rcol"><span class="rt">其他</span><span class="sub">未归类的支出</span></span><span class="cnt">2 笔</span><svg class="drag" width="18" height="18" aria-hidden="true"><use href="#ic_drag_handle"/></svg></div></div>
+  <div class="scroll-pad"></div></div>
+<div class="footbar"><button class="btn2 wide"><svg width="18" height="18" aria-hidden="true"><use href="#ic_plus"/></svg><span>新建分类</span></button>
+<div class="safearea"></div></div>
+</div></div></section><section class="frame" data-screen="5"><div class="flabel">SP-2-01 账户管理</div><div class="bezelless"><div class="screen"><div class="statusbar"><span class="sb-time">14:55</span><span class="sb-marks"><svg width="18" height="12" aria-hidden="true"><rect x="0" y="5" width="3" height="4" rx="1" fill="currentColor"/><rect x="5" y="3" width="3" height="6" rx="1" fill="currentColor"/><rect x="10" y="0" width="3" height="9" rx="1" fill="currentColor"/><rect x="15" y="-3" width="3" height="12" rx="1" fill="currentColor"/></svg><svg width="18" height="12" aria-hidden="true"><rect x="0.5" y="1.5" width="14" height="9" rx="3" fill="none" stroke="currentColor" opacity=".45"/><rect x="2.5" y="3.5" width="9" height="5" rx="1.5" fill="currentColor"/></svg></span></div>
+<header class="topbar">
+  <button class="iconbtn ghost"><svg width="20" height="20" aria-hidden="true"><use href="#ic_shield"/></svg></button>
+  <h1>资产</h1>
+  <div class="tb-right"><button class="iconbtn"><svg width="20" height="20" aria-hidden="true"><use href="#ic_eye_off"/></svg></button></div>
+</header>
+<div class="scroll">
+  <section class="hero">
+    <div class="hairline"></div>
+    <div class="hero-label">净资产</div>
+    <div class="hero-amt"><span class="amt xl tone-ink"><span class="cur">¥</span><span class="int">86,420</span><span class="pnt">.</span><span class="dec">50</span></span></div>
+    <div class="hairline"></div>
+  </section>
+  <section class="grp"><div class="eyebrow">资产</div><div class="panel"><div class="row"><span class="ricos"><svg width="22" height="22" aria-hidden="true"><use href="#ic_card"/></svg></span><span class="rcol"><span class="rt">招行储蓄卡</span><span class="sub">储蓄卡 ····6217</span></span><span class="rw-amt tone-ink"><span class="amt s tone-ink"><span class="cur">¥</span><span class="int">52,180</span><span class="pnt">.</span><span class="dec">30</span></span></span><svg class="chev" width="16" height="16" aria-hidden="true"><use href="#ic_chevron_right"/></svg></div><div class="row"><span class="ricos"><svg width="22" height="22" aria-hidden="true"><use href="#ic_wallet"/></svg></span><span class="rcol"><span class="rt">微信零钱</span><span class="sub">现金</span></span><span class="rw-amt tone-ink"><span class="amt s tone-ink"><span class="cur">¥</span><span class="int">1,240</span><span class="pnt">.</span><span class="dec">20</span></span></span><svg class="chev" width="16" height="16" aria-hidden="true"><use href="#ic_chevron_right"/></svg></div><div class="row"><span class="ricos"><svg width="22" height="22" aria-hidden="true"><use href="#ic_chart_line"/></svg></span><span class="rcol"><span class="rt">指数基金</span><span class="sub">投资 · 3 只持仓</span></span><span class="rw-amt tone-ink"><span class="amt s tone-ink"><span class="cur">¥</span><span class="int">38,000</span><span class="pnt">.</span><span class="dec">00</span></span></span><svg class="chev" width="16" height="16" aria-hidden="true"><use href="#ic_chevron_right"/></svg></div></div></section>
+  <section class="grp"><div class="eyebrow">负债</div><div class="panel"><div class="row"><span class="ricos"><svg width="22" height="22" aria-hidden="true"><use href="#ic_receipt"/></svg></span><span class="rcol"><span class="rt">招行信用卡</span><span class="sub">信用卡 · 本期应还</span></span><span class="rw-amt tone-ink"><span class="amt s tone-ink"><span class="cur">¥</span>−<span class="int">5,000</span><span class="pnt">.</span><span class="dec">00</span></span></span><svg class="chev" width="16" height="16" aria-hidden="true"><use href="#ic_chevron_right"/></svg></div></div></section>
+  <div class="scroll-pad"></div>
+</div>
+<nav class="nav"><a class="navitem" data-goto="ledger"><svg width="22" height="22" aria-hidden="true"><use href="#ic_nav_ledger"/></svg><span class="navlab">流水</span></a><a class="navitem" data-goto="reports"><svg width="22" height="22" aria-hidden="true"><use href="#ic_nav_report"/></svg><span class="navlab">报表</span></a><a class="navitem navcenter" data-goto="add"><span class="navfab"><svg width="22" height="22" aria-hidden="true"><use href="#ic_nav_add"/></svg></span></a><a class="navitem on" data-goto="assets"><svg width="22" height="22" aria-hidden="true"><use href="#ic_nav_assets"/></svg><span class="navlab">资产</span></a><a class="navitem" data-goto="settings"><svg width="22" height="22" aria-hidden="true"><use href="#ic_nav_profile"/></svg><span class="navlab">我的</span></a></nav>
+</div></div></section><section class="frame" data-screen="6"><div class="flabel">SP-3-01 报表页</div><div class="bezelless"><div class="screen"><div class="statusbar"><span class="sb-time">14:55</span><span class="sb-marks"><svg width="18" height="12" aria-hidden="true"><rect x="0" y="5" width="3" height="4" rx="1" fill="currentColor"/><rect x="5" y="3" width="3" height="6" rx="1" fill="currentColor"/><rect x="10" y="0" width="3" height="9" rx="1" fill="currentColor"/><rect x="15" y="-3" width="3" height="12" rx="1" fill="currentColor"/></svg><svg width="18" height="12" aria-hidden="true"><rect x="0.5" y="1.5" width="14" height="9" rx="3" fill="none" stroke="currentColor" opacity=".45"/><rect x="2.5" y="3.5" width="9" height="5" rx="1.5" fill="currentColor"/></svg></span></div>
+<header class="topbar">
+  <button class="iconbtn" data-goto="ledger"><svg width="20" height="20" aria-hidden="true"><use href="#ic_calendar"/></svg></button>
+  <h1>报表</h1>
+  <div class="tb-right">
+    <button class="iconbtn"><svg width="20" height="20" aria-hidden="true"><use href="#ic_filter"/></svg></button>
+    <button class="iconbtn"><svg width="20" height="20" aria-hidden="true"><use href="#ic_more"/></svg></button>
+  </div>
+</header>
+<div class="scroll">
+  <div class="month-note tight"><svg width="13" height="13" aria-hidden="true"><use href="#ic_calendar"/></svg><span>记账月起始：10 日</span>
+    <span class="dot-sep">·</span><span>共 45 笔</span></div>
+  <div class="panel cmppanel">
+    <div class="eyebrow">与上月对比</div>
+    <div class="crow"><span class="ck">支出</span><span class="cv"><span class="amt s tone-ink"><span class="cur">¥</span><span class="int">5,879</span><span class="pnt">.</span><span class="dec">50</span></span></span><span class="cd tone-up"><svg width="14" height="14" aria-hidden="true"><use href="#ic_trend_up"/></svg>12.4%</span></div><div class="crow"><span class="ck">收入</span><span class="cv tone-income"><span class="amt s tone-income"><span class="cur">¥</span>+<span class="int">9,300</span><span class="pnt">.</span><span class="dec">00</span></span></span><span class="cd tone-up"><svg width="14" height="14" aria-hidden="true"><use href="#ic_trend_up"/></svg>8.1%</span></div><div class="crow"><span class="ck">结余</span><span class="cv"><span class="amt s tone-ink"><span class="cur">¥</span><span class="int">3,420</span><span class="pnt">.</span><span class="dec">50</span></span></span><span class="cd tone-dn"><svg width="14" height="14" aria-hidden="true"><use href="#ic_trend_down"/></svg>6.2%</span></div>
+  </div>
+  <div class="panel chartpanel">
+    <div class="eyebrow">分类占比</div>
+    <div class="donut-wrap"><svg class="donut" width="136" height="136" viewBox="0 0 136 136"><g fill="none" stroke-width="13" stroke-linecap="butt"><circle class="dn-seg" cx="68.0" cy="68.0" r="52.0" style="stroke:var(--cat-food);stroke-dasharray:104.55 326.73;stroke-dashoffset:-0.00"/><circle class="dn-seg" cx="68.0" cy="68.0" r="52.0" style="stroke:var(--cat-shopping);stroke-dasharray:78.41 326.73;stroke-dashoffset:-104.55"/><circle class="dn-seg" cx="68.0" cy="68.0" r="52.0" style="stroke:var(--cat-other);stroke-dasharray:58.81 326.73;stroke-dashoffset:-182.97"/><circle class="dn-seg" cx="68.0" cy="68.0" r="52.0" style="stroke:var(--cat-transport);stroke-dasharray:45.74 326.73;stroke-dashoffset:-241.78"/><circle class="dn-seg" cx="68.0" cy="68.0" r="52.0" style="stroke:var(--cat-housing);stroke-dasharray:39.21 326.73;stroke-dashoffset:-287.52"/></g><text class="dn-c1" x="68.0" y="64.0" text-anchor="middle" style="font-size:18px"><tspan class="dn-cur">¥</tspan>5,879<tspan class="dn-pnt">.</tspan><tspan class="dn-dec">50</tspan></text><text class="dn-c2" x="68.0" y="84.0" text-anchor="middle">TOTAL</text></svg></div>
+    <div class="legend"><div class="lrow"><span class="dot8" style="background:var(--cat-food)"></span><span class="lname">餐饮</span><span class="lpct">32%</span><span class="lamt"><span class="amt s tone-ink"><span class="cur">¥</span><span class="int">1,881</span><span class="pnt">.</span><span class="dec">44</span></span></span></div><div class="lrow"><span class="dot8" style="background:var(--cat-shopping)"></span><span class="lname">购物</span><span class="lpct">24%</span><span class="lamt"><span class="amt s tone-ink"><span class="cur">¥</span><span class="int">1,411</span><span class="pnt">.</span><span class="dec">08</span></span></span></div><div class="lrow"><span class="dot8" style="background:var(--cat-other)"></span><span class="lname">其他</span><span class="lpct">18%</span><span class="lamt"><span class="amt s tone-ink"><span class="cur">¥</span><span class="int">1,058</span><span class="pnt">.</span><span class="dec">31</span></span></span></div><div class="lrow"><span class="dot8" style="background:var(--cat-transport)"></span><span class="lname">交通</span><span class="lpct">14%</span><span class="lamt"><span class="amt s tone-ink"><span class="cur">¥</span><span class="int">823</span><span class="pnt">.</span><span class="dec">13</span></span></span></div><div class="lrow"><span class="dot8" style="background:var(--cat-housing)"></span><span class="lname">居住</span><span class="lpct">12%</span><span class="lamt"><span class="amt s tone-ink"><span class="cur">¥</span><span class="int">705</span><span class="pnt">.</span><span class="dec">54</span></span></span></div></div>
+  </div>
+  <div class="panel chartpanel">
+    <div class="eyebrow">每日支出</div>
+    <svg class="bars" viewBox="0 0 274 72" preserveAspectRatio="none" width="100%" height="72"><line x1="0" y1="66.5" x2="274" y2="66.5" style="stroke:var(--line)"/><rect x="0" y="36.2" width="14" height="29.8" rx="3" style="fill:var(--bar-fill);opacity:0.62"/><rect x="20" y="42.4" width="14" height="23.6" rx="3" style="fill:var(--bar-fill);opacity:0.54"/><rect x="40" y="26.3" width="14" height="39.7" rx="3" style="fill:var(--bar-fill);opacity:0.75"/><rect x="60" y="45.5" width="14" height="20.5" rx="3" style="fill:var(--bar-fill);opacity:0.51"/><rect x="80" y="29.4" width="14" height="36.6" rx="3" style="fill:var(--bar-fill);opacity:0.71"/><rect x="100" y="17.4" width="14" height="48.6" rx="3" style="fill:var(--bar-fill);opacity:0.86"/><rect x="120" y="39.3" width="14" height="26.7" rx="3" style="fill:var(--bar-fill);opacity:0.58"/><rect x="140" y="47.6" width="14" height="18.4" rx="3" style="fill:var(--bar-fill);opacity:0.48"/><rect x="160" y="33.0" width="14" height="33.0" rx="3" style="fill:var(--bar-fill);opacity:0.66"/><rect x="180" y="23.7" width="14" height="42.3" rx="3" style="fill:var(--bar-fill);opacity:0.78"/><rect x="200" y="42.9" width="14" height="23.1" rx="3" style="fill:var(--bar-fill);opacity:0.54"/><rect x="220" y="11.2" width="14" height="54.8" rx="3" style="fill:var(--bar-fill);opacity:0.94"/><rect x="240" y="31.0" width="14" height="35.0" rx="3" style="fill:var(--bar-fill);opacity:0.69"/><rect x="260" y="40.3" width="14" height="25.7" rx="3" style="fill:var(--bar-fill);opacity:0.57"/></svg>
+  </div>
+  <div class="scroll-pad"></div>
+</div>
+<nav class="nav"><a class="navitem" data-goto="ledger"><svg width="22" height="22" aria-hidden="true"><use href="#ic_nav_ledger"/></svg><span class="navlab">流水</span></a><a class="navitem on" data-goto="reports"><svg width="22" height="22" aria-hidden="true"><use href="#ic_nav_report"/></svg><span class="navlab">报表</span></a><a class="navitem navcenter" data-goto="add"><span class="navfab"><svg width="22" height="22" aria-hidden="true"><use href="#ic_nav_add"/></svg></span></a><a class="navitem" data-goto="assets"><svg width="22" height="22" aria-hidden="true"><use href="#ic_nav_assets"/></svg><span class="navlab">资产</span></a><a class="navitem" data-goto="settings"><svg width="22" height="22" aria-hidden="true"><use href="#ic_nav_profile"/></svg><span class="navlab">我的</span></a></nav>
+</div></div></section><section class="frame" data-screen="7"><div class="flabel">SP-4-01 备份与恢复</div><div class="bezelless"><div class="screen"><div class="statusbar"><span class="sb-time">14:55</span><span class="sb-marks"><svg width="18" height="12" aria-hidden="true"><rect x="0" y="5" width="3" height="4" rx="1" fill="currentColor"/><rect x="5" y="3" width="3" height="6" rx="1" fill="currentColor"/><rect x="10" y="0" width="3" height="9" rx="1" fill="currentColor"/><rect x="15" y="-3" width="3" height="12" rx="1" fill="currentColor"/></svg><svg width="18" height="12" aria-hidden="true"><rect x="0.5" y="1.5" width="14" height="9" rx="3" fill="none" stroke="currentColor" opacity=".45"/><rect x="2.5" y="3.5" width="9" height="5" rx="1.5" fill="currentColor"/></svg></span></div>
+<header class="topbar"><button class="iconbtn" data-back><svg width="22" height="22" aria-hidden="true"><use href="#ic_back"/></svg></button><h1 class="">备份与恢复</h1><div class="tb-right"><button class="textbtn">生成备份</button></div></header>
+<div class="scroll">
+  <div class="grp0"><div class="panel notepanel">备份为<b>整库加密文件</b>，包含全部账单、分类、账户与设置。通过系统分享保存到网盘或电脑。<span class="nl">卸载应用会清除本地数据，<b>请提前备份</b>。</span></div></div>
+  <section class="grp"><div class="eyebrow">历史备份</div>
+    <div class="panel">
+      <div class="emptybox"><svg class="emptyic" width="28" height="28" aria-hidden="true"><use href="#ic_storage"/></svg>
+        <div style="margin-top:10px;color:var(--ink-2);font-weight:500">还没有备份</div>
+        <div style="margin-top:3px">点击右上角「生成备份」创建第一份</div></div>
+    </div></section>
+  <section class="grp"><div class="eyebrow">恢复流程</div>
+    <div class="panel"><div class="panel notepanel">选择备份 → 校验密码与版本 → 预览（笔数 / 时间范围）→ 确认。<span class="nl">恢复前系统会<b>自动生成一份「恢复前备份」</b>，操作可反悔。</span></div>
+    </div></section>
+  <div class="scroll-pad"></div>
+</div></div></div></section><section class="frame" data-screen="8"><div class="flabel">SP-5-01 发现</div><div class="bezelless"><div class="screen"><div class="statusbar"><span class="sb-time">14:55</span><span class="sb-marks"><svg width="18" height="12" aria-hidden="true"><rect x="0" y="5" width="3" height="4" rx="1" fill="currentColor"/><rect x="5" y="3" width="3" height="6" rx="1" fill="currentColor"/><rect x="10" y="0" width="3" height="9" rx="1" fill="currentColor"/><rect x="15" y="-3" width="3" height="12" rx="1" fill="currentColor"/></svg><svg width="18" height="12" aria-hidden="true"><rect x="0.5" y="1.5" width="14" height="9" rx="3" fill="none" stroke="currentColor" opacity=".45"/><rect x="2.5" y="3.5" width="9" height="5" rx="1.5" fill="currentColor"/></svg></span></div>
+<header class="topbar"><button class="iconbtn" data-back><svg width="22" height="22" aria-hidden="true"><use href="#ic_back"/></svg></button>
+  <h1>发现</h1><div class="tb-right"></div></header>
+<div class="scroll">
+  <section class="grp0"><div class="eyebrow">常用</div>
+    <div class="panel">
+      <div class="row"><span class="ricos"><svg width="22" height="22" aria-hidden="true"><use href="#ic_storage"/></svg></span><span class="rcol"><span class="rt">备份与恢复</span><span class="sub">生成加密备份 · 恢复到任意设备</span></span><svg class="chev" width="16" height="16" aria-hidden="true"><use href="#ic_chevron_right"/></svg></div>
+      <div class="row"><span class="ricos"><svg width="22" height="22" aria-hidden="true"><use href="#ic_scan"/></svg></span><span class="rcol"><span class="rt">分类管理</span><span class="sub">12 个一级 · 41 个二级 · 自定义图标与备注</span></span><svg class="chev" width="16" height="16" aria-hidden="true"><use href="#ic_chevron_right"/></svg></div>
+    </div></section>
+  <section class="grp"><div class="eyebrow">V2.0 · 交易精度与主动管家</div>
+    <div class="panel"><div class="row"><span class="ricos"><svg width="22" height="22" aria-hidden="true"><use href="#ic_transfer"/></svg></span><span class="rcol"><span class="rt">转账 / 借出 / 借入</span><span class="sub">双账户记一笔，显式确认</span></span><svg class="chev" width="16" height="16" aria-hidden="true"><use href="#ic_chevron_right"/></svg></div><div class="row"><span class="ricos"><svg width="22" height="22" aria-hidden="true"><use href="#ic_chart_pie"/></svg></span><span class="rcol"><span class="rt">分割交易</span><span class="sub">一笔消费拆到多个分类</span></span><svg class="chev" width="16" height="16" aria-hidden="true"><use href="#ic_chevron_right"/></svg></div><div class="row"><span class="ricos"><svg width="22" height="22" aria-hidden="true"><use href="#ic_receipt"/></svg></span><span class="rcol"><span class="rt">报销中心</span><span class="sub">待报销 → 已到账三态</span></span><svg class="chev" width="16" height="16" aria-hidden="true"><use href="#ic_chevron_right"/></svg></div><div class="row"><span class="ricos"><svg width="22" height="22" aria-hidden="true"><use href="#ic_card"/></svg></span><span class="rcol"><span class="rt">信用卡账单</span><span class="sub">账单周期、应还、未出账明细</span></span><svg class="chev" width="16" height="16" aria-hidden="true"><use href="#ic_chevron_right"/></svg></div><div class="row"><span class="ricos"><svg width="22" height="22" aria-hidden="true"><use href="#ic_bell"/></svg></span><span class="rcol"><span class="rt">提醒中心</span><span class="sub">预算 / 账单 / 周期三类聚合</span></span><svg class="chev" width="16" height="16" aria-hidden="true"><use href="#ic_chevron_right"/></svg></div><div class="row"><span class="ricos"><svg width="22" height="22" aria-hidden="true"><use href="#ic_recurring"/></svg></span><span class="rcol"><span class="rt">自动规则</span><span class="sub">IF 条件 → THEN 动作</span></span><svg class="chev" width="16" height="16" aria-hidden="true"><use href="#ic_chevron_right"/></svg></div><div class="row"><span class="ricos"><svg width="22" height="22" aria-hidden="true"><use href="#ic_goal"/></svg></span><span class="rcol"><span class="rt">储蓄目标与基金</span><span class="sub">大额支出按月摊存</span></span><svg class="chev" width="16" height="16" aria-hidden="true"><use href="#ic_chevron_right"/></svg></div><div class="row"><span class="ricos"><svg width="22" height="22" aria-hidden="true"><use href="#ic_settings"/></svg></span><span class="rcol"><span class="rt">首页卡片自定义</span><span class="sub">选择常驻卡片与顺序</span></span><svg class="chev" width="16" height="16" aria-hidden="true"><use href="#ic_chevron_right"/></svg></div></div></section>
+  <section class="grp"><div class="eyebrow">V3.0 · 资产完整性与方法论</div>
+    <div class="panel"><div class="row"><span class="ricos"><svg width="22" height="22" aria-hidden="true"><use href="#ic_chart_line"/></svg></span><span class="rcol"><span class="rt">投资持仓</span><span class="sub">成本 / 市值 / 浮动盈亏</span></span><svg class="chev" width="16" height="16" aria-hidden="true"><use href="#ic_chevron_right"/></svg></div><div class="row"><span class="ricos"><svg width="22" height="22" aria-hidden="true"><use href="#ic_calendar"/></svg></span><span class="rcol"><span class="rt">贷款摊销</span><span class="sub">等额本息 / 等额本金</span></span><svg class="chev" width="16" height="16" aria-hidden="true"><use href="#ic_chevron_right"/></svg></div><div class="row"><span class="ricos"><svg width="22" height="22" aria-hidden="true"><use href="#ic_chart_bars"/></svg></span><span class="rcol"><span class="rt">净值追踪</span><span class="sub">净值走势与资产构成</span></span><svg class="chev" width="16" height="16" aria-hidden="true"><use href="#ic_chevron_right"/></svg></div><div class="row"><span class="ricos"><svg width="22" height="22" aria-hidden="true"><use href="#ic_arrow_up_right"/></svg></span><span class="rcol"><span class="rt">资金流向</span><span class="sub">钱从哪来、到哪去、剩多少</span></span><svg class="chev" width="16" height="16" aria-hidden="true"><use href="#ic_chevron_right"/></svg></div><div class="row"><span class="ricos"><svg width="22" height="22" aria-hidden="true"><use href="#ic_filter"/></svg></span><span class="rcol"><span class="rt">交叉分析</span><span class="sub">分类 × 账户透视</span></span><svg class="chev" width="16" height="16" aria-hidden="true"><use href="#ic_chevron_right"/></svg></div><div class="row"><span class="ricos"><svg width="22" height="22" aria-hidden="true"><use href="#ic_status_info"/></svg></span><span class="rcol"><span class="rt">资金年龄</span><span class="sub">花掉的一块钱躺了多少天</span></span><svg class="chev" width="16" height="16" aria-hidden="true"><use href="#ic_chevron_right"/></svg></div><div class="row"><span class="ricos"><svg width="22" height="22" aria-hidden="true"><use href="#ic_budget"/></svg></span><span class="rcol"><span class="rt">预算</span><span class="sub">四种方法论任选</span></span><svg class="chev" width="16" height="16" aria-hidden="true"><use href="#ic_chevron_right"/></svg></div><div class="row"><span class="ricos"><svg width="22" height="22" aria-hidden="true"><use href="#ic_nav_profile"/></svg></span><span class="rcol"><span class="rt">家庭与成员</span><span class="sub">共享账本与角色权限</span></span><svg class="chev" width="16" height="16" aria-hidden="true"><use href="#ic_chevron_right"/></svg></div><div class="row"><span class="ricos"><svg width="22" height="22" aria-hidden="true"><use href="#ic_cloud"/></svg></span><span class="rcol"><span class="rt">开放接口</span><span class="sub">本地 API 与 MCP</span></span><svg class="chev" width="16" height="16" aria-hidden="true"><use href="#ic_chevron_right"/></svg></div><div class="row"><span class="ricos"><svg width="22" height="22" aria-hidden="true"><use href="#ic_export"/></svg></span><span class="rcol"><span class="rt">桌面端与多端</span><span class="sub">四端能力矩阵</span></span><svg class="chev" width="16" height="16" aria-hidden="true"><use href="#ic_chevron_right"/></svg></div></div></section>
+  <section class="grp"><div class="eyebrow">版本</div>
+    <div class="panel">
+      <div class="kvr"><span>当前版本</span><b>V1.0.0</b></div>
+      <div class="kvr"><span>已上线</span><b>V1.0 全部功能</b></div>
+      <div class="kvr"><span>规划中</span><b>V2.0 · V3.0 · 商业化 V4.0</b></div>
+    </div></section>
+  <div class="scroll-pad"></div>
+</div></div></div></section><section class="frame" data-screen="9"><div class="flabel">SP-5-02 主题</div><div class="bezelless"><div class="screen"><div class="statusbar"><span class="sb-time">14:55</span><span class="sb-marks"><svg width="18" height="12" aria-hidden="true"><rect x="0" y="5" width="3" height="4" rx="1" fill="currentColor"/><rect x="5" y="3" width="3" height="6" rx="1" fill="currentColor"/><rect x="10" y="0" width="3" height="9" rx="1" fill="currentColor"/><rect x="15" y="-3" width="3" height="12" rx="1" fill="currentColor"/></svg><svg width="18" height="12" aria-hidden="true"><rect x="0.5" y="1.5" width="14" height="9" rx="3" fill="none" stroke="currentColor" opacity=".45"/><rect x="2.5" y="3.5" width="9" height="5" rx="1.5" fill="currentColor"/></svg></span></div>
+<header class="topbar"><button class="iconbtn" data-back><svg width="22" height="22" aria-hidden="true"><use href="#ic_back"/></svg></button><h1 class="">主题</h1><div class="tb-right"></div></header>
+<div class="segwrap top"><div class="seg">
+  <button class="segi on">跟随系统</button>
+  <button class="segi">浅色</button>
+  <button class="segi">深色</button>
+</div></div>
+<div class="scroll"><div class="panel"><div class="throw"><span class="thsw"><i style="background:var(--th-qingci-p)"></i><i style="background:var(--th-qingci-a)"></i></span><span class="rcol"><span class="rt">青瓷</span><span class="sub">清爽 · 青绿 × 蜜桃</span></span><span class="thtick"></span></div><div class="throw"><span class="thsw"><i style="background:var(--th-dianlan-p)"></i><i style="background:var(--th-dianlan-a)"></i></span><span class="rcol"><span class="rt">靛蓝</span><span class="sub">沉稳 · 深蓝 × 琥珀</span></span><span class="thtick"></span></div><div class="throw"><span class="thsw"><i style="background:var(--th-zhuqing-p)"></i><i style="background:var(--th-zhuqing-a)"></i></span><span class="rcol"><span class="rt">竹青</span><span class="sub">素雅 · 草绿 × 藤紫</span></span><span class="thtick"></span></div><div class="throw"><span class="thsw"><i style="background:var(--th-haiyan-p)"></i><i style="background:var(--th-haiyan-a)"></i></span><span class="rcol"><span class="rt">海盐</span><span class="sub">深邃 · 青蓝 × 珊瑚</span></span><span class="thtick"></span></div><div class="throw"><span class="thsw"><i style="background:var(--th-ouhe-p)"></i><i style="background:var(--th-ouhe-a)"></i></span><span class="rcol"><span class="rt">藕荷</span><span class="sub">柔美 · 藕紫 × 沙金</span></span><span class="thtick"></span></div><div class="throw"><span class="thsw"><i style="background:var(--th-taoyao-p)"></i><i style="background:var(--th-taoyao-a)"></i></span><span class="rcol"><span class="rt">桃夭</span><span class="sub">浪漫 · 桃粉 × 青碧</span></span><span class="thtick"></span></div><div class="throw"><span class="thsw"><i style="background:var(--th-feiying-p)"></i><i style="background:var(--th-feiying-a)"></i></span><span class="rcol"><span class="rt">绯樱</span><span class="sub">古朴 · 绯红 × 松绿</span></span><span class="thtick"></span></div><div class="throw"><span class="thsw"><i style="background:var(--th-xinghuang-p)"></i><i style="background:var(--th-xinghuang-a)"></i></span><span class="rcol"><span class="rt">杏黄</span><span class="sub">温暖 · 杏黄 × 湖蓝</span></span><span class="thtick"></span></div><div class="throw"><span class="thsw"><i style="background:var(--th-doulv-p)"></i><i style="background:var(--th-doulv-a)"></i></span><span class="rcol"><span class="rt">豆绿</span><span class="sub">清新 · 豆绿 × 藤紫</span></span><span class="thtick"></span></div><div class="throw"><span class="thsw"><i style="background:var(--th-subai-p)"></i><i style="background:var(--th-subai-a)"></i></span><span class="rcol"><span class="rt">素白</span><span class="sub">极简 · 炭黑 × 橘红</span></span><span class="thtick"><svg class="thick" width="18" height="18" aria-hidden="true"><use href="#ic_check"/></svg></span></div></div>
+  <div class="grp"><div class="panel notepanel">
+    10 套主题<b>全部免费</b>，每套含浅色 / 深色两态，切换即时生效、无需重启。
+    <span class="nl">    主题只改外观：分类色板与收入 / 支出语义色<b>跨主题固定</b>；
+    主题属本机偏好，多端同步时不覆盖其他设备。</span></div></div>
+  <div class="scroll-pad"></div></div></div></div></section><section class="frame" data-screen="10"><div class="flabel">SP-5-03 我的（设置）</div><div class="bezelless"><div class="screen"><div class="statusbar"><span class="sb-time">14:55</span><span class="sb-marks"><svg width="18" height="12" aria-hidden="true"><rect x="0" y="5" width="3" height="4" rx="1" fill="currentColor"/><rect x="5" y="3" width="3" height="6" rx="1" fill="currentColor"/><rect x="10" y="0" width="3" height="9" rx="1" fill="currentColor"/><rect x="15" y="-3" width="3" height="12" rx="1" fill="currentColor"/></svg><svg width="18" height="12" aria-hidden="true"><rect x="0.5" y="1.5" width="14" height="9" rx="3" fill="none" stroke="currentColor" opacity=".45"/><rect x="2.5" y="3.5" width="9" height="5" rx="1.5" fill="currentColor"/></svg></span></div>
+<header class="topbar"><button class="iconbtn ghost"><svg width="20" height="20" aria-hidden="true"><use href="#ic_nav_profile"/></svg></button>
+  <h1>我的</h1><div class="tb-right"></div></header>
+<div class="scroll">
+  <div class="privacy-strip"><svg width="18" height="18" aria-hidden="true"><use href="#ic_shield"/></svg>
+    <span class="pcol"><span class="pt">隐私承诺</span>
+    <span class="ps">无广告、无外联、无埋点上报</span></span></div>
+  <section class="grp"><div class="eyebrow">记账</div><div class="panel"><div class="row srow"><span class="rcol"><span class="rt">月起始日</span></span><span class="sval">10 日</span><svg class="chev" width="16" height="16" aria-hidden="true"><use href="#ic_chevron_right"/></svg></div><div class="row srow"><span class="rcol"><span class="rt">字体大小</span></span><span class="sval">标准</span><svg class="chev" width="16" height="16" aria-hidden="true"><use href="#ic_chevron_right"/></svg></div><div class="row srow"><span class="rcol"><span class="rt">记账确认音效</span></span><span class="switch"><span class="knob"></span></span></div><div class="row srow"><span class="rcol"><span class="rt">保存后停留在记账页</span></span><span class="switch on"><span class="knob"></span></span></div></div></section>
+  <section class="grp"><div class="eyebrow">安全</div><div class="panel"><div class="row srow"><span class="rcol"><span class="rt">应用锁</span></span><span class="switch"><span class="knob"></span></span></div><div class="row srow"><span class="rcol"><span class="rt">隐藏金额</span></span><span class="switch"><span class="knob"></span></span></div></div></section>
+  <section class="grp"><div class="eyebrow">外观</div><div class="panel"><div class="row srow"><span class="rcol"><span class="rt">主题</span></span><span class="sval">素白</span><svg class="chev" width="16" height="16" aria-hidden="true"><use href="#ic_chevron_right"/></svg></div><div class="row srow"><span class="rcol"><span class="rt">外观模式</span></span><span class="sval">跟随系统</span><svg class="chev" width="16" height="16" aria-hidden="true"><use href="#ic_chevron_right"/></svg></div></div></section>
+  <section class="grp"><div class="eyebrow">数据</div><div class="panel"><div class="row srow"><svg class="sicon" width="20" height="20" aria-hidden="true"><use href="#ic_cloud"/></svg><span class="rcol"><span class="rt">备份与恢复</span></span><svg class="chev" width="16" height="16" aria-hidden="true"><use href="#ic_chevron_right"/></svg></div><div class="row srow"><svg class="sicon" width="20" height="20" aria-hidden="true"><use href="#ic_import"/></svg><span class="rcol"><span class="rt">批量导入</span></span><svg class="chev" width="16" height="16" aria-hidden="true"><use href="#ic_chevron_right"/></svg></div></div></section>
+  <section class="grp"><div class="eyebrow">关于</div><div class="panel"><div class="row srow"><svg class="sicon" width="20" height="20" aria-hidden="true"><use href="#ic_shield"/></svg><span class="rcol"><span class="rt">隐私承诺</span></span><svg class="chev" width="16" height="16" aria-hidden="true"><use href="#ic_chevron_right"/></svg></div><div class="row srow"><span class="rcol"><span class="rt">版本</span></span><span class="sval">V1.0.0</span><svg class="chev" width="16" height="16" aria-hidden="true"><use href="#ic_chevron_right"/></svg></div></div></section>
+  <div class="scroll-pad"></div>
+</div>
+<nav class="nav"><a class="navitem" data-goto="ledger"><svg width="22" height="22" aria-hidden="true"><use href="#ic_nav_ledger"/></svg><span class="navlab">流水</span></a><a class="navitem" data-goto="reports"><svg width="22" height="22" aria-hidden="true"><use href="#ic_nav_report"/></svg><span class="navlab">报表</span></a><a class="navitem navcenter" data-goto="add"><span class="navfab"><svg width="22" height="22" aria-hidden="true"><use href="#ic_nav_add"/></svg></span></a><a class="navitem" data-goto="assets"><svg width="22" height="22" aria-hidden="true"><use href="#ic_nav_assets"/></svg><span class="navlab">资产</span></a><a class="navitem on" data-goto="settings"><svg width="22" height="22" aria-hidden="true"><use href="#ic_nav_profile"/></svg><span class="navlab">我的</span></a></nav>
+</div></div></section><h2 class="vergrouph">V2.0 交易精度与主动管家 · 8 屏</h2><section class="frame" data-screen="11"><div class="flabel">SP-1-04 转账 / 借出 / 借入</div><div class="bezelless"><div class="screen"><div class="statusbar"><span class="sb-time">14:55</span><span class="sb-marks"><svg width="18" height="12" aria-hidden="true"><rect x="0" y="5" width="3" height="4" rx="1" fill="currentColor"/><rect x="5" y="3" width="3" height="6" rx="1" fill="currentColor"/><rect x="10" y="0" width="3" height="9" rx="1" fill="currentColor"/><rect x="15" y="-3" width="3" height="12" rx="1" fill="currentColor"/></svg><svg width="18" height="12" aria-hidden="true"><rect x="0.5" y="1.5" width="14" height="9" rx="3" fill="none" stroke="currentColor" opacity=".45"/><rect x="2.5" y="3.5" width="9" height="5" rx="1.5" fill="currentColor"/></svg></span></div>
+<header class="topbar"><button class="iconbtn" data-back><svg width="22" height="22" aria-hidden="true"><use href="#ic_back"/></svg></button><h1 class="">转账</h1><div class="tb-right"><button class="textbtn">保存</button></div></header>
+<div class="ttabs"><button class="ttab on">转账</button><button class="ttab">借出</button><button class="ttab">借入</button></div>
+<div class="amount-block">
+  <div class="expr">转入基金定投</div>
+  <div class="amt-line"><span class="amt input tone-ink"><span class="cur">¥</span><span class="int">1,000</span><span class="pnt">.</span><span class="dec">00</span></span></div>
+</div>
+<div class="addbody">
+  <div class="panel">
+    <div class="row"><span class="ricos"><svg width="22" height="22" aria-hidden="true"><use href="#ic_arrow_up_right"/></svg></span><span class="rcol"><span class="rt">转出账户</span></span><span class="sval">招行储蓄卡 ····6217</span><svg class="chev" width="16" height="16" aria-hidden="true"><use href="#ic_chevron_right"/></svg></div>
+    <div class="row"><span class="ricos"><svg width="22" height="22" aria-hidden="true"><use href="#ic_arrow_down_left"/></svg></span><span class="rcol"><span class="rt">转入账户</span></span><span class="sval">指数基金 · 定投</span><svg class="chev" width="16" height="16" aria-hidden="true"><use href="#ic_chevron_right"/></svg></div>
+    <div class="row"><span class="ricos"><svg width="22" height="22" aria-hidden="true"><use href="#ic_calendar"/></svg></span><span class="rcol"><span class="rt">日期</span></span><span class="sval">今天</span><svg class="chev" width="16" height="16" aria-hidden="true"><use href="#ic_chevron_right"/></svg></div>
+    <div class="row"><span class="ricos"><svg width="22" height="22" aria-hidden="true"><use href="#ic_note"/></svg></span><span class="rcol"><span class="rt">备注</span></span><span class="sval">选填</span><svg class="chev" width="16" height="16" aria-hidden="true"><use href="#ic_chevron_right"/></svg></div>
+  </div>
+  <div class="grp"><div class="eyebrow">保存后的影响</div>
+    <div class="panel">
+      <div class="duocol"><span>转出账户</span><b style="color:var(--income-ink)">−¥1,000.00</b></div>
+      <div class="duocol"><span>转入账户</span><b style="color:var(--ink)">+¥1,000.00</b></div>
+      <div class="duocol"><span>净资产</span><b>不变</b></div>
+      <div class="duocol"><span>收支与预算</span><b>不计入</b></div>
+    </div></div>
+  <div class="grp"><div class="panel notepanel">
+    涉及<b>两个账户</b>的记账不走「点分类即保存」，需要显式确认（G-6）。
+    <span class="nl">转账只是钱换了地方 —— 计入收支会让你的「支出」凭空翻倍（G-2）。</span>
+  </div></div>
+</div>
+<div class="keypad" style="grid-template-columns:1fr">
+  <button class="key ok">确认转账</button>
+</div>
+<div class="safearea"></div></div></div></section><section class="frame" data-screen="12"><div class="flabel">SP-1-05 分割交易编辑器</div><div class="bezelless"><div class="screen"><div class="statusbar"><span class="sb-time">14:55</span><span class="sb-marks"><svg width="18" height="12" aria-hidden="true"><rect x="0" y="5" width="3" height="4" rx="1" fill="currentColor"/><rect x="5" y="3" width="3" height="6" rx="1" fill="currentColor"/><rect x="10" y="0" width="3" height="9" rx="1" fill="currentColor"/><rect x="15" y="-3" width="3" height="12" rx="1" fill="currentColor"/></svg><svg width="18" height="12" aria-hidden="true"><rect x="0.5" y="1.5" width="14" height="9" rx="3" fill="none" stroke="currentColor" opacity=".45"/><rect x="2.5" y="3.5" width="9" height="5" rx="1.5" fill="currentColor"/></svg></span></div>
+<header class="topbar"><button class="iconbtn" data-back><svg width="22" height="22" aria-hidden="true"><use href="#ic_back"/></svg></button><h1 class="">分割这笔账单</h1><div class="tb-right"><button class="textbtn">完成</button></div></header>
+<div class="scroll">
+  <section class="grp0"><div class="panel" style="padding:16px">
+    <div class="duocol" style="padding:0;min-height:30px;border:0">
+      <span style="color:var(--muted)">账单原始金额</span><b>¥168.00</b></div>
+    <div class="duocol" style="padding:0;min-height:30px;border:0">
+      <span style="color:var(--muted)">已分配</span>
+      <b style="color:var(--ok-ink)">¥168.00</b></div>
+    <div class="pbarwrap"><div class="pbar"><i style="width:100%"></i></div></div>
+    <div class="prowfoot" style="color:var(--ok-ink);margin-top:8px">
+      <svg width="13" height="13" aria-hidden="true"><use href="#ic_status_success"/></svg>已对平，可以保存</div>
+  </div></section>
+  <section class="grp"><div class="eyebrow">子项（2）</div>
+    <div class="panel"><div class="row"><span class="dot6" style="background:var(--cat-food)"></span><span class="rcol"><span class="rt">餐饮 · 午餐</span><span class="sub">工作餐</span></span><span class="rw-amt"><span class="amt s tone-ink"><span class="cur">¥</span><span class="int">68</span><span class="pnt">.</span><span class="dec">00</span></span></span></div><div class="row"><span class="dot6" style="background:var(--cat-social)"></span><span class="rcol"><span class="rt">人情 · 请客</span><span class="sub">招待同事</span></span><span class="rw-amt"><span class="amt s tone-ink"><span class="cur">¥</span><span class="int">100</span><span class="pnt">.</span><span class="dec">00</span></span></span></div>
+      <div class="row"><span class="ricos"><svg width="20" height="20" aria-hidden="true"><use href="#ic_plus"/></svg></span>
+        <span class="rcol"><span class="rt" style="color:var(--primary-ink)">再分一项</span></span></div>
+    </div></section>
+  <div class="grp"><div class="panel notepanel">
+    父子结构：父单不被删除，子项独立统计。父单金额<b>恒等于 Σ 子项金额</b>。
+    <span class="nl">报表中各子项按自己的分类计数，父单<b>分类置空</b>、不参与分类统计
+    （避免双算）；父单只计入账户余额一次。</span></div></div>
+  <div class="scroll-pad"></div>
+</div></div></div></section><section class="frame" data-screen="13"><div class="flabel">SP-1-06 报销中心</div><div class="bezelless"><div class="screen"><div class="statusbar"><span class="sb-time">14:55</span><span class="sb-marks"><svg width="18" height="12" aria-hidden="true"><rect x="0" y="5" width="3" height="4" rx="1" fill="currentColor"/><rect x="5" y="3" width="3" height="6" rx="1" fill="currentColor"/><rect x="10" y="0" width="3" height="9" rx="1" fill="currentColor"/><rect x="15" y="-3" width="3" height="12" rx="1" fill="currentColor"/></svg><svg width="18" height="12" aria-hidden="true"><rect x="0.5" y="1.5" width="14" height="9" rx="3" fill="none" stroke="currentColor" opacity=".45"/><rect x="2.5" y="3.5" width="9" height="5" rx="1.5" fill="currentColor"/></svg></span></div>
+<header class="topbar"><button class="iconbtn" data-back><svg width="22" height="22" aria-hidden="true"><use href="#ic_back"/></svg></button><h1 class="">报销中心</h1><div class="tb-right"></div></header>
+<div class="scroll">
+  <section class="hero" style="padding-top:6px">
+    <div class="hairline"></div>
+    <div class="hero-label">待收回金额</div>
+    <div class="hero-amt"><span class="amt xl tone-ink"><span class="cur">¥</span><span class="int">1,528</span><span class="pnt">.</span><span class="dec">00</span></span></div>
+    <div class="hero-split">
+      <div class="hs"><span class="hs-l">待报销</span><span class="hs-v">1 笔</span></div>
+      <div class="hs"><span class="hs-l">已提交</span><span class="hs-v">1 笔</span></div>
+    </div>
+    <div class="hairline"></div>
+  </section>
+  <section class="grp"><div class="eyebrow">待报销 · 1 笔</div>
+    <div class="panel"><div class="duocol" style="padding:0 16px;min-height:38px"><span style="color:var(--muted)">09-26　交通 · 客户拜访打车</span><b><span class="amt s tone-ink"><span class="cur">¥</span><span class="int">328</span><span class="pnt">.</span><span class="dec">00</span></span></b></div></div></section>
+  <section class="grp"><div class="eyebrow">已提交 · 1 笔</div>
+    <div class="panel"><div class="duocol" style="padding:0 16px;min-height:38px"><span style="color:var(--muted)">09-22　餐饮 · 团队聚餐垫付</span><b><span class="amt s tone-ink"><span class="cur">¥</span><span class="int">1,200</span><span class="pnt">.</span><span class="dec">00</span></span></b></div></div></section>
+  <section class="grp"><div class="eyebrow">已到账 · 1 笔</div>
+    <div class="panel"><div class="duocol" style="padding:0 16px;min-height:38px"><span style="color:var(--muted)">09-15　居住 · 出差酒店</span><b><span class="amt s tone-ink"><span class="cur">¥</span><span class="int">560</span><span class="pnt">.</span><span class="dec">00</span></span></b></div></div></section>
+  <div class="grp"><div class="panel notepanel">
+    报销到账时系统自动生成一笔等额收入并<b>冲销原支出</b> —— 净效果为 0，
+    不会把报销算成额外收入。
+    <span class="nl">支出统计中该笔<b>始终保留</b>（体现真实消费），
+    到账收入标记为「报销回款」，不计入收入口径。</span></div></div>
+  <div class="scroll-pad"></div>
+</div></div></div></section><section class="frame" data-screen="14"><div class="flabel">SP-2-02 信用卡账单详情</div><div class="bezelless"><div class="screen"><div class="statusbar"><span class="sb-time">14:55</span><span class="sb-marks"><svg width="18" height="12" aria-hidden="true"><rect x="0" y="5" width="3" height="4" rx="1" fill="currentColor"/><rect x="5" y="3" width="3" height="6" rx="1" fill="currentColor"/><rect x="10" y="0" width="3" height="9" rx="1" fill="currentColor"/><rect x="15" y="-3" width="3" height="12" rx="1" fill="currentColor"/></svg><svg width="18" height="12" aria-hidden="true"><rect x="0.5" y="1.5" width="14" height="9" rx="3" fill="none" stroke="currentColor" opacity=".45"/><rect x="2.5" y="3.5" width="9" height="5" rx="1.5" fill="currentColor"/></svg></span></div>
+<header class="topbar"><button class="iconbtn" data-back><svg width="22" height="22" aria-hidden="true"><use href="#ic_back"/></svg></button><h1 class="">信用卡账单</h1><div class="tb-right"></div></header>
+<div class="scroll">
+  <section class="hero" style="padding-top:6px">
+    <div class="hairline"></div>
+    <div class="hero-label">本期应还 · 还款日 10月8日</div>
+    <div class="hero-amt"><span class="amt xl tone-ink"><span class="cur">¥</span><span class="int">5,000</span><span class="pnt">.</span><span class="dec">00</span></span></div>
+    <div class="hero-split">
+      <div class="hs"><span class="hs-l">最低还款</span>
+        <span class="hs-v"><span class="amt s tone-ink"><span class="cur">¥</span><span class="int">500</span><span class="pnt">.</span><span class="dec">00</span></span></span></div>
+      <div class="hs"><span class="hs-l">可用额度</span>
+        <span class="hs-v"><span class="amt s tone-ink"><span class="cur">¥</span><span class="int">15,000</span><span class="pnt">.</span><span class="dec">00</span></span></span></div>
+      <div class="hs"><span class="hs-l">已用</span><span class="hs-v">25.0%</span></div>
+    </div>
+    <div class="hairline"></div>
+  </section>
+  <section class="grp"><div class="eyebrow">账户参数</div>
+    <div class="panel" style="padding:6px 0">
+      <div class="kvr"><span>账单日</span><b>每月 25 日</b></div>
+      <div class="kvr"><span>还款日</span><b>次月 8 日</b></div>
+      <div class="kvr"><span>总额度</span><b>¥20,000.00</b></div>
+      <div class="kvr"><span>循环利息</span><b>无（全额还款）</b></div>
+      <div style="padding:12px 16px">
+        <div class="pbar warn"><i style="width:25.0%"></i></div>
+        <div class="prowfoot" style="color:var(--muted);margin-top:8px">
+          已用 25.0%，额度使用健康</div>
+      </div>
+    </div></section>
+  <section class="grp"><div class="eyebrow">本期未出账消费 · ¥1,899.50</div>
+    <div class="panel"><div class="duocol" style="min-height:40px"><span style="color:var(--muted)">09-26　餐饮 · 外卖</span><b><span class="amt s tone-ink"><span class="cur">¥</span><span class="int">86</span><span class="pnt">.</span><span class="dec">50</span></span></b></div><div class="duocol" style="min-height:40px"><span style="color:var(--muted)">09-24　购物 · 数码配件</span><b><span class="amt s tone-ink"><span class="cur">¥</span><span class="int">399</span><span class="pnt">.</span><span class="dec">00</span></span></b></div><div class="duocol" style="min-height:40px"><span style="color:var(--muted)">09-21　餐饮 · 团队聚餐</span><b><span class="amt s tone-ink"><span class="cur">¥</span><span class="int">1,200</span><span class="pnt">.</span><span class="dec">00</span></span></b></div><div class="duocol" style="min-height:40px"><span style="color:var(--muted)">09-18　交通 · 打车</span><b><span class="amt s tone-ink"><span class="cur">¥</span><span class="int">46</span><span class="pnt">.</span><span class="dec">00</span></span></b></div><div class="duocol" style="min-height:40px"><span style="color:var(--muted)">09-12　其他 · 订阅服务</span><b><span class="amt s tone-ink"><span class="cur">¥</span><span class="int">168</span><span class="pnt">.</span><span class="dec">00</span></span></b></div></div></section>
+  <div class="grp"><div class="panel notepanel">
+    <b>双数模型：</b>「欠款余额」是可写的唯一权威量；「可用额度」由总额度派生，<b>只读</b>。
+    <span class="nl">本期应还 ¥5,000.00 与未出账 ¥1,899.50 是两个口径：
+    前者是上一账单周期的结算结果，后者是本期新增。</span>
+    <span class="nl">信用卡消费<b>计入支出统计</b>（钱确实花了）；
+    还信用卡<b>不计入收支</b>（只减少欠款）。</span></div></div>
+  <div class="scroll-pad"></div>
+</div></div></div></section><section class="frame" data-screen="15"><div class="flabel">SP-5-04 提醒中心</div><div class="bezelless"><div class="screen"><div class="statusbar"><span class="sb-time">14:55</span><span class="sb-marks"><svg width="18" height="12" aria-hidden="true"><rect x="0" y="5" width="3" height="4" rx="1" fill="currentColor"/><rect x="5" y="3" width="3" height="6" rx="1" fill="currentColor"/><rect x="10" y="0" width="3" height="9" rx="1" fill="currentColor"/><rect x="15" y="-3" width="3" height="12" rx="1" fill="currentColor"/></svg><svg width="18" height="12" aria-hidden="true"><rect x="0.5" y="1.5" width="14" height="9" rx="3" fill="none" stroke="currentColor" opacity=".45"/><rect x="2.5" y="3.5" width="9" height="5" rx="1.5" fill="currentColor"/></svg></span></div>
+<header class="topbar"><button class="iconbtn" data-back><svg width="22" height="22" aria-hidden="true"><use href="#ic_back"/></svg></button><h1 class="">提醒中心</h1><div class="tb-right"><button class="textbtn">设置</button></div></header>
+<div class="segwrap top"><div class="seg">
+  <button class="segi on">全部</button><button class="segi">预算</button>
+  <button class="segi">账单</button><button class="segi">周期</button>
+</div></div>
+<div class="scroll"><div class="panel" style="margin-bottom:12px;padding:14px 16px"><div style="display:flex;align-items:flex-start;gap:10px"><span class="dot8" style="background:var(--warn-ink);margin-top:6px"></span><span class="rcol"><span class="rt" style="white-space:normal">本月餐饮预算已用 87%</span><span class="sub" style="white-space:normal;line-height:1.6">剩余 ¥130.00，按当前速度将在 5 天后超支</span></span><span class="tagx ring">响铃</span></div><div style="display:flex;gap:8px;margin-top:12px;padding-left:18px"><button class="btn2" style="height:34px;min-width:72px;font-size:calc(14px * var(--tscale))">稍后</button><button class="btn2" style="height:34px;min-width:72px;font-size:calc(14px * var(--tscale));border-color:var(--primary-ink);color:var(--primary-ink)">知道了</button></div></div><div class="panel" style="margin-bottom:12px;padding:14px 16px"><div style="display:flex;align-items:flex-start;gap:10px"><span class="dot8" style="background:var(--warn-ink);margin-top:6px"></span><span class="rcol"><span class="rt" style="white-space:normal">本月总支出已达 90%</span><span class="sub" style="white-space:normal;line-height:1.6">较上月同期多花 12%</span></span><span class="tagx silent">静默</span></div><div style="display:flex;gap:8px;margin-top:12px;padding-left:18px"><button class="btn2" style="height:34px;min-width:72px;font-size:calc(14px * var(--tscale))">稍后</button><button class="btn2" style="height:34px;min-width:72px;font-size:calc(14px * var(--tscale));border-color:var(--primary-ink);color:var(--primary-ink)">知道了</button></div></div><div class="panel" style="margin-bottom:12px;padding:14px 16px"><div style="display:flex;align-items:flex-start;gap:10px"><span class="dot8" style="background:var(--income-ink);margin-top:6px"></span><span class="rcol"><span class="rt" style="white-space:normal">招行信用卡 10月8日还款</span><span class="sub" style="white-space:normal;line-height:1.6">本期应还 ¥5,000.00，还有 10 天</span></span><span class="tagx ring">响铃</span></div><div style="display:flex;gap:8px;margin-top:12px;padding-left:18px"><button class="btn2" style="height:34px;min-width:72px;font-size:calc(14px * var(--tscale))">稍后</button><button class="btn2" style="height:34px;min-width:72px;font-size:calc(14px * var(--tscale));border-color:var(--primary-ink);color:var(--primary-ink)">知道了</button></div></div><div class="panel" style="margin-bottom:12px;padding:14px 16px"><div style="display:flex;align-items:flex-start;gap:10px"><span class="dot8" style="background:var(--primary);margin-top:6px"></span><span class="rcol"><span class="rt" style="white-space:normal">房租 ¥4,500.00 待确认</span><span class="sub" style="white-space:normal;line-height:1.6">今天是每月 1 日，检测到周期记账规则命中</span></span><span class="tagx ring">响铃</span></div><div style="display:flex;gap:8px;margin-top:12px;padding-left:18px"><button class="btn2" style="height:34px;min-width:72px;font-size:calc(14px * var(--tscale))">稍后</button><button class="btn2" style="height:34px;min-width:72px;font-size:calc(14px * var(--tscale));border-color:var(--primary-ink);color:var(--primary-ink)">知道了</button></div></div><div class="panel" style="margin-bottom:12px;padding:14px 16px"><div style="display:flex;align-items:flex-start;gap:10px"><span class="dot8" style="background:var(--primary);margin-top:6px"></span><span class="rcol"><span class="rt" style="white-space:normal">指数基金定投将于 10月15日扣款</span><span class="sub" style="white-space:normal;line-height:1.6">¥1,000.00，从招行储蓄卡扣除</span></span><span class="tagx silent">静默</span></div><div style="display:flex;gap:8px;margin-top:12px;padding-left:18px"><button class="btn2" style="height:34px;min-width:72px;font-size:calc(14px * var(--tscale))">稍后</button><button class="btn2" style="height:34px;min-width:72px;font-size:calc(14px * var(--tscale));border-color:var(--primary-ink);color:var(--primary-ink)">知道了</button></div></div>
+  <div class="panel notepanel">
+    分级通知（G-3）：<b>静默</b>只进提醒中心、不响铃；<b>响铃</b>同时走系统通知。
+    <span class="nl">预算 90% 静默、100% 响铃 —— 但两者都<b>不阻挡你继续记账</b>。</span>
+  </div>
+  <div class="scroll-pad"></div></div></div></div></section><section class="frame" data-screen="16"><div class="flabel">SP-5-05 自动规则</div><div class="bezelless"><div class="screen"><div class="statusbar"><span class="sb-time">14:55</span><span class="sb-marks"><svg width="18" height="12" aria-hidden="true"><rect x="0" y="5" width="3" height="4" rx="1" fill="currentColor"/><rect x="5" y="3" width="3" height="6" rx="1" fill="currentColor"/><rect x="10" y="0" width="3" height="9" rx="1" fill="currentColor"/><rect x="15" y="-3" width="3" height="12" rx="1" fill="currentColor"/></svg><svg width="18" height="12" aria-hidden="true"><rect x="0.5" y="1.5" width="14" height="9" rx="3" fill="none" stroke="currentColor" opacity=".45"/><rect x="2.5" y="3.5" width="9" height="5" rx="1.5" fill="currentColor"/></svg></span></div>
+<header class="topbar"><button class="iconbtn" data-back><svg width="22" height="22" aria-hidden="true"><use href="#ic_back"/></svg></button><h1 class="">自动规则</h1><div class="tb-right"><button class="textbtn">新建</button></div></header>
+<div class="scroll">
+  <section class="grp0"><div class="panel notepanel">
+    规则 = <b>条件（IF）</b> + <b>动作（THEN）</b>。一条账单可在保存时命中多条规则，
+    按优先级顺序执行，后者可覆盖前者。
+    <span class="nl">每次命中都会记入「规则执行日志」，可查看、可撤销。</span>
+  </div></section>
+  <section class="grp"><div class="eyebrow">规则 · 5 条</div>
+    <div class="panel"><div class="rulerow"><span class="ruleno">1</span><span class="rcol"><span class="rt" style="white-space:normal">星巴克自动归类</span><span class="rulecond">IF　商户 包含 <code>星巴克</code></span><span class="rulecond">THEN　分类 → 餐饮 · 饮料　账户 → 招行信用卡</span><span class="rulecond" style="color:var(--faint)">已命中 12 次</span></span><span class="switch on"><span class="knob"></span></span></div><div class="rulerow"><span class="ruleno">2</span><span class="rcol"><span class="rt" style="white-space:normal">地铁通勤归类</span><span class="rulecond">IF　商户 包含 <code>地铁</code> 且 金额 <code>≤ 20</code></span><span class="rulecond">THEN　分类 → 交通 · 公交地铁</span><span class="rulecond" style="color:var(--faint)">已命中 34 次</span></span><span class="switch on"><span class="knob"></span></span></div><div class="rulerow"><span class="ruleno">3</span><span class="rcol"><span class="rt" style="white-space:normal">大额支出标记</span><span class="rulecond">IF　金额 <code>≥ 500</code></span><span class="rulecond">THEN　打标签 <code>#大额</code>　备注追加提醒</span><span class="rulecond" style="color:var(--faint)">已命中 6 次</span></span><span class="switch on"><span class="knob"></span></span></div><div class="rulerow"><span class="ruleno">4</span><span class="rcol"><span class="rt" style="white-space:normal">工资自动入账</span><span class="rulecond">IF　金额 <code>= 15,000</code> 且 类型 收入</span><span class="rulecond">THEN　分类 → 其他 · 工资　账户 → 招行储蓄</span><span class="rulecond" style="color:var(--faint)">已命中 1 次</span></span><span class="switch on"><span class="knob"></span></span></div><div class="rulerow"><span class="ruleno off">5</span><span class="rcol"><span class="rt" style="white-space:normal">晚间消费提醒</span><span class="rulecond">IF　时间 在 <code>23:00–05:00</code></span><span class="rulecond">THEN　打标签 <code>#深夜</code>（仅标记不通知）</span><span class="rulecond" style="color:var(--faint)">已命中 3 次</span></span><span class="switch"><span class="knob"></span></span></div></div></section>
+  <div class="grp"><div class="panel notepanel">
+    执行阶段：<b>保存前</b>（可改写分类 / 账户） / <b>保存后</b>（只做标记与通知）。
+    <span class="nl">改动仅作用于规则生效之后的新账单，<b>不回改历史</b>。</span>
+  </div></div>
+  <div class="scroll-pad"></div>
+</div></div></div></section><section class="frame" data-screen="17"><div class="flabel">SP-5-06 储蓄目标与基金</div><div class="bezelless"><div class="screen"><div class="statusbar"><span class="sb-time">14:55</span><span class="sb-marks"><svg width="18" height="12" aria-hidden="true"><rect x="0" y="5" width="3" height="4" rx="1" fill="currentColor"/><rect x="5" y="3" width="3" height="6" rx="1" fill="currentColor"/><rect x="10" y="0" width="3" height="9" rx="1" fill="currentColor"/><rect x="15" y="-3" width="3" height="12" rx="1" fill="currentColor"/></svg><svg width="18" height="12" aria-hidden="true"><rect x="0.5" y="1.5" width="14" height="9" rx="3" fill="none" stroke="currentColor" opacity=".45"/><rect x="2.5" y="3.5" width="9" height="5" rx="1.5" fill="currentColor"/></svg></span></div>
+<header class="topbar"><button class="iconbtn" data-back><svg width="22" height="22" aria-hidden="true"><use href="#ic_back"/></svg></button><h1 class="">储蓄目标与基金</h1><div class="tb-right"><button class="textbtn">新建</button></div></header>
+<div class="scroll">
+  <section class="hero" style="padding-top:6px">
+    <div class="hairline"></div>
+    <div class="hero-label">目标已存 / 目标总额</div>
+    <div class="hero-amt"><span class="amt xl tone-ink"><span class="cur">¥</span><span class="int">25,300</span><span class="pnt">.</span><span class="dec">00</span></span></div>
+    <div class="hero-split">
+      <div class="hs"><span class="hs-l">总进度</span>
+        <span class="hs-v">47.9%</span></div>
+      <div class="hs"><span class="hs-l">月需存入</span>
+        <span class="hs-v"><span class="amt s tone-ink"><span class="cur">¥</span><span class="int">4,400</span><span class="pnt">.</span><span class="dec">00</span></span></span></div>
+    </div>
+    <div class="hairline"></div>
+  </section>
+  <section class="grp"><div class="eyebrow">目标 · 4 个</div>
+    <div class="panel" style="padding:0 16px"><div class="prow"><div class="prowname"><svg width="18" height="18" aria-hidden="true"><use href="#ic_export"/></svg><span style="margin-left:8px">年度旅行</span><span class="pamt">¥7,400.00 / ¥12,000.00</span></div><div class="pbarwrap"><div class="pbar "><i style="width:62%"></i></div></div><div class="prowfoot" style="color:var(--muted)">62% · 还差 ¥4,600.00<span style="margin-left:auto">月存 ¥1,000.00</span></div></div><div class="prow"><div class="prowname"><svg width="18" height="18" aria-hidden="true"><use href="#ic_wallet"/></svg><span style="margin-left:8px">换手机</span><span class="pamt">¥1,800.00 / ¥6,000.00</span></div><div class="pbarwrap"><div class="pbar "><i style="width:30%"></i></div></div><div class="prowfoot" style="color:var(--muted)">30% · 还差 ¥4,200.00<span style="margin-left:auto">月存 ¥500.00</span></div></div><div class="prow"><div class="prowname"><svg width="18" height="18" aria-hidden="true"><use href="#ic_shield"/></svg><span style="margin-left:8px">保险费（年金）</span><span class="pamt">¥3,600.00 / ¥4,800.00</span></div><div class="pbarwrap"><div class="pbar "><i style="width:75%"></i></div></div><div class="prowfoot" style="color:var(--muted)">75% · 还差 ¥1,200.00<span style="margin-left:auto">月存 ¥400.00</span></div></div><div class="prow"><div class="prowname"><svg width="18" height="18" aria-hidden="true"><use href="#ic_status_success"/></svg><span style="margin-left:8px">应急储备</span><span class="pamt">¥12,500.00 / ¥30,000.00</span></div><div class="pbarwrap"><div class="pbar "><i style="width:42%"></i></div></div><div class="prowfoot" style="color:var(--muted)">42% · 还差 ¥17,500.00<span style="margin-left:auto">月存 ¥2,500.00</span></div></div></div></section>
+  <div class="grp"><div class="panel notepanel">
+    <b>沉淀基金</b>把「一年一次的大额支出」拆成月存（保险费、旅行、年检），
+    避免某个月突然被击穿。
+    <span class="nl">目标里的钱<b>从「安全可花」基数中扣除</b> —— 否则你会以为自己很有钱。</span>
+  </div></div>
+  <div class="scroll-pad"></div>
+</div></div></div></section><section class="frame" data-screen="18"><div class="flabel">SP-5-07 首页卡片自定义</div><div class="bezelless"><div class="screen"><div class="statusbar"><span class="sb-time">14:55</span><span class="sb-marks"><svg width="18" height="12" aria-hidden="true"><rect x="0" y="5" width="3" height="4" rx="1" fill="currentColor"/><rect x="5" y="3" width="3" height="6" rx="1" fill="currentColor"/><rect x="10" y="0" width="3" height="9" rx="1" fill="currentColor"/><rect x="15" y="-3" width="3" height="12" rx="1" fill="currentColor"/></svg><svg width="18" height="12" aria-hidden="true"><rect x="0.5" y="1.5" width="14" height="9" rx="3" fill="none" stroke="currentColor" opacity=".45"/><rect x="2.5" y="3.5" width="9" height="5" rx="1.5" fill="currentColor"/></svg></span></div>
+<header class="topbar"><button class="iconbtn" data-back><svg width="22" height="22" aria-hidden="true"><use href="#ic_back"/></svg></button><h1 class="">首页卡片自定义</h1><div class="tb-right"></div></header>
+<div class="scroll">
+  <section class="grp0"><div class="panel notepanel">
+    勾选要常驻首页的卡片。<b>至少保留 1 张、最多 4 张</b>，长按可拖动排序。
+  </div></section>
+  <section class="grp"><div class="eyebrow">可选卡片 · 已选 3 / 4</div>
+    <div class="panel"><div class="row" style="min-height:64px"><span class="ricnt">1</span><span class="rcol"><span class="rt">记账月结余</span><span class="sub">收入 / 支出 / 结余三数值</span></span><span class="switch on"><span class="knob"></span></span></div><div class="row" style="min-height:64px"><span class="ricnt">2</span><span class="rcol"><span class="rt">预算进度</span><span class="sub">本月预算总进度条</span></span><span class="switch on"><span class="knob"></span></span></div><div class="row" style="min-height:64px"><span class="ricnt">3</span><span class="rcol"><span class="rt">安全可花</span><span class="sub">扣除预留后的日均可支配</span></span><span class="switch on"><span class="knob"></span></span></div><div class="row" style="min-height:64px"><span class="ricnt">4</span><span class="rcol"><span class="rt">目标进度</span><span class="sub">最近一个储蓄目标的进度</span></span><span class="switch"><span class="knob"></span></span></div><div class="row" style="min-height:64px"><span class="ricnt">5</span><span class="rcol"><span class="rt">净值</span><span class="sub">净资产与较上月变化</span></span><span class="switch"><span class="knob"></span></span></div><div class="row" style="min-height:64px"><span class="ricnt">6</span><span class="rcol"><span class="rt">近 7 天热力图</span><span class="sub">按日消费强度色块</span></span><span class="switch"><span class="knob"></span></span></div></div></section>
+  <div class="grp"><div class="panel notepanel">
+    首页卡片顺序与开关属<b>本机偏好</b>，多端同步时不覆盖其他设备。
+  </div></div>
+  <div class="scroll-pad"></div>
+</div></div></div></section><h2 class="vergrouph">V3.0 资产完整性与方法论 · 10 屏</h2><section class="frame" data-screen="19"><div class="flabel">SP-2-04 投资持仓</div><div class="bezelless"><div class="screen"><div class="statusbar"><span class="sb-time">14:55</span><span class="sb-marks"><svg width="18" height="12" aria-hidden="true"><rect x="0" y="5" width="3" height="4" rx="1" fill="currentColor"/><rect x="5" y="3" width="3" height="6" rx="1" fill="currentColor"/><rect x="10" y="0" width="3" height="9" rx="1" fill="currentColor"/><rect x="15" y="-3" width="3" height="12" rx="1" fill="currentColor"/></svg><svg width="18" height="12" aria-hidden="true"><rect x="0.5" y="1.5" width="14" height="9" rx="3" fill="none" stroke="currentColor" opacity=".45"/><rect x="2.5" y="3.5" width="9" height="5" rx="1.5" fill="currentColor"/></svg></span></div>
+<header class="topbar"><button class="iconbtn" data-back><svg width="22" height="22" aria-hidden="true"><use href="#ic_back"/></svg></button><h1 class="">投资持仓</h1><div class="tb-right"><button class="textbtn">刷新</button></div></header>
+<div class="scroll">
+  <section class="hero" style="padding-top:6px">
+    <div class="hairline"></div>
+    <div class="hero-label">持仓总市值</div>
+    <div class="hero-amt"><span class="amt xl tone-ink"><span class="cur">¥</span><span class="int">38,000</span><span class="pnt">.</span><span class="dec">00</span></span></div>
+    <div class="hero-split">
+      <div class="hs"><span class="hs-l">总成本</span>
+        <span class="hs-v"><span class="amt s tone-ink"><span class="cur">¥</span><span class="int">31,600</span><span class="pnt">.</span><span class="dec">00</span></span></span></div>
+      <div class="hs"><span class="hs-l">浮动盈亏</span>
+        <span class="hs-v tone-up"><span class="amt s tone-ink"><span class="cur">¥</span>+<span class="int">6,400</span><span class="pnt">.</span><span class="dec">00</span></span></span></div>
+      <div class="hs"><span class="hs-l">收益率</span>
+        <span class="hs-v tone-up">+20.25%</span></div>
+    </div>
+    <div class="hairline"></div>
+  </section>
+  <section class="grp"><div class="eyebrow">持仓 · 3 只</div>
+    <div class="panel" style="padding:0 16px"><div class="prow"><div class="prowname"><span class="rt">沪深300指数基金</span><span class="pamt">110020</span></div><div class="prowfoot" style="color:var(--muted);font-weight:500">持有 6,841.78 份 · 净值 3.274</div><div class="duocol" style="padding:0;border:0;min-height:30px;margin-top:6px"><span style="color:var(--muted)">市值</span><span><b><span class="amt s tone-ink"><span class="cur">¥</span><span class="int">22,400</span><span class="pnt">.</span><span class="dec">00</span></span></b><span class="tone-income" style="margin-left:10px;font-size:calc(12px * var(--tscale));font-weight:600;font-variant-numeric:tabular-nums">+5,400.00（+31.76%）</span></span></div></div><div class="prow"><div class="prowname"><span class="rt">纳指ETF</span><span class="pamt">513100</span></div><div class="prowfoot" style="color:var(--muted);font-weight:500">持有 1,170.95 份 · 净值 8.950</div><div class="duocol" style="padding:0;border:0;min-height:30px;margin-top:6px"><span style="color:var(--muted)">市值</span><span><b><span class="amt s tone-ink"><span class="cur">¥</span><span class="int">10,480</span><span class="pnt">.</span><span class="dec">00</span></span></b><span class="tone-income" style="margin-left:10px;font-size:calc(12px * var(--tscale));font-weight:600;font-variant-numeric:tabular-nums">+880.00（+9.17%）</span></span></div></div><div class="prow"><div class="prowname"><span class="rt">货币基金</span><span class="pamt">000198</span></div><div class="prowfoot" style="color:var(--muted);font-weight:500">持有 5,120.00 份 · 净值 1.000</div><div class="duocol" style="padding:0;border:0;min-height:30px;margin-top:6px"><span style="color:var(--muted)">市值</span><span><b><span class="amt s tone-ink"><span class="cur">¥</span><span class="int">5,120</span><span class="pnt">.</span><span class="dec">00</span></span></b><span class="tone-income" style="margin-left:10px;font-size:calc(12px * var(--tscale));font-weight:600;font-variant-numeric:tabular-nums">+120.00（+2.40%）</span></span></div></div></div></section>
+  <div class="grp"><div class="panel notepanel">
+    持仓成本为手工录入或买入时自动记账；<b>市值需要行情源</b> ——
+    数据源选型是 V3.0 前的开放问题（免费源 / 用户手填 / 手动刷新三选一或多轨）。
+    <span class="nl">在你选定之前，市值可按「最近一次手动估值」冻结显示。</span>
+  </div></div>
+  <div class="scroll-pad"></div>
+</div></div></div></section><section class="frame" data-screen="20"><div class="flabel">SP-2-05 贷款摊销</div><div class="bezelless"><div class="screen"><div class="statusbar"><span class="sb-time">14:55</span><span class="sb-marks"><svg width="18" height="12" aria-hidden="true"><rect x="0" y="5" width="3" height="4" rx="1" fill="currentColor"/><rect x="5" y="3" width="3" height="6" rx="1" fill="currentColor"/><rect x="10" y="0" width="3" height="9" rx="1" fill="currentColor"/><rect x="15" y="-3" width="3" height="12" rx="1" fill="currentColor"/></svg><svg width="18" height="12" aria-hidden="true"><rect x="0.5" y="1.5" width="14" height="9" rx="3" fill="none" stroke="currentColor" opacity=".45"/><rect x="2.5" y="3.5" width="9" height="5" rx="1.5" fill="currentColor"/></svg></span></div>
+<header class="topbar"><button class="iconbtn" data-back><svg width="22" height="22" aria-hidden="true"><use href="#ic_back"/></svg></button><h1 class="">贷款摊销</h1><div class="tb-right"></div></header>
+<div class="scroll">
+  <section class="hero" style="padding-top:6px">
+    <div class="hairline"></div>
+    <div class="hero-label">剩余本金</div>
+    <div class="hero-amt"><span class="amt xl tone-ink"><span class="cur">¥</span><span class="int">75,099</span><span class="pnt">.</span><span class="dec">30</span></span></div>
+    <div class="hero-split">
+      <div class="hs"><span class="hs-l">月供</span>
+        <span class="hs-v"><span class="amt s tone-ink"><span class="cur">¥</span><span class="int">2,229</span><span class="pnt">.</span><span class="dec">13</span></span></span></div>
+      <div class="hs"><span class="hs-l">已还</span><span class="hs-v">24 / 60 期</span></div>
+      <div class="hs"><span class="hs-l">利率</span><span class="hs-v">4.35%</span></div>
+    </div>
+    <div class="hairline"></div>
+  </section>
+  <section class="grp"><div class="eyebrow">贷款参数</div>
+    <div class="panel" style="padding:6px 0">
+      <div class="kvr"><span>还款方式</span><b>等额本息</b></div>
+      <div class="kvr"><span>贷款总额</span><b>¥120,000.00</b></div>
+      <div class="kvr"><span>利息总额</span><b>¥13,747.80</b></div>
+      <div class="kvr"><span>已还利息</span><b>¥8,598.40</b></div>
+      <div style="padding:12px 16px">
+        <div class="pbar"><i style="width:40.0%"></i></div>
+        <div class="prowfoot" style="color:var(--muted);margin-top:8px">
+          还款进度 40.0%（24 / 60 期）</div>
+      </div>
+    </div></section>
+  <section class="grp"><div class="eyebrow">未来 6 期还款计划</div>
+    <div class="panel" style="padding:8px 14px 6px">
+      <div class="dtbl cols4">
+        <span class="h">期次</span><span class="h r">本金</span>
+        <span class="h r">利息</span><span class="h r">剩余余额</span>
+        <span class="mut">第 25 期</span><span class="r" style="font-weight:600">1,956.89</span><span class="r mut">272.24</span><span class="r">73,142.41</span><span class="mut">第 26 期</span><span class="r" style="font-weight:600">1,963.99</span><span class="r mut">265.14</span><span class="r">71,178.42</span><span class="mut">第 27 期</span><span class="r" style="font-weight:600">1,971.11</span><span class="r mut">258.02</span><span class="r">69,207.31</span><span class="mut">第 28 期</span><span class="r" style="font-weight:600">1,978.25</span><span class="r mut">250.88</span><span class="r">67,229.06</span><span class="mut">第 29 期</span><span class="r" style="font-weight:600">1,985.42</span><span class="r mut">243.71</span><span class="r">65,243.64</span><span class="mut">第 30 期</span><span class="r" style="font-weight:600">1,992.62</span><span class="r mut">236.51</span><span class="r">63,251.02</span>
+      </div>
+    </div></section>
+  <div class="grp"><div class="panel notepanel">
+    每期还款自动生成一条「还款」账单：<b>利息计入支出</b>，本金只减少负债、
+    <b>不计入支出</b>（G-2）。
+    <span class="nl">这样你看到的是「这个月真的花了多少利息」，
+    而不是「我把本金挪了个地方也算花掉」。</span></div></div>
+  <div class="scroll-pad"></div>
+</div></div></div></section><section class="frame" data-screen="21"><div class="flabel">SP-2-06 净值追踪与资产估值</div><div class="bezelless"><div class="screen"><div class="statusbar"><span class="sb-time">14:55</span><span class="sb-marks"><svg width="18" height="12" aria-hidden="true"><rect x="0" y="5" width="3" height="4" rx="1" fill="currentColor"/><rect x="5" y="3" width="3" height="6" rx="1" fill="currentColor"/><rect x="10" y="0" width="3" height="9" rx="1" fill="currentColor"/><rect x="15" y="-3" width="3" height="12" rx="1" fill="currentColor"/></svg><svg width="18" height="12" aria-hidden="true"><rect x="0.5" y="1.5" width="14" height="9" rx="3" fill="none" stroke="currentColor" opacity=".45"/><rect x="2.5" y="3.5" width="9" height="5" rx="1.5" fill="currentColor"/></svg></span></div>
+<header class="topbar"><button class="iconbtn" data-back><svg width="22" height="22" aria-hidden="true"><use href="#ic_back"/></svg></button><h1 class="">净值追踪</h1><div class="tb-right"></div></header>
+<div class="scroll">
+  <section class="hero" style="padding-top:6px">
+    <div class="hairline"></div>
+    <div class="hero-label">当前净值（资产 − 负债）</div>
+    <div class="hero-amt"><span class="amt xl tone-ink"><span class="cur">¥</span><span class="int">86,420</span><span class="pnt">.</span><span class="dec">50</span></span></div>
+    <div class="hero-split">
+      <div class="hs"><span class="hs-l">较上月</span>
+        <span class="hs-v tone-up"><span class="amt s tone-ink"><span class="cur">¥</span>+<span class="int">1,720</span><span class="pnt">.</span><span class="dec">50</span></span></span></div>
+      <div class="hs"><span class="hs-l">环比</span><span class="hs-v tone-up">+2.03%</span></div>
+    </div>
+    <div class="hairline"></div>
+  </section>
+  <section class="grp"><div class="eyebrow">净值走势 · 近 6 个月</div>
+    <div class="panel" style="padding:18px 16px 14px">
+      <div class="minibars"><i class="" style="height:90.6%"></i><i class="" style="height:92.4%"></i><i class="" style="height:94.2%"></i><i class="" style="height:96.2%"></i><i class="" style="height:98.0%"></i><i class="on" style="height:100.0%"></i></div>
+      <div class="mblabels"><span>4月</span><span>5月</span><span>6月</span><span>7月</span><span>8月</span><span>9月</span></div>
+    </div></section>
+  <section class="grp"><div class="eyebrow">资产构成</div>
+    <div class="panel" style="padding:16px">
+      <div class="stack">
+        <i style="width:58.4%;background:var(--cat-food)"></i>
+        <i style="width:41.6%;background:var(--cat-fruit)"></i>
+      </div>
+      <div class="duocol" style="padding:0;border:0;min-height:34px">
+        <span><span class="lgdot" style="background:var(--cat-food)"></span>现金与储蓄</span>
+        <b>¥53,420.50 · 58.4%</b></div>
+      <div class="duocol" style="padding:0;border:0;min-height:34px">
+        <span><span class="lgdot" style="background:var(--cat-fruit)"></span>投资市值</span>
+        <b>¥38,000.00 · 41.6%</b></div>
+      <div class="duocol" style="padding:0;border:0;min-height:34px">
+        <span><span class="lgdot" style="background:var(--faint)"></span>负债</span>
+        <b>−¥5,000.00</b></div>
+    </div></section>
+  <div class="grp"><div class="panel notepanel">
+    净值 = Σ资产 − Σ负债，与资产页<b>同一口径</b>（现金类账户）。
+    <span class="nl">房 / 车等非现金资产靠<b>手动估值与折旧</b>录入，
+    每 3 / 6 / 12 个月提醒你更新一次。</span>
+    <span class="nl">净值曲线仅在估值口径一致时可比 —— 换了口径，图上会留一个标注点。</span>
+  </div></div>
+  <div class="scroll-pad"></div>
+</div></div></div></section><section class="frame" data-screen="22"><div class="flabel">SP-3-03 资金流向（Sankey）</div><div class="bezelless"><div class="screen"><div class="statusbar"><span class="sb-time">14:55</span><span class="sb-marks"><svg width="18" height="12" aria-hidden="true"><rect x="0" y="5" width="3" height="4" rx="1" fill="currentColor"/><rect x="5" y="3" width="3" height="6" rx="1" fill="currentColor"/><rect x="10" y="0" width="3" height="9" rx="1" fill="currentColor"/><rect x="15" y="-3" width="3" height="12" rx="1" fill="currentColor"/></svg><svg width="18" height="12" aria-hidden="true"><rect x="0.5" y="1.5" width="14" height="9" rx="3" fill="none" stroke="currentColor" opacity=".45"/><rect x="2.5" y="3.5" width="9" height="5" rx="1.5" fill="currentColor"/></svg></span></div>
+<header class="topbar"><button class="iconbtn" data-back><svg width="22" height="22" aria-hidden="true"><use href="#ic_back"/></svg></button><h1 class="">资金流向</h1><div class="tb-right"><button class="textbtn">导出</button></div></header>
+<div class="scroll">
+  <section class="grp0"><div class="panel chartpanel">
+    <div class="eyebrow">收入 → 支出 → 结余</div>
+    <div class="sknote">2026年9月 · 记账月 9/1–9/30</div>
+    <svg class="sankey" viewBox="0 0 330 254" preserveAspectRatio="xMidYMid meet">
+      <rect x="14.0" y="18.0" width="14.0" height="190.0" rx="4"
+        style="fill:var(--primary)"/>
+      <text x="14.0" y="12.0" font-size="10" class="skc">收入</text>
+      <path d="M28.0 19.5 C 92 19.5, 118 37.21901075268817, 168.0 33.71901075268817 L 168.0 40.71901075268817 C 118 40.71901075268817, 92 54.93802150537634, 28.0 54.93802150537634 Z" style="fill:var(--cat-food)" opacity=".32"/><rect x="168.0" y="33.71901075268817" width="14.0" height="7" rx="3" style="fill:var(--cat-food)"/><path d="M182.0 37.21901075268817 L 190.0 34.0" stroke="currentColor" stroke-width="1" fill="none" opacity=".25"/><path d="M28.0 57.93802150537634 C 92 57.93802150537634, 118 70.85227956989246, 168.0 67.35227956989246 L 168.0 74.35227956989246 C 118 74.35227956989246, 92 83.76653763440859, 28.0 83.76653763440859 Z" style="fill:var(--cat-shopping)" opacity=".32"/><rect x="168.0" y="67.35227956989246" width="14.0" height="7" rx="3" style="fill:var(--cat-shopping)"/><path d="M182.0 70.85227956989246 L 190.0 71.5" stroke="currentColor" stroke-width="1" fill="none" opacity=".25"/><path d="M28.0 86.76653763440859 C 92 86.76653763440859, 118 96.07723118279569, 168.0 92.57723118279569 L 168.0 99.57723118279569 C 118 99.57723118279569, 92 105.38792473118278, 28.0 105.38792473118278 Z" style="fill:var(--cat-other)" opacity=".32"/><rect x="168.0" y="92.57723118279569" width="14.0" height="7" rx="3" style="fill:var(--cat-other)"/><path d="M182.0 96.07723118279569 L 190.0 109.0" stroke="currentColor" stroke-width="1" fill="none" opacity=".25"/><path d="M28.0 108.38792473118278 C 92 108.38792473118278, 118 115.29624193548385, 168.0 111.79624193548385 L 168.0 118.79624193548385 C 118 118.79624193548385, 92 122.20455913978492, 28.0 122.20455913978492 Z" style="fill:var(--cat-transport)" opacity=".32"/><rect x="168.0" y="111.79624193548385" width="14.0" height="7" rx="3" style="fill:var(--cat-transport)"/><path d="M182.0 115.29624193548385 L 190.0 146.5" stroke="currentColor" stroke-width="1" fill="none" opacity=".25"/><path d="M28.0 125.20455913978492 C 92 125.20455913978492, 118 130.911688172043, 168.0 127.411688172043 L 168.0 134.411688172043 C 118 134.411688172043, 92 136.61881720430105, 28.0 136.61881720430105 Z" style="fill:var(--cat-housing)" opacity=".32"/><rect x="168.0" y="127.411688172043" width="14.0" height="7" rx="3" style="fill:var(--cat-housing)"/><path d="M182.0 130.911688172043 L 190.0 184.0" stroke="currentColor" stroke-width="1" fill="none" opacity=".25"/><path d="M28.0 139.61881720430108 C 92 139.61881720430108, 118 208.0, 168.0 204.5 L 168.0 211.5 C 118 208.0, 92 206.5, 28.0 206.5 Z" style="fill:var(--ok-ink)" opacity=".28"/><text x="194.0" y="37.5" font-size="10.5" class="skl">餐饮 ¥1,881.44</text><text x="194.0" y="75.0" font-size="10.5" class="skl">购物 ¥1,411.08</text><text x="194.0" y="112.5" font-size="10.5" class="skl">其他 ¥1,058.31</text><text x="194.0" y="150.0" font-size="10.5" class="skl">交通 ¥823.13</text><text x="194.0" y="187.5" font-size="10.5" class="skl">居住 ¥705.54</text>
+      <text x="14.0" y="225.0" font-size="12.5" font-weight="600" class="skv">¥9,300.00</text>
+      <rect x="168.0" y="204.5" width="14.0" height="7" rx="3"
+        style="fill:var(--ok-ink)"/>
+      <text x="194.0" y="211.5" font-size="10.5" class="skg">结余 ¥3,420.50</text>
+    </svg>
+  </div></section>
+  <section class="grp"><div class="eyebrow">收支汇总</div>
+    <div class="panel" style="padding:6px 0">
+      <div class="kvr"><span>总收入</span><b>¥9,300.00</b></div>
+      <div class="kvr"><span>总支出</span><b>¥5,879.50</b></div>
+      <div class="kvr"><span>净结余</span><b style="color:var(--ok-ink)">¥3,420.50</b></div>
+      <div class="kvr"><span>储蓄率</span><b>36.8%</b></div>
+    </div></section>
+  <div class="grp"><div class="panel notepanel">
+    桑基图回答的是「钱从哪来、流到哪去、最后剩多少」—— 比环形图更适合看结构，
+    环形图更适合看占比。
+    <span class="nl">色带宽度 = 金额，点任一色带可下钻至该分类的二级明细。</span>
+  </div></div>
+  <div class="scroll-pad"></div>
+</div></div></div></section><section class="frame" data-screen="23"><div class="flabel">SP-3-04 交叉分析</div><div class="bezelless"><div class="screen"><div class="statusbar"><span class="sb-time">14:55</span><span class="sb-marks"><svg width="18" height="12" aria-hidden="true"><rect x="0" y="5" width="3" height="4" rx="1" fill="currentColor"/><rect x="5" y="3" width="3" height="6" rx="1" fill="currentColor"/><rect x="10" y="0" width="3" height="9" rx="1" fill="currentColor"/><rect x="15" y="-3" width="3" height="12" rx="1" fill="currentColor"/></svg><svg width="18" height="12" aria-hidden="true"><rect x="0.5" y="1.5" width="14" height="9" rx="3" fill="none" stroke="currentColor" opacity=".45"/><rect x="2.5" y="3.5" width="9" height="5" rx="1.5" fill="currentColor"/></svg></span></div>
+<header class="topbar"><button class="iconbtn" data-back><svg width="22" height="22" aria-hidden="true"><use href="#ic_back"/></svg></button><h1 class="">交叉分析</h1><div class="tb-right"><button class="textbtn">切维度</button></div></header>
+<div class="scroll">
+  <section class="grp0"><div class="panel" style="padding:16px">
+    <div class="eyebrow" style="margin-left:0">分类 × 账户（9 月支出）</div>
+    <div class="heat cols4"><span class="hd"></span><span class="hc">现金</span><span class="hc">储蓄卡</span><span class="hc">信用卡</span><span class="hd"><span class="dot8" style="background:var(--cat-food)"></span>餐饮</span><span class="cell" style="background:rgba(63,63,70,0.19);color:var(--ink-2)">180</span><span class="cell" style="background:rgba(63,63,70,0.29);color:var(--ink-2)">400</span><span class="cell" style="background:rgba(63,63,70,0.72);color:#FFFFFF">1,301</span><span class="hd"><span class="dot8" style="background:var(--cat-shopping)"></span>购物</span><span class="cell mut">·</span><span class="cell" style="background:rgba(63,63,70,0.25);color:var(--ink-2)">311</span><span class="cell" style="background:rgba(63,63,70,0.62);color:#FFFFFF">1,100</span><span class="hd"><span class="dot8" style="background:var(--cat-other)"></span>其他</span><span class="cell mut">·</span><span class="cell" style="background:rgba(63,63,70,0.60);color:#FFFFFF">1,058</span><span class="cell mut">·</span><span class="hd"><span class="dot8" style="background:var(--cat-transport)"></span>交通</span><span class="cell" style="background:rgba(63,63,70,0.16);color:var(--ink-2)">123</span><span class="cell" style="background:rgba(63,63,70,0.43);color:var(--ink-2)">700</span><span class="cell mut">·</span><span class="hd"><span class="dot8" style="background:var(--cat-housing)"></span>居住</span><span class="cell mut">·</span><span class="cell" style="background:rgba(63,63,70,0.44);color:var(--ink-2)">706</span><span class="cell mut">·</span></div>
+    <div class="heatfoot">数值为金额（元）。颜色越深金额越大；「·」表示该分类在该账户上无消费。</div>
+  </div></section>
+  <section class="grp"><div class="eyebrow">读出来的结论</div>
+    <div class="panel" style="padding:6px 0">
+      <div class="kvr"><span>居住 · 全部走储蓄卡</span><b>¥705.54</b></div>
+      <div class="kvr"><span>购物 · 全部走信用卡</span><b>¥1,411.08</b></div>
+      <div class="kvr"><span>餐饮 · 过半刷信用卡</span><b>¥1,301.44</b></div>
+      <div class="kvr"><span>交通 · 以储蓄卡为主</span><b>¥700.00</b></div>
+      <div class="kvr"><span>现金合计（小额零星）</span><b>¥303.13</b></div>
+      <div class="kvr"><span>信用卡合计</span><b>¥2,401.44</b></div>
+    </div></section>
+  <div class="grp"><div class="panel notepanel">
+    交叉分析的价值在于「<b>发现异常组合</b>」—— 比如某个账户的某类支出突然变成主力，
+    往往意味着你的支付习惯在悄悄改变。
+  </div></div>
+  <div class="scroll-pad"></div>
+</div></div></div></section><section class="frame" data-screen="24"><div class="flabel">SP-3-05 资金年龄</div><div class="bezelless"><div class="screen"><div class="statusbar"><span class="sb-time">14:55</span><span class="sb-marks"><svg width="18" height="12" aria-hidden="true"><rect x="0" y="5" width="3" height="4" rx="1" fill="currentColor"/><rect x="5" y="3" width="3" height="6" rx="1" fill="currentColor"/><rect x="10" y="0" width="3" height="9" rx="1" fill="currentColor"/><rect x="15" y="-3" width="3" height="12" rx="1" fill="currentColor"/></svg><svg width="18" height="12" aria-hidden="true"><rect x="0.5" y="1.5" width="14" height="9" rx="3" fill="none" stroke="currentColor" opacity=".45"/><rect x="2.5" y="3.5" width="9" height="5" rx="1.5" fill="currentColor"/></svg></span></div>
+<header class="topbar"><button class="iconbtn" data-back><svg width="22" height="22" aria-hidden="true"><use href="#ic_back"/></svg></button><h1 class="">资金年龄</h1><div class="tb-right"></div></header>
+<div class="scroll">
+  <section class="hero" style="padding-top:6px">
+    <div class="hairline"></div>
+    <div class="hero-label">花掉的一块钱平均停留天数</div>
+    <div class="hero-amt"><span class="amt xl"><span class="int">34</span><span class="dec" style="font-size:.5em">　天</span></span></div>
+    <div class="hero-split">
+      <div class="hs"><span class="hs-l">较上月</span><span class="hs-v">+3 天</span></div>
+      <div class="hs"><span class="hs-l">近 6 月趋势</span><span class="hs-v">持续上升</span></div>
+    </div>
+    <div class="hairline"></div>
+  </section>
+  <section class="grp"><div class="eyebrow">近 6 个月</div>
+    <div class="panel" style="padding:18px 16px 14px">
+      <div class="minibars"><i class="" style="height:52.9%"></i><i class="" style="height:61.8%"></i><i class="" style="height:70.6%"></i><i class="" style="height:79.4%"></i><i class="" style="height:91.2%"></i><i class="on" style="height:100.0%"></i></div>
+      <div class="mblabels"><span>4月</span><span>5月</span><span>6月</span><span>7月</span><span>8月</span><span>9月</span></div>
+    </div></section>
+  <section class="grp"><div class="eyebrow">这个数字在说什么</div>
+    <div class="panel" style="padding:6px 0">
+      <div class="kvr"><span>≥ 30 天 · 有缓冲</span><b>健康</b></div>
+      <div class="kvr"><span>15–30 天 · 收支同月</span><b>正常</b></div>
+      <div class="kvr"><span>&lt; 15 天 · 月光警报</span><b>偏低</b></div>
+      <div class="duocol" style="border-top:1px solid var(--line);min-height:44px">
+        <span style="font-weight:600">当前判定</span>
+        <b style="color:var(--ok-ink)">健康 · 有缓冲</b></div>
+    </div></section>
+  <div class="grp"><div class="panel notepanel">
+    计算口径：<b>FIFO（先进先出）</b>。每笔支出都从最早的收入里扣，
+    扣到哪一天的余额就记多少天，最后取加权平均。
+    <span class="nl">这是一种「体检指标」，不参与任何记账流程，<b>只读不写</b>。</span>
+  </div></div>
+  <div class="scroll-pad"></div>
+</div></div></div></section><section class="frame" data-screen="25"><div class="flabel">SP-5-09 预算（四种方法论）</div><div class="bezelless"><div class="screen"><div class="statusbar"><span class="sb-time">14:55</span><span class="sb-marks"><svg width="18" height="12" aria-hidden="true"><rect x="0" y="5" width="3" height="4" rx="1" fill="currentColor"/><rect x="5" y="3" width="3" height="6" rx="1" fill="currentColor"/><rect x="10" y="0" width="3" height="9" rx="1" fill="currentColor"/><rect x="15" y="-3" width="3" height="12" rx="1" fill="currentColor"/></svg><svg width="18" height="12" aria-hidden="true"><rect x="0.5" y="1.5" width="14" height="9" rx="3" fill="none" stroke="currentColor" opacity=".45"/><rect x="2.5" y="3.5" width="9" height="5" rx="1.5" fill="currentColor"/></svg></span></div>
+<header class="topbar"><button class="iconbtn" data-back><svg width="22" height="22" aria-hidden="true"><use href="#ic_back"/></svg></button><h1 class="">预算</h1><div class="tb-right"><button class="textbtn">新建</button></div></header>
+<div class="segwrap top"><div class="seg"><button class="segi on">分类限额</button><button class="segi">信封预算</button><button class="segi">零基预算</button><button class="segi">50-30-20</button></div></div>
+<div class="scroll">
+  <section class="grp0"><div class="hero" style="padding-top:2px">
+    <div class="hairline"></div>
+    <div class="hero-label">本月预算已用</div>
+    <div class="hero-amt">48.2<span style="font-size:.52em;font-weight:600">%</span></div>
+    <div class="hero-split">
+      <div class="hs"><span class="hs-l">已花</span>
+        <span class="hs-v"><span class="amt s tone-ink"><span class="cur">¥</span><span class="int">4,821</span><span class="pnt">.</span><span class="dec">19</span></span></span></div>
+      <div class="hs"><span class="hs-l">预算</span>
+        <span class="hs-v"><span class="amt s tone-ink"><span class="cur">¥</span><span class="int">10,000</span><span class="pnt">.</span><span class="dec">00</span></span></span></div>
+      <div class="hs"><span class="hs-l">剩余</span>
+        <span class="hs-v"><span class="amt s tone-ink"><span class="cur">¥</span><span class="int">5,178</span><span class="pnt">.</span><span class="dec">81</span></span></span></div>
+    </div>
+    <div class="hairline"></div>
+  </div></section>
+  <section class="grp"><div class="eyebrow">分类限额 · 5 类</div>
+    <div class="panel" style="padding:0 16px"><div class="prow"><div class="prowname"><span class="dot8" style="background:var(--cat-housing)"></span>居住<span class="pamt">¥705.54 / ¥4,600.00</span></div><div class="pbarwrap"><div class="pbar "><i style="width:15.3%"></i></div></div><div class="prowfoot ">剩余 ¥3,894.46（85%）</div></div><div class="prow"><div class="prowname"><span class="dot8" style="background:var(--cat-food)"></span>餐饮<span class="pamt">¥1,881.44 / ¥3,000.00</span></div><div class="pbarwrap"><div class="pbar "><i style="width:62.7%"></i></div></div><div class="prowfoot ">剩余 ¥1,118.56（37%）</div></div><div class="prow"><div class="prowname"><span class="dot8" style="background:var(--cat-shopping)"></span>购物<span class="pamt">¥1,411.08 / ¥1,500.00</span></div><div class="pbarwrap"><div class="pbar warn"><i style="width:94.1%"></i></div></div><div class="prowfoot warn"><svg width="13" height="13" aria-hidden="true"><use href="#ic_status_warning"/></svg>仅剩 ¥88.92，注意节奏</div></div><div class="prow"><div class="prowname"><span class="dot8" style="background:var(--cat-transport)"></span>交通<span class="pamt">¥823.13 / ¥600.00</span></div><div class="pbarwrap"><div class="pbar over"><i style="width:100.0%"></i></div></div><div class="prowfoot over"><svg width="13" height="13" aria-hidden="true"><use href="#ic_status_warning"/></svg>已超支 ¥223.13</div></div><div class="prow"><div class="prowname"><span class="dot8" style="background:var(--cat-entertainment)"></span>娱乐<span class="pamt">¥0.00 / ¥300.00</span></div><div class="pbarwrap"><div class="pbar "><i style="width:0.0%"></i></div></div><div class="prowfoot ">剩余 ¥300.00（100%）</div></div></div></section>
+  <div class="grp"><div class="panel notepanel">
+    <b>四套方法论：</b>信封（每类一个信封，花完即止） / 零基（收入全部预先分配，余额为 0）
+    / 50-30-20（必要 50 · 想要 30 · 储蓄 20） / 分类限额（最轻量）。
+    <span class="nl">进度条三级着色与「是否响铃通知」绑定（G-3）：
+    <b>90% 静默提醒、100% 响铃通知</b>，但两者都不阻挡你继续记账。</span>
+  </div></div>
+  <div class="scroll-pad"></div>
+</div></div></div></section><section class="frame" data-screen="26"><div class="flabel">SP-5-10 家庭与成员</div><div class="bezelless"><div class="screen"><div class="statusbar"><span class="sb-time">14:55</span><span class="sb-marks"><svg width="18" height="12" aria-hidden="true"><rect x="0" y="5" width="3" height="4" rx="1" fill="currentColor"/><rect x="5" y="3" width="3" height="6" rx="1" fill="currentColor"/><rect x="10" y="0" width="3" height="9" rx="1" fill="currentColor"/><rect x="15" y="-3" width="3" height="12" rx="1" fill="currentColor"/></svg><svg width="18" height="12" aria-hidden="true"><rect x="0.5" y="1.5" width="14" height="9" rx="3" fill="none" stroke="currentColor" opacity=".45"/><rect x="2.5" y="3.5" width="9" height="5" rx="1.5" fill="currentColor"/></svg></span></div>
+<header class="topbar"><button class="iconbtn" data-back><svg width="22" height="22" aria-hidden="true"><use href="#ic_back"/></svg></button><h1 class="">家庭与成员</h1><div class="tb-right"><button class="textbtn">邀请</button></div></header>
+<div class="scroll">
+  <section class="grp0"><div class="panel notepanel">
+    共享账本：多人共同记同一本账，数据实时互见。
+    <b>与「记账伙伴」不同</b> —— 伙伴只是别人帮你记，不共享你的账本（G-5，两套边界不共用）。
+  </div></section>
+  <section class="grp"><div class="eyebrow">账本</div>
+    <div class="panel">
+      <div class="row"><span class="rcol"><span class="rt">家庭共享账本</span>
+        <span class="sub">3 名成员 · 本月共同记账 47 笔</span></span><span class="switch on"><span class="knob"></span></span></div>
+      <div class="row"><span class="rcol"><span class="rt">成员消费可见性</span>
+        <span class="sub">所有成员可见全部账单</span></span>
+        <svg class="chev" width="16" height="16" aria-hidden="true"><use href="#ic_chevron_right"/></svg></div>
+    </div></section>
+  <section class="grp"><div class="eyebrow">成员与权限 · 3 人</div>
+    <div class="panel"><div class="row" style="min-height:64px"><span class="avt" style="background:var(--primary);color:var(--on-primary)"><svg width="17" height="17" aria-hidden="true"><use href="#ic_nav_profile"/></svg></span><span class="rcol"><span class="rt">我（李振宇）</span><span class="sub">所有者</span></span><span class="sval" style="color:var(--primary-ink)">管理</span></div><div class="row" style="min-height:64px"><span class="avt" style="background:var(--cat-social);color:var(--on-primary)"><svg width="17" height="17" aria-hidden="true"><use href="#ic_nav_profile"/></svg></span><span class="rcol"><span class="rt">配偶</span><span class="sub">成员 · 本月支出 ¥4,282.00</span></span><span class="sval" style="color:var(--primary-ink)">管理</span></div><div class="row" style="min-height:64px"><span class="avt" style="background:var(--warn-ink);color:var(--on-primary)"><svg width="17" height="17" aria-hidden="true"><use href="#ic_eye"/></svg></span><span class="rcol"><span class="rt">孩子</span><span class="sub">只读</span></span><span class="sval" style="color:var(--primary-ink)">管理</span></div></div></section>
+  <div class="grp"><div class="panel notepanel">
+    三种角色：<b>所有者</b>（可增删成员、改权限、删除账本） / <b>成员</b>（可记账、可改自己的账）
+    / <b>只读</b>（只能看）。
+    <span class="nl">成员看到的分类与主题仍是<b>各自本机偏好</b>，不会被账本同步覆盖。</span>
+  </div></div>
+  <div class="scroll-pad"></div>
+</div></div></div></section><section class="frame" data-screen="27"><div class="flabel">SP-5-11 开放接口（API / MCP）</div><div class="bezelless"><div class="screen"><div class="statusbar"><span class="sb-time">14:55</span><span class="sb-marks"><svg width="18" height="12" aria-hidden="true"><rect x="0" y="5" width="3" height="4" rx="1" fill="currentColor"/><rect x="5" y="3" width="3" height="6" rx="1" fill="currentColor"/><rect x="10" y="0" width="3" height="9" rx="1" fill="currentColor"/><rect x="15" y="-3" width="3" height="12" rx="1" fill="currentColor"/></svg><svg width="18" height="12" aria-hidden="true"><rect x="0.5" y="1.5" width="14" height="9" rx="3" fill="none" stroke="currentColor" opacity=".45"/><rect x="2.5" y="3.5" width="9" height="5" rx="1.5" fill="currentColor"/></svg></span></div>
+<header class="topbar"><button class="iconbtn" data-back><svg width="22" height="22" aria-hidden="true"><use href="#ic_back"/></svg></button><h1 class="">开放接口</h1><div class="tb-right"></div></header>
+<div class="scroll">
+  <section class="grp0"><div class="panel notepanel">
+    <b>默认关闭。</b>开放接口会让外部程序读写你的账本，
+    请只在明确需要时开启，并逐项限定权限范围。
+  </div></section>
+  <section class="grp"><div class="eyebrow">接口</div>
+    <div class="panel">
+      <div class="row"><span class="ricos"><svg width="20" height="20" aria-hidden="true"><use href="#ic_cloud"/></svg></span><span class="rcol"><span class="rt">本地 REST API</span><span class="sub">仅监听 127.0.0.1，不暴露到局域网</span></span><span class="switch"><span class="knob"></span></span></div>
+      <div class="row"><span class="ricos"><svg width="20" height="20" aria-hidden="true"><use href="#ic_share"/></svg></span><span class="rcol"><span class="rt">MCP 服务（给 LLM 用）</span><span class="sub">供 Claude / Cursor 等客户端读取账本</span></span><span class="switch"><span class="knob"></span></span></div>
+      <div class="row"><span class="ricos"><svg width="20" height="20" aria-hidden="true"><use href="#ic_qr"/></svg></span>
+        <span class="rcol"><span class="rt">访问令牌</span>
+        <span class="sub">一次生成、可随时吊销</span></span>
+        <span class="sval" style="color:var(--primary-ink)">复制</span></div>
+    </div></section>
+  <section class="grp"><div class="eyebrow">权限范围（最小必要）· 接口开启后生效</div>
+    <div class="panel">
+      <div class="row"><span class="ricos"><svg width="20" height="20" aria-hidden="true"><use href="#ic_eye"/></svg></span><span class="rcol"><span class="rt">读取账单与分类</span></span><span class="switch on"><span class="knob"></span></span></div>
+      <div class="row"><span class="ricos"><svg width="20" height="20" aria-hidden="true"><use href="#ic_budget"/></svg></span><span class="rcol"><span class="rt">读取预算与目标</span></span><span class="switch on"><span class="knob"></span></span></div>
+      <div class="row"><span class="ricos"><svg width="20" height="20" aria-hidden="true"><use href="#ic_edit"/></svg></span><span class="rcol"><span class="rt">写入账单</span><span class="sub">建议保持关闭，写入走导入更安全</span></span><span class="switch"><span class="knob"></span></span></div>
+      <div class="row"><span class="ricos"><svg width="20" height="20" aria-hidden="true"><use href="#ic_delete"/></svg></span><span class="rcol"><span class="rt">删除数据</span><span class="sub">默认永不可授予</span></span><span class="switch lock"><span class="knob"></span></span></div>
+    </div></section>
+  <div class="grp"><div class="panel notepanel">
+    接口只在<b>本机回环地址</b>监听，不经过任何服务器 ——
+    你的账本不会因为「开放」而离开这台设备。
+    <span class="nl">MCP 侧默认<b>只读</b>，写入需要单独勾选并二次确认。</span>
+  </div></div>
+  <div class="scroll-pad"></div>
+</div></div></div></section><section class="frame" data-screen="28"><div class="flabel">SP-6-01 桌面端与多端</div><div class="bezelless"><div class="screen"><div class="statusbar"><span class="sb-time">14:55</span><span class="sb-marks"><svg width="18" height="12" aria-hidden="true"><rect x="0" y="5" width="3" height="4" rx="1" fill="currentColor"/><rect x="5" y="3" width="3" height="6" rx="1" fill="currentColor"/><rect x="10" y="0" width="3" height="9" rx="1" fill="currentColor"/><rect x="15" y="-3" width="3" height="12" rx="1" fill="currentColor"/></svg><svg width="18" height="12" aria-hidden="true"><rect x="0.5" y="1.5" width="14" height="9" rx="3" fill="none" stroke="currentColor" opacity=".45"/><rect x="2.5" y="3.5" width="9" height="5" rx="1.5" fill="currentColor"/></svg></span></div>
+<header class="topbar"><button class="iconbtn" data-back><svg width="22" height="22" aria-hidden="true"><use href="#ic_back"/></svg></button><h1 class="">桌面端与多端</h1><div class="tb-right"></div></header>
+<div class="scroll">
+  <section class="grp0"><div class="panel notepanel">
+    Flutter 工程结构<b>已含 macos / web / windows 目录</b> ——
+    四端不是「将来重做」，而是「逐步点亮」。
+    <span class="nl">这决定了桌面端的边际成本远低于重写。</span>
+  </div></section>
+  <section class="grp"><div class="eyebrow">四端能力矩阵</div>
+    <div class="panel"><div class="row" style="min-height:68px"><span class="ricos" style="color:var(--ok-ink)"><svg width="22" height="22" aria-hidden="true"><use href="#ic_status_success"/></svg></span><span class="rcol"><span class="rt">手机（iOS / Android）</span><span class="sub">3 秒记账 · 点分类即保存</span></span><span class="tagx done">已支持</span></div><div class="row" style="min-height:68px"><span class="ricos" style="color:var(--ok-ink)"><svg width="22" height="22" aria-hidden="true"><use href="#ic_status_success"/></svg></span><span class="rcol"><span class="rt">平板（iPad / Android Pad）</span><span class="sub">双栏布局 · 侧栏常驻 · 手写备注</span></span><span class="tagx done">已支持</span></div><div class="row" style="min-height:68px"><span class="ricos" style="color:var(--muted)"><svg width="22" height="22" aria-hidden="true"><use href="#ic_status_info"/></svg></span><span class="rcol"><span class="rt">桌面（Windows / macOS）</span><span class="sub">全键盘操作 · 批量录入 · 报表打印</span></span><span class="tagx silent">V3.0</span></div><div class="row" style="min-height:68px"><span class="ricos" style="color:var(--muted)"><svg width="22" height="22" aria-hidden="true"><use href="#ic_status_info"/></svg></span><span class="rcol"><span class="rt">Web（浏览器）</span><span class="sub">免安装查看与导出 · 只读为主</span></span><span class="tagx silent">V3.0</span></div></div></section>
+  <section class="grp"><div class="eyebrow">桌面端差异化能力（V3.0）</div>
+    <div class="panel" style="padding:6px 0">
+      <div class="kvr"><span>全键盘录账（Tab 跳转 / Enter 保存）</span><b>规划</b></div>
+      <div class="kvr"><span>CSV / Excel 批量导入与去重</span><b>规划</b></div>
+      <div class="kvr"><span>报表导出 PDF 并打印</span><b>规划</b></div>
+      <div class="kvr"><span>多账本同开（侧栏切换）</span><b>规划</b></div>
+    </div></section>
+  <div class="grp"><div class="panel notepanel">
+    桌面端与 Web 端的<b>先后顺序是开放问题</b>：Web 先行可以覆盖「临时在别人电脑上查账」，
+    macOS 先行则贴近重度用户。
+    <span class="nl">建议在 V2.0 云同步落地后按真实用量决定。</span>
+  </div></div>
+  <div class="scroll-pad"></div>
+</div></div></div></section>
+</div>
+<script>
+(function () {
+  document.querySelectorAll('.screenpicker button').forEach(function (b) {
+    b.addEventListener('click', function () {
+      var f = document.querySelector('.frame[data-screen="' + b.dataset.jump + '"]');
+      if (f) f.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      document.querySelectorAll('.screenpicker button').forEach(function (x) {
+        x.classList.toggle('on', x === b);
+      });
+    });
+  });
+})();
+</script>
+</body></html>

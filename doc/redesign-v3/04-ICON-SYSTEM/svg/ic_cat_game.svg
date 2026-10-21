@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" role="img" aria-label="ic_cat_game">
+  <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <rect x="4" y="8.5" width="16" height="9" rx="4.5"/>
+  <path d="M8.75 12.25v2.75"/>
+  <path d="M7.5 13.5h2.5"/>
+  <circle cx="15.5" cy="12.75" r="1.35" fill="currentColor" stroke="none"/>
+  <circle cx="17.25" cy="14.5" r="1.35" fill="currentColor" stroke="none"/>
+  </g>
+</svg>
