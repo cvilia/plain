@@ -39,3 +39,4 @@ Android 构建见 `AGENTS.md`（flavor：`dev` / `prod`）。
 - `lib/design_system` — 令牌组件
 
 产品与架构文档见上级目录 `01-`～`14-` 系列。
+使用小米Misan字体，需要遵循字体使用协议
